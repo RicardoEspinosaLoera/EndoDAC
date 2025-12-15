@@ -256,6 +256,10 @@ class MonodepthOptions:
                                  help="if set will perform the flipping post processing "
                                       "from the original monodepth paper",
                                  action="store_true")
+        self.parser.add_argument("--illumination_invariant",
+                                   type=float,
+                                   help="illumination invariant weight",
+                                   default=0.2)
 
         # EVALUATION options
         self.parser.add_argument("--save_recon",
