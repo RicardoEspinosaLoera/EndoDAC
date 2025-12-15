@@ -817,7 +817,7 @@ class Trainer:
         outputs = self.models["depth_model"](inputs["color_aug", 0, 0])
 
         if self.use_pose_net:
-            outputs.update(self.predict_poses(inputs, outputs))
+            outputs.update(self.predict_poses(inputs))
 
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses_val(inputs, outputs)
