@@ -91,8 +91,8 @@ class Trainer:
                     num_frames_to_predict_for=2)
 
                 self.models["lighting"] = decoders.LightingDecoder(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
-                    self.models["lighting"].to(self.device)
-                    self.parameters_to_train += list(self.models["lighting"].parameters())
+                self.models["lighting"].to(self.device)
+                self.parameters_to_train += list(self.models["lighting"].parameters())
 
             elif self.opt.pose_model_type == "shared":
                 self.models["pose"] = decoders.PoseDecoder(
