@@ -510,6 +510,24 @@ class Trainer:
                                 
                 
         return outputs
+    
+    def compute_loss_masks(reprojection_loss, identity_reprojection_loss, inputs):
+        """ Compute loss masks for each of standard reprojection and depth hint
+        reprojection"""
+
+        if identity_reprojection_loss is None:
+            # we are not using automasking - standard reprojection loss applied to all pixels
+            reprojection_loss_mask = torch.ones_like(reprojection_loss)
+
+        else:
+            # we are using automasking
+            #print(reprojection_loss.shape)
+            #print(identity_reprojection_loss.shape)
+            all_losses = torch.cat([reprojection_loss, identity_reprojection_loss], dim=1)
+            idxs = torch.argmin(all_losses, dim=1, keepdim=True)
+            reprojection_loss_mask = (idxs == 0).float()           
+            
+        return reprojection_loss_mask
 
     def compute_losses(self, inputs, outputs):
 
