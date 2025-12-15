@@ -448,7 +448,7 @@ class Trainer:
         self.set_train()
         
         return mean_errors[2], mean_errors[4]
-        
+
     def process_batch_0(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
