@@ -511,7 +511,7 @@ class Trainer:
                 
         return outputs
     
-    def compute_loss_masks(reprojection_loss, identity_reprojection_loss, inputs):
+    def compute_loss_masks(self, reprojection_loss, identity_reprojection_loss, inputs):
         """ Compute loss masks for each of standard reprojection and depth hint
         reprojection"""
 
