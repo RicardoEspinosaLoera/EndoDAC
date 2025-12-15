@@ -9,6 +9,7 @@ import models.decoders as decoders
 import models.endodac as endodac
 import numpy as np
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from utils.utils import *
 from utils.layers import *
@@ -925,7 +926,7 @@ class Trainer:
                 vis = vis.transpose(2, 0, 1)
 
         return vis
-        
+
     def save_model(self, mode='epoch'):
         """Save model weights to disk
         """
