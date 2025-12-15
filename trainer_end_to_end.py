@@ -125,9 +125,9 @@ class Trainer:
         self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.learning_rate)
         self.model_lr_scheduler = optim.lr_scheduler.StepLR(
             self.model_optimizer, self.opt.scheduler_step_size, 0.1)
-        self.model_optimizer_0 = optim.Adam(self.parameters_to_train_0, 1e-4)
+        """self.model_optimizer_0 = optim.Adam(self.parameters_to_train_0, 1e-4)
         self.model_lr_scheduler_0 = optim.lr_scheduler.StepLR(
-            self.model_optimizer_0, self.opt.scheduler_step_size, 0.1)
+            self.model_optimizer_0, self.opt.scheduler_step_size, 0.1)"""
 
         if self.opt.load_weights_folder is not None:
             self.load_model()
