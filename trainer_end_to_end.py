@@ -477,7 +477,16 @@ class Trainer:
                     pose_inputs = [self.models["pose_encoder"](torch.cat(inputs_all, 1))]
                     
                     # Original
-                    axisangle, translation = self.models["pose"](pose_inputs)
+                    #axisangle, translation = self.models["pose"](pose_inputs)
+
+                    axisangle, translation, intermediate_feature = self.models["pose"](pose_inputs)
+
+                    if self.opt.learn_intrinsics:
+                        cam_K = self.models['intrinsics_head'](
+                        intermediate_feature, self.opt.width, self.opt.height)
+                        inv_K = torch.inverse(cam_K)
+                        outputs[('K', 0)] = cam_K
+                        outputs[('inv_K', 0)] = inv_K
 
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
