@@ -7,6 +7,7 @@ import math
 import cv2
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms as transforms
 
 def disp_to_depth(disp, min_depth, max_depth):
     """Convert network's sigmoid output into depth prediction
@@ -26,7 +27,7 @@ def get_feature_oclution_mask(img):
     t = torch.cat((o,o,o,o,o,o,o,o), dim = 1)
     
     return t
-    
+
 def get_illumination_invariant_features(img):
     # Convert to grayscale if RGB
     if img.shape[1] != 1:
