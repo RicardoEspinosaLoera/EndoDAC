@@ -51,25 +51,29 @@ class Trainer:
         self.models["depth_model"].to(self.device)
         self.parameters_to_train += list(filter(lambda p: p.requires_grad, self.models["depth_model"].parameters()))
 
-        self.models["position_encoder"] = encoders.ResnetEncoder(
+        # Optical Flow Encoder
+        """self.models["position_encoder"] = encoders.ResnetEncoder(
             self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2)  # 18
         self.models["position_encoder"].to(self.device)
-        self.parameters_to_train_0 += list(self.models["position_encoder"].parameters())
+        self.parameters_to_train_0 += list(self.models["position_encoder"].parameters())"""
 
-        self.models["position"] = decoders.PositionDecoder(
+        # Optical Flow Decoder
+        """self.models["position"] = decoders.PositionDecoder(
             self.models["position_encoder"].num_ch_enc, self.opt.scales)
         self.models["position"].to(self.device)
-        self.parameters_to_train_0 += list(self.models["position"].parameters())
+        self.parameters_to_train_0 += list(self.models["position"].parameters())"""
 
-        self.models["transform_encoder"] = encoders.ResnetEncoder(
+        # Appearance Flow Encoder
+        """self.models["transform_encoder"] = encoders.ResnetEncoder(
             self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2)  # 18
         self.models["transform_encoder"].to(self.device)
-        self.parameters_to_train += list(self.models["transform_encoder"].parameters())
-
-        self.models["transform"] = decoders.TransformDecoder(
+        self.parameters_to_train += list(self.models["transform_encoder"].parameters())"""
+        
+        #Appearance Flow Decoder
+        """self.models["transform"] = decoders.TransformDecoder(
             self.models["transform_encoder"].num_ch_enc, self.opt.scales)
         self.models["transform"].to(self.device)
-        self.parameters_to_train += list(self.models["transform"].parameters())
+        self.parameters_to_train += list(self.models["transform"].parameters())"""
 
         if self.use_pose_net:
 
@@ -85,6 +89,10 @@ class Trainer:
                     self.models["pose_encoder"].num_ch_enc,
                     num_input_features=1,
                     num_frames_to_predict_for=2)
+
+                self.models["lighting"] = decoders.LightingDecoder(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
+                    self.models["lighting"].to(self.device)
+                    self.parameters_to_train += list(self.models["lighting"].parameters())
 
             elif self.opt.pose_model_type == "shared":
                 self.models["pose"] = decoders.PoseDecoder(
@@ -180,7 +188,7 @@ class Trainer:
 
         self.backproject_depth = {}
         self.project_3d = {}
-        self.position_depth = {}
+        #self.position_depth = {}
         
         for scale in self.opt.scales:
             h = self.opt.height // (2 ** scale)
@@ -192,8 +200,8 @@ class Trainer:
             self.project_3d[scale] = Project3D(self.opt.batch_size, h, w)
             self.project_3d[scale].to(self.device)
 
-            self.position_depth[scale] = optical_flow((h, w), self.opt.batch_size, h, w)
-            self.position_depth[scale].to(self.device)
+            #self.position_depth[scale] = optical_flow((h, w), self.opt.batch_size, h, w)
+            #self.position_depth[scale].to(self.device)
 
         self.depth_metric_names = [
             "de/abs_rel", "de/sq_rel", "de/rmse", "de/log_rmse", "da/a1", "da/a2", "da/a3"]
@@ -227,10 +235,10 @@ class Trainer:
     def set_train_0(self):
         """Convert all models to training mode
         """
-        for param in self.models["position_encoder"].parameters():
+        """for param in self.models["position_encoder"].parameters():
             param.requires_grad = True
         for param in self.models["position"].parameters():
-            param.requires_grad = True
+            param.requires_grad = True"""
 
         for param in self.models["depth_model"].parameters():
             param.requires_grad = False
@@ -238,32 +246,32 @@ class Trainer:
             param.requires_grad = False
         for param in self.models["pose"].parameters():
             param.requires_grad = False
-        for param in self.models["transform_encoder"].parameters():
-            param.requires_grad = False
-        for param in self.models["transform"].parameters():
-            param.requires_grad = False
+        """for param in self.models["transform_encoder"].parameters():
+            param.requires_grad = False"""
+        """for param in self.models["transform"].parameters():
+            param.requires_grad = False"""
         if self.opt.learn_intrinsics:
             for param in self.models["intrinsics_head"].parameters():
                 param.requires_grad = False
             
-        self.models["position_encoder"].train()
-        self.models["position"].train()
+        #self.models["position_encoder"].train()
+        #self.models["position"].train()
 
         self.models["depth_model"].eval()
         self.models["pose_encoder"].eval()
         self.models["pose"].eval()
-        self.models["transform_encoder"].eval()
-        self.models["transform"].eval()
+        #self.models["transform_encoder"].eval()
+        #self.models["transform"].eval()
         if self.opt.learn_intrinsics:
             self.models["intrinsics_head"].eval()
 
     def set_train(self):
         """Convert all models to training mode
         """
-        for param in self.models["position_encoder"].parameters():
+        """for param in self.models["position_encoder"].parameters():
             param.requires_grad = False
         for param in self.models["position"].parameters():
-            param.requires_grad = False
+            param.requires_grad = False"""
 
         for name, param in self.models["depth_model"].named_parameters():
             if "seed_" not in name:
@@ -277,22 +285,22 @@ class Trainer:
             param.requires_grad = True
         for param in self.models["pose"].parameters():
             param.requires_grad = True
-        for param in self.models["transform_encoder"].parameters():
-            param.requires_grad = True
-        for param in self.models["transform"].parameters():
-            param.requires_grad = True
+        """for param in self.models["transform_encoder"].parameters():
+            param.requires_grad = True"""
+        """for param in self.models["transform"].parameters():
+            param.requires_grad = True"""
         if self.opt.learn_intrinsics:
             for param in self.models["intrinsics_head"].parameters():
                 param.requires_grad = True
 
-        self.models["position_encoder"].eval()
-        self.models["position"].eval()
+        #self.models["position_encoder"].eval()
+        #self.models["position"].eval()
 
         self.models["depth_model"].train()
         self.models["pose_encoder"].train()
         self.models["pose"].train()
-        self.models["transform_encoder"].train()
-        self.models["transform"].train()
+        #self.models["transform_encoder"].train()
+        #self.models["transform"].train()
         if self.opt.learn_intrinsics:
             self.models["intrinsics_head"].train()
 
@@ -300,12 +308,21 @@ class Trainer:
         """Convert all models to testing/evaluation mode
         """
         self.models["depth_model"].eval()
-        self.models["transform_encoder"].eval()
-        self.models["transform"].eval()
+        #self.models["transform_encoder"].eval()
+        #self.models["transform"].eval()
         self.models["pose_encoder"].eval()
         self.models["pose"].eval()
         if self.opt.learn_intrinsics:
             self.models["intrinsics_head"].eval()
+
+
+    def get_illumination_invariant_loss(self, pred, target):
+        features_p = get_illumination_invariant_features(pred)
+        features_t = get_illumination_invariant_features(target)
+        ssim_loss = self.ssim(features_p, features_t).mean(1, True)
+ 
+        return ssim_loss
+
 
     def train(self):
         """Run the entire training pipeline
@@ -336,11 +353,12 @@ class Trainer:
             before_op_time = time.time()
 
             # position
+            """
             self.set_train_0()
             _, losses_0 = self.process_batch_0(inputs)
             self.model_optimizer_0.zero_grad()
             losses_0["loss"].backward()
-            self.model_optimizer_0.step()
+            self.model_optimizer_0.step()"""
 
             # depth, pose, transform
             self.set_train()
@@ -430,6 +448,7 @@ class Trainer:
         self.set_train()
         
         return mean_errors[2], mean_errors[4]
+        
     def process_batch_0(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
@@ -442,7 +461,7 @@ class Trainer:
 
         return outputs, losses
 
-    def predict_poses_0(self, inputs):
+    def predict_poses(self, inputs):
         """Predict poses between input frames for monocular sequences.
         """
         outputs = {}
@@ -454,77 +473,93 @@ class Trainer:
                 if f_i != "s":
 
                     inputs_all = [pose_feats[f_i], pose_feats[0]]
-                    inputs_all_reverse = [pose_feats[0], pose_feats[f_i]]
+                    #inputs_all_reverse = [pose_feats[0], pose_feats[f_i]]
+                    pose_inputs = [self.models["pose_encoder"](torch.cat(inputs_all, 1))]
+                    
+                    # Original
+                    axisangle, translation = self.models["pose"](pose_inputs)
 
-                    # position
-                    position_inputs = self.models["position_encoder"](torch.cat(inputs_all, 1))
-                    position_inputs_reverse = self.models["position_encoder"](torch.cat(inputs_all_reverse, 1))
-                    outputs_0 = self.models["position"](position_inputs)
-                    outputs_1 = self.models["position"](position_inputs_reverse)
+                    outputs[("axisangle", 0, f_i)] = axisangle
+                    outputs[("translation", 0, f_i)] = translation
 
+                    # Invert the matrix if the frame id is negative
+                    outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
+                        axisangle[:, 0], translation[:, 0])
+                    
+                    outputs_lighting = self.models["lighting"](pose_inputs[0])
+                    
+                    #Lighting      
                     for scale in self.opt.scales:
-                        outputs[("position", scale, f_i)] = outputs_0[("position", scale)]
-                        outputs[("position", "high", scale, f_i)] = F.interpolate(
-                            outputs[("position", scale, f_i)], [self.opt.height, self.opt.width], mode="bilinear",
-                            align_corners=True)
-                        outputs[("registration", scale, f_i)] = self.spatial_transform(inputs[("color", f_i, 0)],
-                                                                                       outputs[(
-                                                                                       "position", "high", scale, f_i)])
+                        outputs["b_"+str(scale)+"_"+str(f_i)] = outputs_lighting[("brightness", scale)]
+                        outputs["c_"+str(scale)+"_"+str(f_i)] = outputs_lighting[("contrast", scale)] 
 
-                        outputs[("position_reverse", scale, f_i)] = outputs_1[("position", scale)]
-                        outputs[("position_reverse", "high", scale, f_i)] = F.interpolate(
-                            outputs[("position_reverse", scale, f_i)], [self.opt.height, self.opt.width],
-                            mode="bilinear", align_corners=True)
-                        outputs[("occu_mask_backward", scale, f_i)], _ = self.get_occu_mask_backward(
-                            outputs[("position_reverse", "high", scale, f_i)])
-                        outputs[("occu_map_bidirection", scale, f_i)] = self.get_occu_mask_bidirection(
-                            outputs[("position", "high", scale, f_i)],
-                            outputs[("position_reverse", "high", scale, f_i)])
-
-                    # transform
-                    transform_input = [outputs[("registration", 0, f_i)], inputs[("color", 0, 0)]]
-                    transform_inputs = self.models["transform_encoder"](torch.cat(transform_input, 1))
-                    outputs_2 = self.models["transform"](transform_inputs)
-
-                    for scale in self.opt.scales:
-                        outputs[("transform", scale, f_i)] = outputs_2[("transform", scale)]
-                        outputs[("transform", "high", scale, f_i)] = F.interpolate(
-                            outputs[("transform", scale, f_i)], [self.opt.height, self.opt.width], mode="bilinear",
-                            align_corners=True)
-                        outputs[("refined", scale, f_i)] = (outputs[("transform", "high", scale, f_i)] * outputs[
-                            ("occu_mask_backward", 0, f_i)].detach() + inputs[("color", 0, 0)])
-                        outputs[("refined", scale, f_i)] = torch.clamp(outputs[("refined", scale, f_i)], min=0.0,
-                                                                       max=1.0)
+            #Lighting
+            for f_i in self.opt.frame_ids[1:]:
+                for scale in self.opt.scales:
+                    outputs[("bh",scale, f_i)] = F.interpolate(outputs["b_"+str(scale)+"_"+str(f_i)], [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                    outputs[("ch",scale, f_i)] = F.interpolate(outputs["c_"+str(scale)+"_"+str(f_i)], [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                                
+                
         return outputs
 
-    def compute_losses_0(self, inputs, outputs):
+    def compute_losses(self, inputs, outputs):
 
         losses = {}
+        loss_reprojection = 0
+        loss_ilumination_invariant = 0
         total_loss = 0
 
+
         for scale in self.opt.scales:
-
             loss = 0
-            loss_smooth_registration = 0
-            loss_registration = 0
 
+            if self.opt.v1_multiscale:
+                source_scale = scale
+            else:
+                source_scale = 0
+
+            disp = outputs[("disp", scale)]
             color = inputs[("color", 0, scale)]
-
+            #Losses & compute mask
             for frame_id in self.opt.frame_ids[1:]:
-                occu_mask_backward = outputs[("occu_mask_backward", 0, frame_id)].detach()
-                loss_smooth_registration += (get_smooth_loss(outputs[("position", scale, frame_id)], color))
-                loss_registration += (
-                    self.compute_reprojection_loss(outputs[("registration", scale, frame_id)], outputs[("refined", scale, frame_id)].detach()) * occu_mask_backward).sum() / occu_mask_backward.sum()
+                # Mask
+                target = inputs[("color", 0, 0)]
+                pred = outputs[("color", frame_id, scale)]                
 
-            loss += loss_registration / 2.0
-            loss += self.opt.position_smoothness * (loss_smooth_registration / 2.0) / (2 ** scale)
+                rep = self.compute_reprojection_loss(pred, target)
 
+                pred = inputs[("color", frame_id, source_scale)]
+                rep_identity = self.compute_reprojection_loss(pred, target)
+                
+                reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
+                reprojection_loss_mask_iil = get_feature_oclution_mask(reprojection_loss_mask)
+                #Losses
+                #target = outputs[("color_refined", frame_id, scale)] #Lighting
+                pred = outputs[("color_refined", frame_id, scale)]
+                #SIMM
+                loss_reprojection += (self.compute_reprojection_loss(pred, target) * reprojection_loss_mask).sum() / reprojection_loss_mask.sum()
+                #Multiscale SIMM
+                #loss_reprojection += (self.get_ms_simm_loss(pred, target) * reprojection_loss_mask).sum() / reprojection_loss_mask.sum()
+                #Illuminations invariant loss
+                target = inputs[("color", 0, 0)]
+                pred = outputs[("color_refined", frame_id, scale)]
+                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil).sum() / reprojection_loss_mask_iil.sum()
+ 
+            
+            loss += loss_reprojection / 2.0
+            loss += self.opt.illumination_invariant * loss_ilumination_invariant / 2.0
+            mean_disp = disp.mean(2, True).mean(3, True)
+            norm_disp = disp / (mean_disp + 1e-7)
+            smooth_loss = get_smooth_loss(norm_disp, color)
+
+            loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss
         return losses
+
 
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
@@ -541,7 +576,7 @@ class Trainer:
 
         return outputs, losses
 
-    def predict_poses(self, inputs, disps):
+    def predict_poses__(self, inputs, disps):
         """Predict poses between input frames for monocular sequences.
         """
         outputs = {}
@@ -556,10 +591,10 @@ class Trainer:
                     inputs_all_reverse = [pose_feats[0], pose_feats[f_i]]
 
                     # position
-                    position_inputs = self.models["position_encoder"](torch.cat(inputs_all, 1))
+                    """position_inputs = self.models["position_encoder"](torch.cat(inputs_all, 1))
                     position_inputs_reverse = self.models["position_encoder"](torch.cat(inputs_all_reverse, 1))
                     outputs_0 = self.models["position"](position_inputs)
-                    outputs_1 = self.models["position"](position_inputs_reverse)
+                    outputs_1 = self.models["position"](position_inputs_reverse)"""
 
                     for scale in self.opt.scales:
 
@@ -667,8 +702,7 @@ class Trainer:
                     padding_mode="border",
                     align_corners=True)
 
-                outputs[("position_depth", scale, frame_id)] = self.position_depth[source_scale](
-                        cam_points, cam_K, T)
+                outputs[("color_refined", frame_id, scale)] = outputs[("ch",scale, frame_id)] * outputs[("color", frame_id, scale)] + outputs[("bh", scale, frame_id)]
 
     def compute_reprojection_loss(self, pred, target):
 
@@ -683,7 +717,7 @@ class Trainer:
 
         return reprojection_loss
 
-    def compute_losses(self, inputs, outputs):
+    def compute_losses__(self, inputs, outputs):
 
         losses = {}
         total_loss = 0
