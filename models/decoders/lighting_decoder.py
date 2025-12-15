@@ -7,8 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from collections import OrderedDict
-from layers import ConvBlock, Conv3x3, upsample  # upsample is unused but kept for compatibility
-
+#from layers import ConvBlock, Conv3x3, upsample  # upsample is unused but kept for compatibility
+from utils.layers import *
 
 class LightingDecoder(nn.Module):
     """
