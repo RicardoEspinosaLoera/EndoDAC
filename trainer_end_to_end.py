@@ -820,7 +820,7 @@ class Trainer:
             outputs.update(self.predict_poses(inputs))
 
         self.generate_images_pred(inputs, outputs)
-        losses = self.compute_losses_val(inputs, outputs)
+        losses = self.compute_losses(inputs, outputs)
 
         return outputs, losses
 
