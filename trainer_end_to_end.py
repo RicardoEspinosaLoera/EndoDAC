@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 import time
 import json
 import datasets
+from datasets.scared_dataset import SCAREDRAWDataset
 import models.encoders as encoders
 import models.decoders as decoders
 import models.endodac as endodac
