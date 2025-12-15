@@ -390,7 +390,7 @@ class Trainer:
             self.step += 1
             
         self.model_lr_scheduler.step()
-        self.model_lr_scheduler_0.step()
+        #self.model_lr_scheduler_0.step()
 
     def run_epoch_eval(self):
         """Run a single epoch of evaluation
