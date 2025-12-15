@@ -295,6 +295,9 @@ class Trainer:
             param.requires_grad = True"""
         """for param in self.models["transform"].parameters():
             param.requires_grad = True"""
+        for param in self.models["lighting"].parameters():
+            param.requires_grad = True
+        
         if self.opt.learn_intrinsics:
             for param in self.models["intrinsics_head"].parameters():
                 param.requires_grad = True
@@ -305,6 +308,7 @@ class Trainer:
         self.models["depth_model"].train()
         self.models["pose_encoder"].train()
         self.models["pose"].train()
+        self.models["lighting"].train()
         #self.models["transform_encoder"].train()
         #self.models["transform"].train()
         if self.opt.learn_intrinsics:
