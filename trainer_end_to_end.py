@@ -14,6 +14,11 @@ from utils.utils import *
 from utils.layers import *
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+import wandb
+
+wandb.init(project="IIEndoDAC-ENDOVIS", entity="respinosa")
+
+_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -860,33 +865,25 @@ class Trainer:
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
 
     def log(self, mode, inputs, outputs, losses):
-        """Write an event to the tensorboard events file
-        """
-        writer = self.writers[mode]
-        for l, v in losses.items():
-            writer.add_scalar("{}".format(l), v, self.step)
+            """Write an event to the tensorboard events file
+            """
+            #writer = self.writers[mode]
+            for l, v in losses.items():
+                wandb.log({mode+"{}".format(l):v},step =self.step)
 
-        for j in range(min(4, self.opt.batch_size)):  # write a maxmimum of four images
-            for s in self.opt.scales:
-                for frame_id in self.opt.frame_ids[1:]:
+            for j in range(min(4, self.opt.batch_size)):  # write a maxmimum of four images
+                s = 0  # log only max scale
+                for frame_id in self.opt.frame_ids:
 
-                    writer.add_image(
-                        "brightness_{}_{}/{}".format(frame_id, s, j),
-                        outputs[("transform", "high", s, frame_id)][j].data, self.step)
-                    writer.add_image(
-                        "registration_{}_{}/{}".format(frame_id, s, j),
-                        outputs[("registration", s, frame_id)][j].data, self.step)
-                    writer.add_image(
-                        "refined_{}_{}/{}".format(frame_id, s, j),
-                        outputs[("refined", s, frame_id)][j].data, self.step)
-                    if s == 0:
-                        writer.add_image(
-                            "occu_mask_backward_{}_{}/{}".format(frame_id, s, j),
-                            outputs[("occu_mask_backward", s, frame_id)][j].data, self.step)
-            
-                writer.add_image(
-                    "disp_{}/{}".format(s, j),
-                    normalize_image(outputs[("disp", s)][j]), self.step)
+                    wandb.log({ "color_{}_{}/{}".format(frame_id, s, j): wandb.Image(inputs[("color", frame_id, s)][j].data)},step=self.step)
+                    
+                    if s == 0 and frame_id != 0:
+                        wandb.log({"color_pred_{}_{}/{}".format(frame_id, s, j): wandb.Image(outputs[("color", frame_id, s)][j].data)},step=self.step)
+                        wandb.log({"color_pred_refined_{}_{}/{}".format(frame_id, s, j): wandb.Image(outputs[("color_refined", frame_id,s)][j].data)},step=self.step)
+                        wandb.log({"contrast_{}_{}/{}".format(frame_id, s, j): wandb.Image(outputs[("ch",s, frame_id)][j].data)},step=self.step)
+                        wandb.log({"brightness_{}_{}/{}".format(frame_id, s, j): wandb.Image(outputs[("bh",s, frame_id)][j].data)},step=self.step)
+                disp = self.colormap(outputs[("disp", s)][j, 0])
+                wandb.log({"disp_multi_{}/{}".format(s, j): wandb.Image(disp.transpose(1, 2, 0))},step=self.step)
 
     def save_opts(self):
         """Save options to disk so we know what we ran this experiment with
@@ -899,6 +896,36 @@ class Trainer:
         with open(os.path.join(models_dir, 'opt.json'), 'w') as f:
             json.dump(to_save, f, indent=2)
 
+    def colormap(self, inputs, normalize=True, torch_transpose=True):
+        if isinstance(inputs, torch.Tensor):
+            inputs = inputs.detach().cpu().numpy()
+
+        vis = inputs
+        if normalize:
+            ma = float(vis.max())
+            mi = float(vis.min())
+            d = ma - mi if ma != mi else 1e5
+            vis = (vis - mi) / d
+
+        if vis.ndim == 4:
+            vis = vis.transpose([0, 2, 3, 1])
+            vis = _DEPTH_COLORMAP(vis)
+            vis = vis[:, :, :, 0, :3]
+            if torch_transpose:
+                vis = vis.transpose(0, 3, 1, 2)
+        elif vis.ndim == 3:
+            vis = _DEPTH_COLORMAP(vis)
+            vis = vis[:, :, :, :3]
+            if torch_transpose:
+                vis = vis.transpose(0, 3, 1, 2)
+        elif vis.ndim == 2:
+            vis = _DEPTH_COLORMAP(vis)
+            vis = vis[..., :3]
+            if torch_transpose:
+                vis = vis.transpose(2, 0, 1)
+
+        return vis
+        
     def save_model(self, mode='epoch'):
         """Save model weights to disk
         """
