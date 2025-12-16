@@ -352,6 +352,7 @@ class Trainer:
                     # a1 = a1_new
                     self.save_model(mode='epoch')
             self.save_model(mode='last')
+    
     def run_epoch(self):
         """Run a single epoch of training and validation
         """

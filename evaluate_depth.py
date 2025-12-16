@@ -16,6 +16,7 @@ from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
 from options import MonodepthOptions
 import datasets
+from datasets.scared_dataset import SCAREDRAWDataset
 import models.encoders as encoders
 import models.decoders as decoders
 import models.endodac as endodac
