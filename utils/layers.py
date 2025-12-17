@@ -7,7 +7,6 @@ import math
 import cv2
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as transforms
 
 def disp_to_depth(disp, min_depth, max_depth):
     """Convert network's sigmoid output into depth prediction
@@ -20,50 +19,6 @@ def disp_to_depth(disp, min_depth, max_depth):
     depth = 1 / scaled_disp
     return scaled_disp, depth
 
-def get_feature_oclution_mask(img):
-    kernel = torch.tensor([[1, 1, 1],[1, 1, 1],[1, 1, 1]]).to(device=img.device).type(torch.cuda.FloatTensor)
-    padding = (3 - 1) // 2  # Padding to maintain input size
-    o = F.conv2d(img, kernel.view(1, 1, 3, 3), padding=padding)
-    t = torch.cat((o,o,o,o,o,o,o,o), dim = 1)
-    
-    return t
-
-def get_illumination_invariant_features(img):
-    # Convert to grayscale if RGB
-    if img.shape[1] != 1:
-        img_gray = transforms.functional.rgb_to_grayscale(img, 1)
-    else:
-        img_gray = img
-
-    if img_gray.dim() == 3:
-        img_gray = img_gray.unsqueeze(0)
-
-    device = img_gray.device
-
-    # Robinson directional kernels
-    K = [
-        torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32, device=device),
-        torch.tensor([[0, 1, 2], [-1, 0, 1], [-2, -1, 0]], dtype=torch.float32, device=device),
-        torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], dtype=torch.float32, device=device),
-        torch.tensor([[2, 1, 0], [1, 0, -1], [0, -1, -2]], dtype=torch.float32, device=device),
-        torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32, device=device),
-        torch.tensor([[0, -1, -2], [1, 0, -1], [2, 1, 0]], dtype=torch.float32, device=device),
-        torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32, device=device),
-        torch.tensor([[-2, -1, 0], [-1, 0, 1], [0, 1, 2]], dtype=torch.float32, device=device),
-    ]
-
-    # Convolve
-    responses = [F.conv2d(img_gray, k.view(1, 1, 3, 3), padding=1) for k in K]
-
-    # Normalize for contrast invariance
-    sq_D = sum([r**2 for r in responses])
-    NormD = torch.sqrt(torch.clamp(sq_D, min=1e-9))
-    responses_norm = [r / NormD for r in responses]
-
-    # Concatenate into multi-channel descriptor
-    t = torch.cat(responses_norm, dim=1)
-
-    return t
 
 def transformation_from_parameters(axisangle, translation, invert=False):
     """Convert the network's (axisangle, translation) output into a 4x4 matrix
@@ -726,4 +681,3 @@ class reduced_ransac(nn.Module):
         cv_f = torch.from_numpy(cv_f).float().to(match.get_device())
         
         return cv_f
-
