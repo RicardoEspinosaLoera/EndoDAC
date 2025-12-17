@@ -6,7 +6,6 @@
 import warnings
 from typing import Callable
 import fvcore.nn.weight_init as weight_init
-from .MAB import *
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
