@@ -19,7 +19,8 @@ import datasets
 from datasets.scared_dataset import SCAREDRAWDataset
 import models.encoders as encoders
 import models.decoders as decoders
-import models.endodac as endodac
+#import models.endodac as endodac
+import models.hadepth as hadepth
 
 cv2.setNumThreads(0)  # This speeds up evaluation 5x on our unix systems (OpenCV 3.3.1)
 
@@ -88,11 +89,17 @@ def evaluate(opt):
                                 pin_memory=True, drop_last=False)
 
         if opt.model_type == 'endodac':
-            depther = endodac.endodac(
+            """depther = endodac.endodac(
                 backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
                 image_shape=(224,280), pretrained_path=opt.pretrained_path,
                 residual_block_indexes=opt.residual_block_indexes,
-                include_cls_token=opt.include_cls_token)
+                include_cls_token=opt.include_cls_token)"""
+            depther = hadepth.hadepth(
+            backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
+            image_shape=(224,280), pretrained_path=opt.pretrained_path,
+            residual_block_indexes=opt.residual_block_indexes,
+            include_cls_token=opt.include_cls_token)
+
             model_dict = depther.state_dict()
             depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
             depther.cuda()
