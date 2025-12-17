@@ -548,7 +548,7 @@ def get_texu_mask(non_rigid, rigid):
    
     return texu_mask
 
-def get_ilumination_invariant_features(img):
+def get_illumination_invariant_features(img):
     # Convert to grayscale if RGB
     if img.shape[1] != 1:
         img_gray = transforms.functional.rgb_to_grayscale(img, 1)
