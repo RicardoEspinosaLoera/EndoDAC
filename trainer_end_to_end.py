@@ -287,7 +287,7 @@ class Trainer:
             warm_up = True
         else:
             warm_up = False
-        endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
+        hadepth.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
         for param in self.models["pose_encoder"].parameters():
             param.requires_grad = True
         for param in self.models["pose"].parameters():
