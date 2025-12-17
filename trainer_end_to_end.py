@@ -7,6 +7,7 @@ from datasets.scared_dataset import SCAREDRAWDataset
 import models.encoders as encoders
 import models.decoders as decoders
 import models.endodac as endodac
+import models.hadepth as hadepth
 import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
@@ -49,7 +50,7 @@ class Trainer:
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        self.models["depth_model"] = endodac.endodac(
+        self.models["depth_model"] = hadepth.hadepth(
             backbone_size = "base", r=self.opt.lora_rank, lora_type=self.opt.lora_type,
             image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
             residual_block_indexes=self.opt.residual_block_indexes,

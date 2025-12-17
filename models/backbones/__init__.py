@@ -6,7 +6,6 @@
 import logging
 
 from . import vision_transformer as vits
-from . import galora
 
 logger = logging.getLogger("dinov2")
 
