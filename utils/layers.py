@@ -7,6 +7,8 @@ import math
 import cv2
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms as transforms
+
 
 def disp_to_depth(disp, min_depth, max_depth):
     """Convert network's sigmoid output into depth prediction
