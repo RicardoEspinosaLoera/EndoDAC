@@ -16,6 +16,7 @@ from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
 
 import datasets
+from datasets.scared_dataset import SCAREDRAWDataset
 import models.hadepth as hadepth
 from options import MonodepthOptions
 
@@ -67,7 +68,7 @@ def evaluate(opt):
         if opt.eval_split == 'endovis':
             batch_size = 1
             filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = datasets.SCAREDRAWDataset(opt.data_path, filenames,
+            dataset = SCAREDRAWDataset(opt.data_path, filenames,
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
