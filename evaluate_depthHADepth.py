@@ -14,12 +14,13 @@ import scipy.stats as st
 
 from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
-from options import MonodepthOptions
+
 import datasets
-from datasets.scared_dataset import SCAREDRAWDataset
-import models.encoders as encoders
-import models.decoders as decoders
-import models.endodac as endodac
+import models.hadepth as hadepth
+from options import MonodepthOptions
+
+options = MonodepthOptions()
+opt = options.parse()
 
 cv2.setNumThreads(0)  # This speeds up evaluation 5x on our unix systems (OpenCV 3.3.1)
 
@@ -54,26 +55,19 @@ def evaluate(opt):
         "Please choose mono or stereo evaluation by setting either --eval_mono or --eval_stereo"
 
     if opt.ext_disp_to_eval is None:
-        if not opt.model_type == 'depthanything':
-            opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
-            assert os.path.isdir(opt.load_weights_folder), \
-                "Cannot find a folder at {}".format(opt.load_weights_folder)
+        opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
+        assert os.path.isdir(opt.load_weights_folder), \
+            "Cannot find a folder at {}".format(opt.load_weights_folder)
 
-            print("-> Loading weights from {}".format(opt.load_weights_folder))
-        else:
-            print("Evaluating Depth Anything model")
+        print("-> Loading weights from {}".format(opt.load_weights_folder))
 
-        if opt.model_type == 'endodac':
-            depther_path = os.path.join(opt.load_weights_folder, "depth_model.pth")
-            depther_dict = torch.load(depther_path)
-        elif opt.model_type == 'afsfm':
-            encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
-            decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
-            encoder_dict = torch.load(encoder_path)
+        depther_path = os.path.join(opt.load_weights_folder, "depth_model.pth")
+        depther_dict = torch.load(depther_path)
 
         if opt.eval_split == 'endovis':
+            batch_size = 1
             filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+            dataset = datasets.SCAREDRAWDataset(opt.data_path, filenames,
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
@@ -83,31 +77,25 @@ def evaluate(opt):
             dataset = datasets.C3VDDataset(opt.data_path, opt.height, opt.width,
                                                 [0], 4, is_train=False)
             MAX_DEPTH = 100
+        else:
+            batch_size = 16
+            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
+            dataset = datasets.CUSTOMRAWDataset(opt.data_path, filenames,
+                                                opt.height, opt.width,
+                                                [0], 4, is_train=False)
 
-        dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=opt.num_workers,
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=opt.num_workers,
                                 pin_memory=True, drop_last=False)
 
-        if opt.model_type == 'endodac':
-            depther = endodac.endodac(
-                backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
-                image_shape=(224,280), pretrained_path=opt.pretrained_path,
-                residual_block_indexes=opt.residual_block_indexes,
-                include_cls_token=opt.include_cls_token)
-            model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
-            depther.cuda()
-            depther.eval()
-        elif opt.model_type == 'afsfm':
-            encoder = encoders.ResnetEncoder(opt.num_layers, False)
-            depth_decoder = decoders.DepthDecoder(encoder.num_ch_enc, scales=range(4))
-            model_dict = encoder.state_dict()
-            encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})
-            depth_decoder.load_state_dict(torch.load(decoder_path))
-            depther = lambda image: depth_decoder(encoder(image))
-            encoder.cuda()
-            encoder.eval()
-            depth_decoder.cuda()
-            depth_decoder.eval()
+        depther = hadepth.hadepth(
+            backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
+            image_shape=(224,280), pretrained_path=opt.pretrained_path,
+            residual_block_indexes=opt.residual_block_indexes,
+            include_cls_token=opt.include_cls_token)
+        model_dict = depther.state_dict()
+        depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
+        depther.cuda()
+        depther.eval()
     else:
         print("-> Loading predictions from {}".format(opt.ext_disp_to_eval))
         pred_disps = np.load(opt.ext_disp_to_eval)
@@ -127,9 +115,8 @@ def evaluate(opt):
         dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=opt.num_workers,
                                 pin_memory=True, drop_last=False)
 
-    if opt.eval_split == 'endovis':
-        gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
-        gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+    gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+    gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
         
     if opt.visualize_depth:
         vis_dir = os.path.join(opt.load_weights_folder, "vis_depth")
@@ -156,8 +143,7 @@ def evaluate(opt):
                 time_start = time.time()
                 output = depther(input_color)
                 inference_time = time.time() - time_start
-                if opt.model_type == 'endodac' or opt.model_type == 'afsfm':
-                    output_disp = output[("disp", 0)]
+                output_disp = output[("disp", 0)]
                 pred_disp, _ = disp_to_depth(output_disp, opt.min_depth, opt.max_depth)
                 pred_disp = pred_disp.cpu()[:, 0].numpy()
                 pred_disp = pred_disp[0]
@@ -173,6 +159,8 @@ def evaluate(opt):
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
                 gt_depth = data["depth_gt"].squeeze().numpy()
+            else:
+                gt_depth = gt_depths[i]
 
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
