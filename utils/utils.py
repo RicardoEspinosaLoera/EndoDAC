@@ -42,6 +42,15 @@ def sec_to_hm_str(t):
     h, m, s = sec_to_hm(t)
     return "{:02d}h{:02d}m{:02d}s".format(h, m, s)
 
+def fft_amp_phase(x):
+    fft = torch.fft.fft2(x, norm="ortho")
+    return torch.abs(fft), torch.angle(fft)
+
+def stm_transplant(warped, source):
+    Aw, _ = fft_amp_phase(warped)
+    _, Ps = fft_amp_phase(source)
+    fft_new = Aw * torch.exp(1j * Ps)
+    return torch.fft.ifft2(fft_new, norm="ortho").real
 
 def download_model_if_doesnt_exist(model_name):
     """If pretrained kitti model doesn't exist, download and unzip it

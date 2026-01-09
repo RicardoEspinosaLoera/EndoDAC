@@ -73,7 +73,7 @@ def evaluate(opt):
 
         if opt.eval_split == 'endovis':
             filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+            dataset = datasets.SCAREDRAWDataset(opt.data_path, filenames,
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
