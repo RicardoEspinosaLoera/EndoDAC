@@ -38,7 +38,7 @@ class MonodepthOptions:
                                  type=str,
                                  help="which lora type use for the model",
                                  choices=["lora", "dvlora", "none", "flora", "dora"],
-                                 default="dora")
+                                 default="lora")
         self.parser.add_argument("--lora_rank",
                                  type=int,
                                  help="the rank of lora",
