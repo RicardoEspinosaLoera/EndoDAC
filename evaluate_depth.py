@@ -88,11 +88,10 @@ def evaluate(opt):
                                 pin_memory=True, drop_last=False)
 
         if opt.model_type == 'endodac':
-            # Use empty residual blocks for evaluation if checkpoint doesn't have them
             depther = endodac.endodac(
                 backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
                 image_shape=(224,280), pretrained_path=opt.pretrained_path,
-                residual_block_indexes=[],  # Don't use residual blocks during evaluation
+                residual_block_indexes=opt.residual_block_indexes,
                 include_cls_token=opt.include_cls_token)
             model_dict = depther.state_dict()
             depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
