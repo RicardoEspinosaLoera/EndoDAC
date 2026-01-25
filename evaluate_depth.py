@@ -90,16 +90,29 @@ def evaluate(opt):
 
         if opt.model_type == 'endodac':
             depther = endodac.endodac(
-                backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
-                image_shape=(224,280), pretrained_path=opt.pretrained_path,
-                residual_block_indexes=opt.residual_block_indexes,
-                include_cls_token=opt.include_cls_token)
-            
-            model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
+                backbone_size="base",
+                r=opt.lora_rank,
+                lora_type=opt.lora_type,                 # "dvlora"
+                image_shape=(224, 280),
+                pretrained_path=None,                    # IMPORTANT
+                residual_block_indexes=opt.residual_block_indexes,  # [2,5,8,11]
+                include_cls_token=opt.include_cls_token  # True
+            )
+
+            ckpt = torch.load(depther_path)
+
+            # if checkpoint is wrapped
+            if isinstance(ckpt, dict) and "model" in ckpt:
+                ckpt = ckpt["model"]
+
+            missing, unexpected = depther.load_state_dict(ckpt, strict=False)
+
+            print("Missing keys:", len(missing))
+            print("Unexpected keys:", len(unexpected))
 
             depther.cuda()
             depther.eval()
+
         elif opt.model_type == 'afsfm':
             encoder = encoders.ResnetEncoder(opt.num_layers, False)
             depth_decoder = decoders.DepthDecoder(encoder.num_ch_enc, scales=range(4))
