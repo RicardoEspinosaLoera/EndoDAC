@@ -65,7 +65,6 @@ def evaluate(opt):
             print("Evaluating Depth Anything model")
 
         if opt.model_type == 'endodac':
-            print("endodac model")
             depther_path = os.path.join(opt.load_weights_folder, "depth_model.pth")
             depther_dict = torch.load(depther_path)
         elif opt.model_type == 'afsfm':
@@ -92,7 +91,7 @@ def evaluate(opt):
         if opt.model_type == 'endodac':
             depther = endodac.endodac(
                 backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
-                image_shape=(224,280), pretrained_path=opt.pretrained_path,
+                image_shape=(224,280), pretrained_path=None,
                 residual_block_indexes=opt.residual_block_indexes,
                 include_cls_token=opt.include_cls_token)
             model_dict = depther.state_dict()
