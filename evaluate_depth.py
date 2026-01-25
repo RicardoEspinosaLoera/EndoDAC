@@ -104,7 +104,11 @@ def evaluate(opt):
                 include_cls_token=opt.include_cls_token
             )
             model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
+            #depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
+            depther.load_state_dict(
+                {k: v for k, v in depther_dict.items() if k in depther.state_dict()},
+                strict=False
+            )
 
             depther.cuda()
             depther.eval()
