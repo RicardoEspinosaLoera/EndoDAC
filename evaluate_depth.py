@@ -56,6 +56,7 @@ def evaluate(opt):
     if opt.ext_disp_to_eval is None:
         if not opt.model_type == 'depthanything':
             opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
+            print("opt.load_weights_folder:", opt.load_weights_folder)
             assert os.path.isdir(opt.load_weights_folder), \
                 "Cannot find a folder at {}".format(opt.load_weights_folder)
 
@@ -95,11 +96,7 @@ def evaluate(opt):
                 residual_block_indexes=opt.residual_block_indexes,
                 include_cls_token=opt.include_cls_token)
             model_dict = depther.state_dict()
-            #depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
-            depther.load_state_dict(
-                {k: v for k, v in depther_dict.items() if k in model_dict},
-                strict=False
-            )
+            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
 
             depther.cuda()
             depther.eval()
