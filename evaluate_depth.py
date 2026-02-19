@@ -131,7 +131,7 @@ def evaluate(opt):
         dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=opt.num_workers,
                                 pin_memory=True, drop_last=False)
 
-    if opt.eval_split == 'endovis':
+    if opt.eval_split == 'endovis' or opt.eval_split == 'hamlyn':
         gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
         gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
         
