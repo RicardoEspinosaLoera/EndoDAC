@@ -89,24 +89,14 @@ def evaluate(opt):
 
         if opt.model_type == 'endodac':
 
-           depther = endodac.endodac(
-                backbone_size="base",
-                r=4,
-                lora_type="dvlora",
-                image_shape=(224,280),
-                pretrained_path="./pretrained_model",
+            depther = endodac.endodac(
+                backbone_size = "base", r=4, lora_type="dvlora",
+                image_shape=(224,280), pretrained_path="./pretrained_model",
                 residual_block_indexes=[2,5,8,11],
-                include_cls_token=True
-            )
+                include_cls_token=True)
 
-            if "model" in depther_dict:
-                depther_dict = depther_dict["model"]
-
-            missing, unexpected = depther.load_state_dict(depther_dict, strict=False)
-
-            print("Missing keys:", missing)
-            print("Unexpected keys:", unexpected)
-
+            model_dict = depther.state_dict()
+            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
             depther.cuda()
             depther.eval()
         elif opt.model_type == 'afsfm':
