@@ -191,6 +191,7 @@ def evaluate(opt):
                 vis_file_name = os.path.join(vis_dir, sequence + "_" +  keyframe + "_" + frame_id + ".png")
                 cv2.imwrite(vis_file_name, vis_pred_depth)
             
+            print(pred_depth.shape, gt_depth.shape, mask.shape)
             pred_depth = pred_depth[mask]
             gt_depth = gt_depth[mask]
             
