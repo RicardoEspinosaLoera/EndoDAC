@@ -92,7 +92,7 @@ def evaluate(opt):
             depther = endodac.endodac(
                 backbone_size = "base", r=4, lora_type="dvlora",
                 image_shape=(224,280), pretrained_path=None,
-                residual_block_indexes=[2,5,8,11],
+                residual_block_indexes=[],
                 include_cls_token=True)
 
             model_dict = depther.state_dict()
