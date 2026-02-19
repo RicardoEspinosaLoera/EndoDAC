@@ -98,20 +98,10 @@ def evaluate(opt):
                 include_cls_token=opt.include_cls_token
             )
 
-            depther_path = os.path.join(opt.load_weights_folder, "depth_model.pth")
-            checkpoint = torch.load(depther_path)
-
-            if "model" in checkpoint:
-                checkpoint = checkpoint["model"]
-
-            missing, unexpected = depther.load_state_dict(checkpoint, strict=False)
-
-            print("Missing keys:", missing)
-            print("Unexpected keys:", unexpected)
-
+            model_dict = depther.state_dict()
+            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
             depther.cuda()
             depther.eval()
-
         elif opt.model_type == 'afsfm':
             encoder = encoders.ResnetEncoder(opt.num_layers, False)
             depth_decoder = decoders.DepthDecoder(encoder.num_ch_enc, scales=range(4))
