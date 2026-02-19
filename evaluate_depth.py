@@ -96,7 +96,7 @@ def evaluate(opt):
                 include_cls_token=True)
 
             model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
+            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=True)
             depther.cuda()
             depther.eval()
         elif opt.model_type == 'afsfm':
