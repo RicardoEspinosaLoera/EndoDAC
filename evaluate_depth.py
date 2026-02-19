@@ -176,7 +176,10 @@ def evaluate(opt):
                 keyframe = str(np.array(data['keyframe'][0]))
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
-                gt_depth = data["depth_gt"].squeeze().numpy()
+                gt_depth = gt_depths[i]
+                sequence = str(np.array(data['sequence'][0]))
+                keyframe = str(np.array(data['keyframe'][0]))
+                frame_id = "{:06d}".format(data['frame_id'][0])
 
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
