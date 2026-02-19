@@ -95,8 +95,18 @@ def evaluate(opt):
                 residual_block_indexes=[2,5,8,11],
                 include_cls_token=True)
 
-            model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
+            depther_path = os.path.join(opt.load_weights_folder, "depth_model.pth")
+            depther_dict = torch.load(depther_path)
+
+            # If checkpoint is wrapped
+            if "model" in depther_dict:
+                depther_dict = depther_dict["model"]
+
+            missing, unexpected = depther.load_state_dict(depther_dict, strict=False)
+
+            print("Missing keys:", missing)
+            print("Unexpected keys:", unexpected)
+
             depther.cuda()
             depther.eval()
         elif opt.model_type == 'afsfm':
