@@ -88,15 +88,12 @@ def evaluate(opt):
                                 pin_memory=True, drop_last=False)
 
         if opt.model_type == 'endodac':
+
             depther = endodac.endodac(
-                backbone_size="base",
-                r=opt.lora_rank,
-                lora_type=opt.lora_type,
-                image_shape=(224,280),
-                pretrained_path=None,
-                residual_block_indexes=opt.residual_block_indexes,
-                include_cls_token=opt.include_cls_token
-            )
+                backbone_size = "base", r=4, lora_type="dv_lora",
+                image_shape=(224,280), pretrained_path=opt.pretrained_path,
+                residual_block_indexes=[2,5,8,11],
+                include_cls_token=True)
 
             model_dict = depther.state_dict()
             depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
