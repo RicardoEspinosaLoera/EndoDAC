@@ -91,7 +91,7 @@ def evaluate(opt):
 
             depther = endodac.endodac(
                 backbone_size = "base", r=4, lora_type="dv_lora",
-                image_shape=(224,280), pretrained_path=opt.pretrained_path,
+                image_shape=(224,280), pretrained_path="./pretrained_model",
                 residual_block_indexes=[2,5,8,11],
                 include_cls_token=True)
 
