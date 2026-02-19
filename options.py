@@ -34,6 +34,8 @@ class MonodepthOptions:
                                  type=str,
                                  help="pretrained weights path",
                                  default=os.path.join(file_dir, "pretrained_model"))
+
+                                 
         self.parser.add_argument("--lora_type",
                                  type=str,
                                  help="which lora type use for the model",
