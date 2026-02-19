@@ -177,6 +177,7 @@ def evaluate(opt):
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
                 gt_depth = gt_depths[i]
+                print(gt_depth.shape)
                 #sequence = str(np.array(data['sequence'][0]))
                 #keyframe = str(np.array(data['keyframe'][0]))
                 #frame_id = "{:06d}".format(data['frame_id'][0])
