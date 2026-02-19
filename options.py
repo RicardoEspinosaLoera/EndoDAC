@@ -35,12 +35,13 @@ class MonodepthOptions:
                                  help="pretrained weights path",
                                  default=os.path.join(file_dir, "pretrained_model"))
 
-                                 
+
         self.parser.add_argument("--lora_type",
                                  type=str,
                                  help="which lora type use for the model",
                                  choices=["lora", "dvlora", "none", "flora", "dora"],
                                  default="dvlora")
+        
         self.parser.add_argument("--lora_rank",
                                  type=int,
                                  help="the rank of lora",
