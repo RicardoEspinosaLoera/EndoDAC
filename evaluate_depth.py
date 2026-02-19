@@ -77,8 +77,10 @@ def evaluate(opt):
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
-            dataset = datasets.HamlynDataset(opt.data_path, opt.height, opt.width,
-                                                [0], 4, is_train=False)
+            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
+            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+                                            opt.height, opt.width,
+                                            [0], 4, is_train=False)
         elif opt.eval_split == 'c3vd':
             dataset = datasets.C3VDDataset(opt.data_path, opt.height, opt.width,
                                                 [0], 4, is_train=False)
