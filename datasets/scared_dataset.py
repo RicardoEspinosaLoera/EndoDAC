@@ -40,9 +40,9 @@ class SCAREDRAWDataset(SCAREDDataset):
 
     def get_image_path(self, folder, frame_index, side):
         #f_str = "frame_data{:06d}{}".format(frame_index-1, self.img_ext)
-        f_str = "{}{}".format(frame_index, self.img_ext)
-        sequence = folder[7]
-        data_splt = "train" if int(sequence) < 8 else "test"
+        #f_str = "{}{}".format(frame_index, self.img_ext)
+        #sequence = folder[7]
+        #data_splt = "train" if int(sequence) < 8 else "test"
         #image_path = os.path.join(
         #    self.data_path, data_splt, folder, "data", self.side_map[side], f_str)
         image_path = os.path.join(self.data_path, folder, "data", f_str)
