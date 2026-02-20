@@ -15,8 +15,7 @@ import scipy.stats as st
 from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
 from options import MonodepthOptions
-#import datasets
-from datasets.scared_dataset import SCAREDRAWDataset
+import datasets
 import models.encoders as encoders
 import models.decoders as decoders
 import models.endodac as endodac
@@ -73,14 +72,12 @@ def evaluate(opt):
 
         if opt.eval_split == 'endovis':
             filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+            dataset = datasets.SCAREDRAWDataset(opt.data_path, filenames,
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
-            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = SCAREDRAWDataset(opt.data_path, filenames,
-                                            opt.height, opt.width,
-                                            [0], 4, is_train=False)
+            dataset = datasets.HamlynDataset(opt.data_path, opt.height, opt.width,
+                                                [0], 4, is_train=False)
         elif opt.eval_split == 'c3vd':
             dataset = datasets.C3VDDataset(opt.data_path, opt.height, opt.width,
                                                 [0], 4, is_train=False)
@@ -90,15 +87,13 @@ def evaluate(opt):
                                 pin_memory=True, drop_last=False)
 
         if opt.model_type == 'endodac':
-
             depther = endodac.endodac(
-                backbone_size = "base", r=4, lora_type="dvlora",
-                image_shape=(224,280), pretrained_path=None,
-                residual_block_indexes=[2,5,8,11],
-                include_cls_token=True)
-
+                backbone_size = "base", r=opt.lora_rank, lora_type=opt.lora_type,
+                image_shape=(224,280), pretrained_path=opt.pretrained_path,
+                residual_block_indexes=opt.residual_block_indexes,
+                include_cls_token=opt.include_cls_token)
             model_dict = depther.state_dict()
-            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=True)
+            depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
             depther.cuda()
             depther.eval()
         elif opt.model_type == 'afsfm':
@@ -121,10 +116,8 @@ def evaluate(opt):
                                             opt.height, opt.width,
                                             [0], 4, is_train=False)
         elif opt.eval_split == 'hamlyn':
-            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-            dataset = datasets.SCAREDRAWDataset(opt.data_path, filenames,
-                                            opt.height, opt.width,
-                                            [0], 4, is_train=False)
+            dataset = datasets.HamlynDataset(opt.data_path, opt.height, opt.width,
+                                                [0], 4, is_train=False)
         elif opt.eval_split == 'c3vd':
             dataset = datasets.C3VDDataset(opt.data_path, opt.height, opt.width,
                                                 [0], 4, is_train=False)
@@ -133,7 +126,7 @@ def evaluate(opt):
         dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=opt.num_workers,
                                 pin_memory=True, drop_last=False)
 
-    if opt.eval_split == 'endovis' or opt.eval_split == 'hamlyn':
+    if opt.eval_split == 'endovis':
         gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
         gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
         
@@ -178,10 +171,7 @@ def evaluate(opt):
                 keyframe = str(np.array(data['keyframe'][0]))
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
-                gt_depth = gt_depths[i]
-                #sequence = str(np.array(data['sequence'][0]))
-                #keyframe = str(np.array(data['keyframe'][0]))
-                #frame_id = "{:06d}".format(data['frame_id'][0])
+                gt_depth = data["depth_gt"].squeeze().numpy()
 
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
