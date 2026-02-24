@@ -18,6 +18,7 @@ import models.encoders as encoders
 import models.decoders as decoders
 import models.endodac as endodac
 import models.hadepth as hadepth
+import models.endosfmlearner as endosfmlearner
 
 cv2.setNumThreads(0)
 
@@ -42,6 +43,8 @@ class DepthModelFactory:
             return DepthModelFactory._load_hadepth(opt)
         elif model_type == 'afsfm':
             return DepthModelFactory._load_afsfm(opt)
+        elif model_type == 'endosfmlearner':
+            return DepthModelFactory._load_endosfmlearner(opt)
         elif model_type == 'monovit':
             return DepthModelFactory._load_monovit(opt)
         else:
@@ -101,6 +104,48 @@ class DepthModelFactory:
         
         depther = lambda image: depth_decoder(encoder(image))
         return depther, 'afsfm'
+    
+    @staticmethod
+    def _load_afslearner(opt):
+        """Load AFSLearner model (ResNet + DepthDecoder)"""
+        encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
+        decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
+        encoder_dict = torch.load(encoder_path)
+        
+        encoder = encoders.ResnetEncoder(opt.num_layers, False)
+        depth_decoder = decoders.DepthDecoder(encoder.num_ch_enc, scales=range(4))
+        model_dict = encoder.state_dict()
+        encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})
+        depth_decoder.load_state_dict(torch.load(decoder_path))
+        
+        encoder.cuda()
+        encoder.eval()
+        depth_decoder.cuda()
+        depth_decoder.eval()
+        
+        depther = lambda image: depth_decoder(encoder(image))
+        return depther, 'afslearner'
+    
+    @staticmethod
+    def _load_endosfmlearner(opt):
+
+        dispnet_path = os.path.join(opt.load_weights_folder, "dispnet_model_best.pth.tar")
+        weights = torch.load(dispnet_path)
+        
+        # Create model
+        disp_net = DispResNet(num_layers=opt.num_layers, pretrained=False)
+        
+        # Load weights
+        if isinstance(weights, dict) and 'state_dict' in weights:
+            disp_net.load_state_dict(weights['state_dict'])
+        else:
+            disp_net.load_state_dict(weights)
+        
+        # Move to GPU and set to eval mode
+        disp_net.cuda()
+        disp_net.eval()
+        
+        return disp_net, 'endosfmlearner'
     
     @staticmethod
     def _load_monovit(opt):
