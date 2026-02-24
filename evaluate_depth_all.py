@@ -133,7 +133,7 @@ class DepthModelFactory:
         weights = torch.load(dispnet_path)
         
         # Create model
-        disp_net = endosfmlearner.DispResNet(num_layers=opt.num_layers, pretrained=False)
+        disp_net = endosfmlearner.DepthDecoder(num_layers=opt.num_layers, pretrained=False)
         
         # Load weights
         if isinstance(weights, dict) and 'state_dict' in weights:
