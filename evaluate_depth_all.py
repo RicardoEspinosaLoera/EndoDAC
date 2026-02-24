@@ -175,8 +175,9 @@ def evaluate(opt):
                             pin_memory=True, drop_last=False)
 
     # Load ground truth
-    gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
-    gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+    if opt.eval_split == 'endovis':
+        gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+        gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
 
     print("-> Evaluating on {} split".format(opt.eval_split))
 
