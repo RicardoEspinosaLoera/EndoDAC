@@ -205,7 +205,7 @@ def evaluate(opt):
             time_start = time.time()
             output = depther(input_color)
             inference_time = time.time() - time_start
-            inference_times.append(inference_time)
+            inference_times.append(inference_time)            
 
             # Extract disparity
             if isinstance(output, dict):
@@ -218,11 +218,17 @@ def evaluate(opt):
             pred_disp = pred_disp[0] if pred_disp.shape[0] == 1 else pred_disp
 
             # Get ground truth
-            gt_depth = gt_depths[i]
+            if opt.eval_split == 'endovis':
+                gt_depth = gt_depths[i]
+                sequence = str(np.array(data['sequence'][0]))
+                keyframe = str(np.array(data['keyframe'][0]))
+                frame_id = "{:06d}".format(data['frame_id'][0])
+            elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
+                gt_depth = data["depth_gt"].squeeze().numpy()
             
             # Handle 3D gt_depth (extract first channel if needed)
-            if gt_depth.ndim == 3:
-                gt_depth = gt_depth[:, :, 0]
+            # if gt_depth.ndim == 3:
+            #    gt_depth = gt_depth[:, :, 0]
 
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
