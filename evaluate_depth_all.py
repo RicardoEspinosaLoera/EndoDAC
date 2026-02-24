@@ -43,7 +43,7 @@ class DepthModelFactory:
             return DepthModelFactory._load_hadepth(opt)
         elif model_type == 'afsfm':
             return DepthModelFactory._load_afsfm(opt)
-        elif model_type == 'endosfmlearner':
+        elif model_type == 'endosfml':
             return DepthModelFactory._load_endosfmlearner(opt)
         elif model_type == 'monovit':
             return DepthModelFactory._load_monovit(opt)
