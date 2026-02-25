@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from collections import OrderedDict
-from layers import *
+from utils.layers import *
 
 from .resnet_encoder import ResnetEncoder
 from .hr_decoder import DepthDecoderT
