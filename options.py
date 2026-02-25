@@ -215,7 +215,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_type",
                                  type=str,
                                  help="which training split to use",
-                                 choices=["endodac", "afsfm", "endosfml"],
+                                 choices=["endodac", "afsfm", "endosfml","monovit"],
                                  default="endodac")
         self.parser.add_argument("--eval_stereo",
                                  help="if set evaluates in stereo mode",
