@@ -19,6 +19,7 @@ import models.decoders as decoders
 import models.endodac as endodac
 import models.hadepth as hadepth
 import models.endosfmlearner as endosfmlearner
+import models.monovit as monovit
 
 cv2.setNumThreads(0)
 
@@ -150,21 +151,17 @@ class DepthModelFactory:
     @staticmethod
     def _load_monovit(opt):
         """Load MonoViT model (MPViT encoder + DepthDecoderT)"""
-        try:
-            import models.networks as networks
-        except ImportError:
-            raise ImportError("networks module not found. Ensure MonoViT model files are available.")
         
         encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
         decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
         encoder_dict = torch.load(encoder_path)
         
         # Create encoder
-        encoder = networks.mpvit_small()
+        encoder = monovit.mpvit_small()
         encoder.num_ch_enc = [64, 128, 216, 288, 288]
         
         # Create decoder for transformer-based model
-        depth_decoder = networks.DepthDecoderT()
+        depth_decoder = monovit.DepthDecoderT()
         
         # Load weights
         model_dict = encoder.state_dict()
