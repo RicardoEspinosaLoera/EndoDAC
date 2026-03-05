@@ -155,7 +155,7 @@ class DepthModelFactory:
         encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
         decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
         encoder_dict = torch.load(encoder_path)
-        
+    
         # Create encoder
         encoder = monovit.mpvit_small()
         encoder.num_ch_enc = [64, 128, 216, 288, 288]
@@ -208,7 +208,7 @@ def evaluate(opt):
                                             [0], 4, is_train=False)
     elif opt.eval_split == 'c3vd':
         dataset = C3VDDataset(opt.data_path, opt.height, opt.width,
-                                            [0], 4, is_train=False)
+                              [0], 4, is_train=False, split='test')
         MAX_DEPTH = 100
     else:
         raise ValueError(f"Unknown eval_split: {opt.eval_split}")
