@@ -86,6 +86,12 @@ class DepthModelFactory:
         model_dict = depther.state_dict()
         depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
         #depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
+        
+        depther_dict = torch.load(depther_path)
+        residual_keys = [k for k in depther_dict.keys() if 'residual_' in k]
+        print(f"Residual keys in checkpoint: {len(residual_keys)}")
+        print(residual_keys[:5])
+                
         depther.cuda()
         depther.eval()
         return depther, 'hadepth'
