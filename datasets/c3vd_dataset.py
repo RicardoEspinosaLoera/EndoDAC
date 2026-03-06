@@ -21,7 +21,7 @@ except ImportError:
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Testing scenes for C3VD dataset
-TESTING_SCENES = ['trans_t1_a', 'trans_t1_b', 'trans_t2_a', 'trans_t2_b', 'trans_t2_c', 'trans_t3_a', 'trans_t3_b', 'trans_t4_a', 'trans_t4_b']
+TESTING_SCENES = ['trans_t1_a', 'trans_t1_b', 'trans_t2_a', 'trans_t2_b', 'trans_t2_c', 'trans_t3_a', 'trans_t3_b']
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
