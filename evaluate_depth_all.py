@@ -75,10 +75,14 @@ class DepthModelFactory:
         depther_dict = torch.load(depther_path)
         
         depther = hadepth.hadepth(
-            backbone_size="base", r=opt.lora_rank, lora_type=opt.lora_type,
-            image_shape=(224, 280), pretrained_path=opt.pretrained_path,
-            residual_block_indexes=opt.residual_block_indexes,
-            include_cls_token=opt.include_cls_token)
+            backbone_size="base",
+            r=opt.lora_rank,
+            lora_type=opt.lora_type,
+            image_shape=(224, 280),
+            pretrained_path=opt.pretrained_path,
+            residual_block_indexes=[2, 5, 8, 11],  # explicitly hardcode this
+            include_cls_token=opt.include_cls_token
+)
         model_dict = depther.state_dict()
         depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
         #depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
