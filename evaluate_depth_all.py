@@ -32,6 +32,17 @@ def render_depth(disp):
     return disp_color
 
 
+def batch_post_process_disparity(l_disp, r_disp):
+    """Apply the disparity post-processing method as introduced in Monodepthv1
+    """
+    _, h, w = l_disp.shape
+    m_disp = 0.5 * (l_disp + r_disp)
+    l, _ = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h))
+    l_mask = (1.0 - np.clip(20 * (l - 0.05), 0, 1))[None, ...]
+    r_mask = l_mask[:, :, ::-1]
+    return r_mask * l_disp + l_mask * r_disp + (1.0 - l_mask - r_mask) * m_disp
+
+
 class DepthModelFactory:
     """Factory class to load different depth estimation models"""
     
@@ -187,39 +198,80 @@ def evaluate(opt):
     assert sum((opt.eval_mono, opt.eval_stereo)) == 1, \
         "Please choose mono or stereo evaluation by setting either --eval_mono or --eval_stereo"
 
-    opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
-    assert os.path.isdir(opt.load_weights_folder), \
-        "Cannot find a folder at {}".format(opt.load_weights_folder)
+    if opt.ext_disp_to_eval is None:
+        opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
+        assert os.path.isdir(opt.load_weights_folder), \
+            "Cannot find a folder at {}".format(opt.load_weights_folder)
 
-    print("-> Loading weights from {}".format(opt.load_weights_folder))
+        print("-> Loading weights from {}".format(opt.load_weights_folder))
 
-    # Load model using factory
-    depther, model_name = DepthModelFactory.load_model(opt.model_type, opt)
-    print(f"-> Loaded {model_name} model")
+        # Load model using factory
+        depther, model_name = DepthModelFactory.load_model(opt.model_type, opt)
+        print(f"-> Loaded {model_name} model")
+        
+        # Determine batch size based on eval_split and model type
+        if opt.eval_split in ['hamlyn', 'c3vd']:
+            batch_size = 1
+        else:
+            batch_size = 16
 
-    # Load dataset based on eval_split
-    if opt.eval_split == 'endovis':
-        filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-        dataset = SCAREDRAWDataset(opt.data_path, filenames,
-                                        opt.height, opt.width,
-                                        [0], 4, is_train=False)
-    elif opt.eval_split == 'hamlyn':
-        dataset = HamlynDataset(opt.data_path, opt.height, opt.width,
+        # Load dataset based on eval_split
+        if opt.eval_split == 'endovis':
+            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
+            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+                                            opt.height, opt.width,
                                             [0], 4, is_train=False)
-    elif opt.eval_split == 'c3vd':
-        dataset = C3VDDataset(opt.data_path, opt.height, opt.width,
-                              [0], 4, is_train=False, split='test')
-        MAX_DEPTH = 100
+        elif opt.eval_split == 'hamlyn':
+            dataset = HamlynDataset(opt.data_path, opt.height, opt.width,
+                                                [0], 4, is_train=False)
+        elif opt.eval_split == 'c3vd':
+            dataset = C3VDDataset(opt.data_path, opt.height, opt.width,
+                                  [0], 4, is_train=False, split='test')
+            MAX_DEPTH = 100
+        else:
+            raise ValueError(f"Unknown eval_split: {opt.eval_split}")
+
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=opt.num_workers,
+                                pin_memory=True, drop_last=False)
+
+        # Load ground truth only for endovis
+        if opt.eval_split == 'endovis':
+            gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+            gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
     else:
-        raise ValueError(f"Unknown eval_split: {opt.eval_split}")
+        print("-> Loading predictions from {}".format(opt.ext_disp_to_eval))
+        pred_disps = np.load(opt.ext_disp_to_eval)
+        
+        # Load dataset for external predictions
+        if opt.eval_split == 'endovis':
+            filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
+            dataset = SCAREDRAWDataset(opt.data_path, filenames,
+                                            opt.height, opt.width,
+                                            [0], 4, is_train=False)
+        elif opt.eval_split == 'hamlyn':
+            dataset = HamlynDataset(opt.data_path, opt.height, opt.width,
+                                                [0], 4, is_train=False)
+        elif opt.eval_split == 'c3vd':
+            dataset = C3VDDataset(opt.data_path, opt.height, opt.width,
+                                  [0], 4, is_train=False, split='test')
+            MAX_DEPTH = 100
+        else:
+            raise ValueError(f"Unknown eval_split: {opt.eval_split}")
 
-    dataloader = DataLoader(dataset, 1, shuffle=False, num_workers=opt.num_workers,
-                            pin_memory=True, drop_last=False)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=opt.num_workers,
+                                pin_memory=True, drop_last=False)
+        
+        # Load ground truth for external predictions
+        if opt.eval_split == 'endovis':
+            gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+            gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+        
+        depther = None
 
-    # Load ground truth
-    if opt.eval_split == 'endovis':
-        gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
-        gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+    # Create visualization directory if needed
+    if opt.visualize_depth:
+        vis_dir = os.path.join(opt.load_weights_folder if opt.ext_disp_to_eval is None else os.path.dirname(opt.ext_disp_to_eval), "vis_depth")
+        os.makedirs(vis_dir, exist_ok=True)
 
     print("-> Evaluating on {} split".format(opt.eval_split))
 
@@ -244,21 +296,24 @@ def evaluate(opt):
                 # Post-processed results require each image to have two forward passes
                 input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0)
 
-            # Forward pass
-            time_start = time.time()
-            output = depther(input_color)
-            inference_time = time.time() - time_start
-            inference_times.append(inference_time)            
+            if opt.ext_disp_to_eval is None:
+                # Forward pass
+                time_start = time.time()
+                output = depther(input_color)
+                inference_time = time.time() - time_start
+                inference_times.append(inference_time)
 
-            # Extract disparity
-            if isinstance(output, dict):
-                output_disp = output[("disp", 0)]
+                # Extract disparity
+                if isinstance(output, dict):
+                    output_disp = output[("disp", 0)]
+                else:
+                    output_disp = output
+                
+                pred_disp, _ = disp_to_depth(output_disp, opt.min_depth, opt.max_depth)
+                pred_disp = pred_disp.cpu()[:, 0].numpy()
+                pred_disp = pred_disp[0] if pred_disp.shape[0] == 1 else pred_disp
             else:
-                output_disp = output
-            
-            pred_disp, _ = disp_to_depth(output_disp, opt.min_depth, opt.max_depth)
-            pred_disp = pred_disp.cpu()[:, 0].numpy()
-            pred_disp = pred_disp[0] if pred_disp.shape[0] == 1 else pred_disp
+                pred_disp = pred_disps[i]
 
             # Get ground truth
             if opt.eval_split == 'endovis':
@@ -277,6 +332,15 @@ def evaluate(opt):
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
             pred_depth = 1 / pred_disp
+
+            # Visualize if needed
+            if opt.visualize_depth:
+                vis_pred_disp = render_depth(pred_disp)
+                if opt.eval_split == 'endovis':
+                    vis_file_name = os.path.join(vis_dir, "{:06d}.png".format(i))
+                else:
+                    vis_file_name = os.path.join(vis_dir, "{:06d}.png".format(i))
+                cv2.imwrite(vis_file_name, vis_pred_disp)
 
             # Create mask for valid regions
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
@@ -323,7 +387,8 @@ def evaluate(opt):
     print("\n       " + ("{:>11}      | " * 7).format("abs_rel", "sq_rel", "rmse", "rmse_log", "a1", "a2", "a3"))
     print("mean:" + ("&{: 12.3f}      " * 7).format(*mean_errors.tolist()) + "\\\\")
     print("cls: " + ("& [{: 6.3f}, {: 6.3f}] " * 7).format(*cls.tolist()) + "\\\\")
-    print("average inference time: {:0.1f} ms".format(np.mean(np.array(inference_times)) * 1000))
+    if opt.ext_disp_to_eval is None:
+        print("average inference time: {:0.1f} ms".format(np.mean(np.array(inference_times)) * 1000))
     print("\n-> Done!")
 
 
