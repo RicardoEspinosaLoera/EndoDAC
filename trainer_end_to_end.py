@@ -9,7 +9,10 @@ import models.decoders as decoders
 #import models.endodac as endodac
 import models.hadepth as hadepth
 import numpy as np
+import cv2
+import torch
 import torch.optim as optim
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from utils.utils import *
@@ -334,6 +337,82 @@ class Trainer:
  
         return ssim_loss
 
+    def get_highlight_mask(self, image):
+        """
+        Compute binary mask to detect highlighted pixels in endoscopic images.
+        Based on HSV color space analysis.
+        
+        Args:
+            image: Tensor of shape (B, 3, H, W) with values in [0, 1]
+            
+        Returns:
+            mask: Binary mask (B, 1, H, W) where 1=non-highlighted, 0=highlighted
+        """
+        # Convert RGB to HSV
+        batch_size, _, h, w = image.shape
+        mask = torch.ones((batch_size, 1, h, w), device=image.device, dtype=image.dtype)
+        
+        # Process in CPU for HSV conversion
+        image_np = (image.detach().cpu().numpy() * 255).astype(np.uint8)
+        
+        for i in range(batch_size):
+            # Convert from (C, H, W) to (H, W, C) and RGB to HSV
+            img_rgb = image_np[i].transpose(1, 2, 0)
+            img_hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV).astype(np.float32)
+            
+            # Normalize HSV channels: H [0, 180] -> [0, 1], S [0, 255] -> [0, 1], V [0, 255] -> [0, 1]
+            S = img_hsv[:, :, 1] / 255.0
+            V = img_hsv[:, :, 2] / 255.0
+            
+            # Compute thresholds based on image statistics
+            S_mean = np.mean(S)
+            V_mean = np.mean(V)
+            S_hard = 0.1
+            V_hard = 0.9
+            
+            S_tau = np.minimum(S_mean - 0.2, S_hard)
+            V_tau = np.maximum(V_mean + 0.2, V_hard)
+            
+            # Create highlight mask: M(p) = 0 if highlighted, 1 if non-highlighted
+            # Highlights: low saturation (S < S_τ) AND high brightness (V > V_τ)
+            highlight_pixels = (S < S_tau) & (V > V_tau)
+            mask_np = np.ones((1, h, w), dtype=np.float32)
+            mask_np[0, highlight_pixels] = 0
+            mask[i] = torch.from_numpy(mask_np).to(image.device)
+        
+        return mask
+
+    def compute_highlight_aware_loss(self, pred, target):
+        """
+        Compute highlight-aware photometric loss that masks out highlighted regions.
+        
+        Args:
+            pred: Predicted/synthesized image (B, 3, H, W)
+            target: Target image (B, 3, H, W)
+            
+        Returns:
+            loss: Masked photometric loss
+            mask: The highlight mask used
+        """
+        # Get highlight mask from target image
+        mask = self.get_highlight_mask(target)
+        
+        # Compute standard reprojection loss
+        reprojection_loss = self.compute_reprojection_loss(pred, target)
+        
+        # Apply highlight mask to loss
+        # mask shape: (B, 1, H, W), reprojection_loss shape: (B, 1, H, W)
+        masked_loss = reprojection_loss * mask
+        
+        # Average over non-highlighted pixels
+        valid_pixels = mask.sum()
+        if valid_pixels > 0:
+            loss = masked_loss.sum() / valid_pixels
+        else:
+            loss = masked_loss.mean()
+        
+        return loss, mask
+
 
     def train(self):
         """Run the entire training pipeline
@@ -575,10 +654,12 @@ class Trainer:
                 #Losses
                 #target = outputs[("color_refined", frame_id, scale)] #Lighting
                 pred = outputs[("color_refined", frame_id, scale)]
-                #SIMM
-                loss_reprojection += (self.compute_reprojection_loss(pred, target) * reprojection_loss_mask).sum() / reprojection_loss_mask.sum()
-                #Multiscale SIMM
-                #loss_reprojection += (self.get_ms_simm_loss(pred, target) * reprojection_loss_mask).sum() / reprojection_loss_mask.sum()
+                
+                # Use highlight-aware photometric loss
+                target = inputs[("color", 0, 0)]
+                loss_highlight_aware, highlight_mask = self.compute_highlight_aware_loss(pred, target)
+                loss_reprojection += loss_highlight_aware
+                
                 #Illuminations invariant loss
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color_refined", frame_id, scale)]
