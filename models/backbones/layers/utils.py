@@ -7,11 +7,6 @@ import warnings
 from typing import Callable
 import fvcore.nn.weight_init as weight_init
 
-try:
-    from .MAB import *
-except ImportError:
-    pass  # MAB module might not be available in all configs
-
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -99,13 +94,13 @@ class ResBottleneckBlock(nn.Module):
     """
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            bottleneck_channels: int,
-            act_layer: Callable[..., nn.Module] = nn.GELU,
-            conv_kernels=3,
-            conv_paddings=1,
+        self,
+        in_channels: int,
+        out_channels: int,
+        bottleneck_channels: int,
+        act_layer: Callable[..., nn.Module] = nn.GELU,
+        conv_kernels=3,
+        conv_paddings=1,
     ):
         """
         Args:
@@ -119,46 +114,41 @@ class ResBottleneckBlock(nn.Module):
         """
         super().__init__()
 
-        n_feats = in_channels
-        i_feats = 2 * n_feats
-
-        self.norm = LayerNorm(n_feats, data_format='channels_first')
-        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
-
-        self.LKA7 = nn.Sequential(
-            nn.Conv2d(n_feats // 3, n_feats // 3, 7, 1, 7 // 2, groups=n_feats // 3),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 9, stride=1, padding=(9 // 2) * 4, groups=n_feats // 3, dilation=4),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 1, 1, 0))
-        self.LKA5 = nn.Sequential(
-            nn.Conv2d(n_feats // 3, n_feats // 3, 5, 1, 5 // 2, groups=n_feats // 3),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 7, stride=1, padding=(7 // 2) * 3, groups=n_feats // 3, dilation=3),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 1, 1, 0))
-        self.LKA3 = nn.Sequential(
-            nn.Conv2d(n_feats // 3, n_feats // 3, 3, 1, 1, groups=n_feats // 3),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 5, stride=1, padding=(5 // 2) * 2, groups=n_feats // 3, dilation=2),
-            nn.Conv2d(n_feats // 3, n_feats // 3, 1, 1, 0))
-
-        self.X3 = nn.Conv2d(n_feats // 3, n_feats // 3, 3, 1, 1, groups=n_feats // 3)
-        self.X5 = nn.Conv2d(n_feats // 3, n_feats // 3, 5, 1, 5 // 2, groups=n_feats // 3)
-        self.X7 = nn.Conv2d(n_feats // 3, n_feats // 3, 7, 1, 7 // 2, groups=n_feats // 3)
-
-        self.proj_first = nn.Sequential(
-            nn.Conv2d(n_feats, i_feats, 1, 1, 0))
-
-        self.proj_last = nn.Sequential(
-            nn.Conv2d(n_feats, n_feats, 1, 1, 0))
-        #
-        self.norm.weight.data.zero_()
-        self.norm.bias.data.zero_()
-
+        self.conv1 = nn.Conv2d(in_channels, bottleneck_channels, 1, bias=False)
+        self.norm1 = LayerNorm(bottleneck_channels)
+        self.act1 = act_layer()
+        
+        self.conv2 = nn.Conv2d(
+            bottleneck_channels,
+            bottleneck_channels,
+            conv_kernels,
+            padding=conv_paddings,
+            bias=False,
+        )
+        self.norm2 = LayerNorm(bottleneck_channels)
+        self.act2 = act_layer()
+        
+        self.conv3 = nn.Conv2d(bottleneck_channels, out_channels, 1, bias=False)
+        self.norm3 = LayerNorm(out_channels)
+        
+        for layer in [self.conv1, self.conv2, self.conv3]:
+            weight_init.c2_msra_fill(layer)
+        for layer in [self.norm1, self.norm2]:
+            layer.weight.data.fill_(1.0)
+            layer.bias.data.zero_()
+        # zero init last norm layer.
+        self.norm3.weight.data.zero_()
+        self.norm3.bias.data.zero_()
+        
     def forward(self, x):
-        out = self.proj_first(x)
-        a, out = torch.chunk(out, 2, dim=1)
-        a_1, a_2, a_3 = torch.chunk(a, 3, dim=1)
-        a = torch.cat([self.LKA3(a_1) * self.X3(a_1), self.LKA5(a_2) * self.X5(a_2), self.LKA7(a_3) * self.X7(a_3)],
-                      dim=1)
-        out = self.proj_last(out * a) * self.scale
-        out = self.norm(out)
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.act1(out)
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.act2(out)
+        out = self.conv3(out)
+        out = self.norm3(out)
         return out
     
 
