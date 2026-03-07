@@ -649,8 +649,8 @@ class Trainer:
                 pred = inputs[("color", frame_id, source_scale)]
                 rep_identity = self.compute_reprojection_loss(pred, target)
                 
-                #reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
-                #reprojection_loss_mask_iil = get_feature_oclution_mask(reprojection_loss_mask)
+                reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
+                reprojection_loss_mask_iil = get_feature_oclution_mask(reprojection_loss_mask)
                 #Losses
                 #target = outputs[("color_refined", frame_id, scale)] #Lighting
                 pred = outputs[("color_refined", frame_id, scale)]
@@ -660,17 +660,10 @@ class Trainer:
                 loss_highlight_aware, highlight_mask = self.compute_highlight_aware_loss(pred, target)
                 loss_reprojection += loss_highlight_aware
                 
-                #Illuminations invariant loss with highlight mask
+                #Illuminations invariant loss
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color_refined", frame_id, scale)]
-                illumination_loss = self.get_illumination_invariant_loss(pred, target)
-                # Apply highlight mask to illumination invariant loss
-                masked_illumination_loss = illumination_loss * highlight_mask
-                valid_pixels = highlight_mask.sum()
-                if valid_pixels > 0:
-                    loss_ilumination_invariant += masked_illumination_loss.sum() / valid_pixels
-                else:
-                    loss_ilumination_invariant += masked_illumination_loss.mean()
+                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil).sum() / reprojection_loss_mask_iil.sum()
  
             
             loss += loss_reprojection / 2.0
