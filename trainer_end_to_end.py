@@ -387,13 +387,14 @@ class Trainer:
 
         return mask
 
-    def compute_highlight_aware_loss(self, pred, target, alpha=0.85):
+    def compute_highlight_aware_loss(self, pred, target, reprojection_loss_mask, alpha=0.85):
         """
         Highlight-aware photometric loss from HADepth (Eq. 9–11).
 
         Args:
             pred   : Synthesized image I_{s->t} (B,3,H,W)
             target : Target image I_t          (B,3,H,W)
+            reprojection_loss_mask : Mask for reprojection loss (B,1,H,W)
             alpha  : SSIM weight (default 0.85)
 
         Returns:
@@ -405,7 +406,7 @@ class Trainer:
         # 1) Compute highlight mask from target image
         # --------------------------------------------------
         mask = self.get_highlight_mask(target)
-
+        mask = mask * reprojection_loss_mask  # combine with reprojection loss mask to focus on valid pixels
         # --------------------------------------------------
         # 2) SSIM term (NOT masked)
         # --------------------------------------------------
@@ -653,6 +654,8 @@ class Trainer:
 
         for scale in self.opt.scales:
             loss = 0
+            loss_reprojection = 0
+            loss_ilumination_invariant = 0
 
             if self.opt.v1_multiscale:
                 source_scale = scale
@@ -674,19 +677,25 @@ class Trainer:
                 
                 reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
                 reprojection_loss_mask_iil = get_feature_oclution_mask(reprojection_loss_mask)
+
                 #Losses
                 #target = outputs[("color_refined", frame_id, scale)] #Lighting
                 pred = outputs[("color_refined", frame_id, scale)]
                 
                 # Use highlight-aware photometric loss
                 target = inputs[("color", 0, 0)]
-                loss_highlight_aware, highlight_mask = self.compute_highlight_aware_loss(pred, target)
+                loss_highlight_aware, highlight_mask = self.compute_highlight_aware_loss(pred, target, reprojection_loss_mask)
                 loss_reprojection += loss_highlight_aware
+
+                #combined masks
+                combined_mask = reprojection_loss_mask * highlight_mask
+                reprojection_loss_mask_iil_combined = reprojection_loss_mask_iil * highlight_mask
+
                 
                 #Illuminations invariant loss
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color_refined", frame_id, scale)]
-                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil).sum() / reprojection_loss_mask_iil.sum()
+                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil_combined).sum() / reprojection_loss_mask_iil_combined.sum()
  
             
             loss += loss_reprojection / 2.0
