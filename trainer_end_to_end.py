@@ -6,8 +6,8 @@ import datasets
 from datasets.scared_dataset import SCAREDRAWDataset
 import models.encoders as encoders
 import models.decoders as decoders
-#import models.endodac as endodac
-import models.hadepth as hadepth
+import models.endodac as endodac
+#import models.hadepth as hadepth
 import numpy as np
 import cv2
 import torch
@@ -54,7 +54,7 @@ class Trainer:
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        self.models["depth_model"] = hadepth.hadepth(
+        self.models["depth_model"] = endodac.endodac(
             backbone_size = "base", r=self.opt.lora_rank, lora_type=self.opt.lora_type,
             image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
             residual_block_indexes=self.opt.residual_block_indexes,
@@ -291,7 +291,7 @@ class Trainer:
             warm_up = True
         else:
             warm_up = False
-        hadepth.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
+        endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
         for param in self.models["pose_encoder"].parameters():
             param.requires_grad = True
         for param in self.models["pose"].parameters():
@@ -647,8 +647,6 @@ class Trainer:
     def compute_losses(self, inputs, outputs):
 
         losses = {}
-        loss_reprojection = 0
-        loss_ilumination_invariant = 0
         total_loss = 0
 
 
