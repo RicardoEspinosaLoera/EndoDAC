@@ -40,7 +40,7 @@ class MonodepthOptions:
                                  type=str,
                                  help="which lora type use for the model",
                                  choices=["lora", "dvlora", "none", "flora", "dora"],
-                                 default="dora")
+                                 default="dvlora")
         
         self.parser.add_argument("--lora_rank",
                                  type=int,
@@ -67,7 +67,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="hadepth")
+                                 default="endodac_iil")
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
