@@ -67,7 +67,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="endodac_iil")
+                                 default="hadepth_iil")
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
@@ -94,7 +94,8 @@ class MonodepthOptions:
                                  type=int,
                                  help="input image width",
                                  default=320)
-        self.parser.add_argument("--disparity_smoothness",
+        self.parser.add_argument("--
+        ",
                                  type=float,
                                  help="disparity smoothness weight",
                                  default=1e-3)
@@ -216,7 +217,7 @@ class MonodepthOptions:
                                  type=str,
                                  help="which model type to use for evaluation",
                                  choices=["endodac", "hadepth", "afsfm", "endosfml", "monovit"],
-                                 default="endodac")
+                                 default="hadepth")
         self.parser.add_argument("--eval_stereo",
                                  help="if set evaluates in stereo mode",
                                  action="store_true")

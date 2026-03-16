@@ -103,4 +103,3 @@ class Linear(nn.Linear, LoRALayer):
             return result
         else:
             return F.linear(x, T(self.weight+self.new_lora.view(-1)), bias=self.bias)
-
