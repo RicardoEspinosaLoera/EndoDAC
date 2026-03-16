@@ -687,13 +687,13 @@ class Trainer:
 
                 #combined masks
                 combined_mask = reprojection_loss_mask * highlight_mask
-                reprojection_loss_mask_iil_combined = reprojection_loss_mask_iil * highlight_mask
+                #reprojection_loss_mask_iil_combined = reprojection_loss_mask_iil * highlight_mask
 
                 
                 #Illuminations invariant loss
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color_refined", frame_id, scale)]
-                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil_combined).sum() / reprojection_loss_mask_iil_combined.sum()
+                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil).sum() / reprojection_loss_mask_iil.sum()
  
             
             loss += loss_reprojection / 2.0
