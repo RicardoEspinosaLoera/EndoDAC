@@ -341,6 +341,10 @@ def evaluate(opt):
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
             pred_depth = 1 / pred_disp
+            
+            # Save full 2D versions for visualization BEFORE masking
+            pred_depth_full = pred_depth.copy()
+            gt_depth_full = gt_depth.copy()
 
             # Create mask for valid regions
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
@@ -367,25 +371,39 @@ def evaluate(opt):
             if not np.isnan(error).all():
                 errors.append(error)
             
-            # Log to WandB (sample every 10 frames to avoid too many logs)
-            if i % 10 == 0:
-                # Visualize depth: clip at 95th percentile for better visualization
-                depth_pred_viz = visualize_depth_map(pred_depth)
-                depth_gt_viz = visualize_depth_map(gt_depth)
-                error_map = visualize_error_map(gt_depth, pred_depth, percentile=95)
+            # Log to WandB (sample every 50 frames to avoid rate limiting)
+            if i % 50 == 0 and len(pred_depth) > 0:
+                # Visualize depth using FULL 2D maps before masking (better visualization)
+                # Resize full maps to smaller size for faster upload
+                h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
+                gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
+                pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
                 
-                # Convert BGR to RGB for WandB
-                depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
-                depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
-                error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
-                
-                wandb.log({
-                    "depth_pred": wandb.Image(depth_pred_rgb),
-                    "depth_gt": wandb.Image(depth_gt_rgb),
-                    "error_map": wandb.Image(error_map_rgb),
-                    "frame_idx": i,
-                    "abs_error": np.mean(np.abs(gt_depth - pred_depth))
-                })
+                try:
+                    # Visualize depth: clip at 95th percentile
+                    depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
+                    depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
+                    
+                    # Create error map from masked values
+                    error_full = np.abs(gt_depth_full - pred_depth_full)
+                    error_clipped = np.clip(error_full, 0, np.percentile(error_full[mask], 95))
+                    error_normalized = (error_clipped / (error_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
+                    error_map = cv2.applyColorMap(error_normalized, cv2.COLORMAP_INFERNO)
+                    
+                    # Convert BGR to RGB for WandB
+                    depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
+                    depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
+                    error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
+                    
+                    wandb.log({
+                        "depth_pred": wandb.Image(depth_pred_rgb),
+                        "depth_gt": wandb.Image(depth_gt_rgb),
+                        "error_map": wandb.Image(error_map_rgb),
+                        "frame_idx": i,
+                        "abs_error": np.mean(np.abs(gt_depth - pred_depth))
+                    }, commit=True)
+                except Exception as e:
+                    print(f"Warning: Could not log frame {i} to WandB: {e}")
 
     # Print results
     if not opt.disable_median_scaling:
