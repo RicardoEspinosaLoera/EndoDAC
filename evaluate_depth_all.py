@@ -403,7 +403,8 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            pred_depth = 1 / pred_disp
+            _, pred_depth = disp_to_depth(pred_disp, self.opt.min_depth, self.opt.max_depth)
+            #pred_depth = 1 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
             pred_depth_full = pred_depth.copy()
@@ -445,25 +446,13 @@ def evaluate(opt):
                     #print(f"Frame {i}: Preparing visualization with dimensions {gt_height}x{gt_width} -> {h_viz}x{w_viz}")
                     
                     # Ensure proper 2D shapes before resizing
-                    if gt_depth_full.ndim != 2:
+                    """if gt_depth_full.ndim != 2:
                         #print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
                         gt_depth_full = gt_depth_full[:, :, 0] if gt_depth_full.ndim == 3 else gt_depth_full
                     if pred_depth_full.ndim != 2:
                         #print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
-                        pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full
-                    
-                    # Validate arrays are not empty and have valid values
-                    if gt_depth_full.size == 0 or pred_depth_full.size == 0:
-                        #print(f"Warning: Empty depth arrays, skipping visualization")
-                        continue
-                    
-                    # Check for NaN or inf values
-                    if np.isnan(gt_depth_full).any() or np.isinf(gt_depth_full).any():
-                        #print(f"Warning: gt_depth contains NaN or inf, skipping visualization")
-                        continue
-                    if np.isnan(pred_depth_full).any() or np.isinf(pred_depth_full).any():
-                        #print(f"Warning: pred_depth contains NaN or inf, skipping visualization")
-                        continue
+                        pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full"""
+
                     
                     # Ensure arrays are proper dtype
                     gt_depth_full = np.asarray(gt_depth_full, dtype=np.float32)
