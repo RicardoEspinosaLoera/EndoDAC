@@ -1023,7 +1023,8 @@ class Trainer:
             ma = float(vis.max())
             mi = float(vis.min())
             d = ma - mi if ma != mi else 1e5
-            vis = (vis - mi) / d
+            # Invert: closer points (lower depth) = lighter, farther points (higher depth) = darker
+            vis = (ma - vis) / d
 
         if vis.ndim == 4:
             vis = vis.transpose([0, 2, 3, 1])

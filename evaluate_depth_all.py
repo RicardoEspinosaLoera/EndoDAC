@@ -61,7 +61,8 @@ def colormap(inputs, normalize=True, percentile=95):
         ma = float(vis.max())
         mi = float(vis.min())
         d = ma - mi if ma != mi else 1e5
-        vis = (vis - mi) / d
+        # Invert: closer points (lower depth) = lighter, farther points (higher depth) = darker
+        vis = (ma - vis) / d
 
     # Apply colormap based on dimensions
     if vis.ndim == 2:
