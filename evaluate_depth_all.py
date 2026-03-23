@@ -441,6 +441,11 @@ def evaluate(opt):
                     # Resize full maps to smaller size for faster upload
                     h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
                     
+                    # Validate visualization dimensions
+                    if h_viz <= 0 or w_viz <= 0:
+                        print(f"Warning: Invalid visualization dimensions h_viz={h_viz}, w_viz={w_viz}, skipping visualization")
+                        continue
+                    
                     # Ensure proper 2D shapes before resizing
                     if gt_depth_full.ndim != 2:
                         print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
@@ -448,6 +453,11 @@ def evaluate(opt):
                     if pred_depth_full.ndim != 2:
                         print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
                         pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full
+                    
+                    # Validate arrays are not empty
+                    if gt_depth_full.size == 0 or pred_depth_full.size == 0:
+                        print(f"Warning: Empty depth arrays, skipping visualization")
+                        continue
                     
                     gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
                     pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
