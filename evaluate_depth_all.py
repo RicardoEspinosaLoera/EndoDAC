@@ -463,13 +463,37 @@ def evaluate(opt):
                     depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
                     error_map_rgb = cv2.cvtColor(error_map_viz, cv2.COLOR_BGR2RGB)
                     
-                    wandb.log({
+                    # Log base depth visualization and error map
+                    wandb_log_dict = {
                         "depth_pred": wandb.Image(depth_pred_rgb),
                         "depth_gt": wandb.Image(depth_gt_rgb),
                         "error_map": wandb.Image(error_map_rgb),
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth))
-                    }, commit=True)
+                    }
+                    
+                    # Log disparity at multiple scales BEFORE conversion to depth
+                    if isinstance(output, dict):
+                        for scale in range(4):  # Typical scales: 0, 1, 2, 3
+                            if ("disp", scale) in output:
+                                disp_scale = output[("disp", scale)]
+                                if isinstance(disp_scale, torch.Tensor):
+                                    disp_scale = disp_scale.detach().cpu().numpy()
+                                
+                                # Take first batch if batched
+                                if disp_scale.ndim == 4:
+                                    disp_scale = disp_scale[0]
+                                
+                                # Apply colormap to disparity
+                                disp_colored = colormap(disp_scale, normalize=True, percentile=95)
+                                
+                                # Convert BGR to RGB for WandB (transpose from HWC to HWC)
+                                disp_rgb = cv2.cvtColor(disp_colored, cv2.COLOR_BGR2RGB)
+                                
+                                wandb_log_dict[f"disp_scale_{scale}"] = wandb.Image(disp_rgb)
+                    
+                    wandb.log(wandb_log_dict, commit=True)
+                    
                 except Exception as e:
                     print(f"Warning: Could not log frame {i} to WandB: {e}")
 
