@@ -26,7 +26,7 @@ import models.monovit as monovit
 cv2.setNumThreads(0)
 
 # Initialize plasma colormap for visualization
-DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
+_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -37,6 +37,54 @@ def render_depth(disp):
     return disp_color
 
 
+def colormap(inputs, normalize=True, percentile=95):
+    """Apply plasma colormap to visualization inputs
+    
+    Args:
+        inputs: Input array or tensor (2D, 3D, or 4D)
+        normalize: Whether to normalize input to 0-1 range
+        percentile: Percentile for clipping to avoid saturation
+    
+    Returns:
+        vis: Colored visualization as numpy array (H, W, 3) in BGR format
+    """
+    if isinstance(inputs, torch.Tensor):
+        inputs = inputs.detach().cpu().numpy()
+
+    vis = inputs.copy()
+    
+    # Clip at percentile for better visualization
+    if vis.ndim >= 2:
+        vis = np.clip(vis, 0, np.percentile(vis, percentile))
+    
+    if normalize:
+        ma = float(vis.max())
+        mi = float(vis.min())
+        d = ma - mi if ma != mi else 1e5
+        vis = (vis - mi) / d
+
+    # Apply colormap based on dimensions
+    if vis.ndim == 2:
+        vis = _DEPTH_COLORMAP(vis)
+        vis = vis[..., :3]
+    elif vis.ndim == 3:
+        vis = _DEPTH_COLORMAP(vis)
+        vis = vis[..., :3]
+    elif vis.ndim == 4:
+        vis = vis.transpose([0, 2, 3, 1])
+        vis = _DEPTH_COLORMAP(vis)
+        vis = vis[:, :, :, :3]
+    
+    # Convert to uint8 (0-255 range)
+    vis = (vis * 255).astype(np.uint8)
+    
+    # Convert RGB to BGR for OpenCV compatibility
+    if vis.ndim == 3:
+        vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
+    
+    return vis
+
+
 def visualize_depth_map(depth, percentile=95):
     """Visualize depth map with Plasma colormap
     
@@ -45,49 +93,22 @@ def visualize_depth_map(depth, percentile=95):
         percentile: Percentile for clipping to avoid saturation
     
     Returns:
-        depth_viz: RGB colored depth visualization
+        depth_viz: BGR colored depth visualization
     """
-    # Clip at percentile
-    depth_clipped = np.clip(depth, 0, np.percentile(depth, percentile))
-    # Normalize to 0-1 for colormap
-    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8))
-    # Apply plasma colormap
-    depth_colored = DEPTH_COLORMAP(depth_normalized)
-    # Convert to uint8 RGB (drop alpha channel)
-    depth_viz = (depth_colored[:, :, :3] * 255).astype(np.uint8)
-    # Convert RGB to BGR for OpenCV
-    depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
-    return depth_viz
+    return colormap(depth, normalize=True, percentile=percentile)
 
 
-def visualize_error_map(gt_depth, pred_depth, percentile=95):
-    """Create error map visualization showing absolute difference
+def visualize_error_map(error, percentile=95):
+    """Create error map visualization
     
     Args:
-        gt_depth: Ground truth depth (masked)
-        pred_depth: Predicted depth (masked, same shape as gt_depth)
+        error: Error map (H, W) - should already be computed
         percentile: Percentile for clipping (to avoid saturation)
     
     Returns:
-        error_map: RGB colored error map (dark = low error, bright = high error)
+        error_map: BGR colored error map (dark = low error, bright = high error)
     """
-    # Compute absolute error
-    error = np.abs(gt_depth - pred_depth)
-    
-    # Clip at percentile to avoid saturation
-    error_clipped = np.clip(error, 0, np.percentile(error, percentile))
-    
-    # Normalize to 0-1 for colormap
-    error_normalized = error_clipped / (error_clipped.max() + 1e-8)
-    
-    # Apply plasma colormap
-    error_colored = DEPTH_COLORMAP(error_normalized)
-    # Convert to uint8 RGB (drop alpha channel)
-    error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
-    # Convert RGB to BGR for OpenCV
-    error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
-    
-    return error_map
+    return colormap(error, normalize=True, percentile=percentile)
 
 
 class DepthModelFactory:
@@ -383,8 +404,8 @@ def evaluate(opt):
             if not np.isnan(error).all():
                 errors.append(error)
             
-            # Log to WandB (sample every 50 frames to avoid rate limiting)
-            if i % 50 == 0 and len(pred_depth) > 0:
+            # Log to WandB (sample every 25 frames to avoid rate limiting)
+            if i % 25 == 0 and len(pred_depth) > 0:
                 # Visualize depth using FULL 2D maps before masking (better visualization)
                 # Resize full maps to smaller size for faster upload
                 h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
@@ -396,13 +417,14 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map using the visualization function
-                    error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=95)
+                    # Compute and visualize error map
+                    error_data = np.abs(gt_depth_resized - pred_depth_resized)
+                    error_map_viz = visualize_error_map(error_data, percentile=95)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
                     depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
-                    error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
+                    error_map_rgb = cv2.cvtColor(error_map_viz, cv2.COLOR_BGR2RGB)
                     
                     wandb.log({
                         "depth_pred": wandb.Image(depth_pred_rgb),
