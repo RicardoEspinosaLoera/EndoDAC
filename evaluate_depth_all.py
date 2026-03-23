@@ -384,10 +384,19 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map from masked values
-                    error_full = np.abs(gt_depth_full - pred_depth_full)
-                    error_clipped = np.clip(error_full, 0, np.percentile(error_full[mask], 95))
-                    error_normalized = (error_clipped / (error_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
+                    # Create error map from resized depth maps (same as visualization)
+                    error_map_data = np.abs(gt_depth_resized - pred_depth_resized)
+                    
+                    # Clip at 95th percentile to avoid saturation
+                    error_clipped = np.clip(error_map_data, 0, np.percentile(error_map_data, 95))
+                    
+                    # Normalize to 0-255
+                    error_max = error_clipped.max()
+                    if error_max > 0:
+                        error_normalized = (error_clipped / error_max * 255.0).astype(np.uint8)
+                    else:
+                        error_normalized = np.zeros_like(error_clipped, dtype=np.uint8)
+                    
                     error_map = cv2.applyColorMap(error_normalized, cv2.COLORMAP_INFERNO)
                     
                     # Convert BGR to RGB for WandB
