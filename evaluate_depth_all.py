@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 import scipy.stats as st
 import wandb
+import matplotlib.pyplot as plt
 
 from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
@@ -24,6 +25,9 @@ import models.monovit as monovit
 
 cv2.setNumThreads(0)
 
+# Initialize plasma colormap for visualization
+DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
+
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
 def render_depth(disp):
@@ -34,7 +38,7 @@ def render_depth(disp):
 
 
 def visualize_depth_map(depth, percentile=95):
-    """Visualize depth map with INFERNO colormap
+    """Visualize depth map with Plasma colormap
     
     Args:
         depth: Depth map (H, W)
@@ -45,10 +49,14 @@ def visualize_depth_map(depth, percentile=95):
     """
     # Clip at percentile
     depth_clipped = np.clip(depth, 0, np.percentile(depth, percentile))
-    # Normalize to 0-255
-    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
-    # Apply colormap
-    depth_viz = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_INFERNO)
+    # Normalize to 0-1 for colormap
+    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8))
+    # Apply plasma colormap
+    depth_colored = DEPTH_COLORMAP(depth_normalized)
+    # Convert to uint8 RGB (drop alpha channel)
+    depth_viz = (depth_colored[:, :, :3] * 255).astype(np.uint8)
+    # Convert RGB to BGR for OpenCV
+    depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
     return depth_viz
 
 
@@ -61,7 +69,7 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
         percentile: Percentile for clipping (to avoid saturation)
     
     Returns:
-        error_map: RGB colored error map (black/blue = low error, red/white = high error)
+        error_map: RGB colored error map (dark = low error, bright = high error)
     """
     # Compute absolute error
     error = np.abs(gt_depth - pred_depth)
@@ -69,11 +77,15 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     # Clip at percentile to avoid saturation
     error_clipped = np.clip(error, 0, np.percentile(error, percentile))
     
-    # Normalize to 0-255 for visualization
-    error_normalized = (error_clipped / (error_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
+    # Normalize to 0-1 for colormap
+    error_normalized = error_clipped / (error_clipped.max() + 1e-8)
     
-    # Apply colormap (INFERNO: black/blue -> blue/yellow -> red/white)
-    error_map = cv2.applyColorMap(error_normalized, cv2.COLORMAP_INFERNO)
+    # Apply plasma colormap
+    error_colored = DEPTH_COLORMAP(error_normalized)
+    # Convert to uint8 RGB (drop alpha channel)
+    error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
+    # Convert RGB to BGR for OpenCV
+    error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
     
     return error_map
 
@@ -384,20 +396,8 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map from resized depth maps (same as visualization)
-                    error_map_data = np.abs(gt_depth_resized - pred_depth_resized)
-                    
-                    # Clip at 95th percentile to avoid saturation
-                    error_clipped = np.clip(error_map_data, 0, np.percentile(error_map_data, 95))
-                    
-                    # Normalize to 0-255
-                    error_max = error_clipped.max()
-                    if error_max > 0:
-                        error_normalized = (error_clipped / error_max * 255.0).astype(np.uint8)
-                    else:
-                        error_normalized = np.zeros_like(error_clipped, dtype=np.uint8)
-                    
-                    error_map = cv2.applyColorMap(error_normalized, cv2.COLORMAP_INFERNO)
+                    # Create error map using the visualization function
+                    error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=95)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
