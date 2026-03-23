@@ -388,15 +388,16 @@ def evaluate(opt):
             # Get ground truth
             if opt.eval_split == 'endovis':
                 gt_depth = gt_depths[i]
-                #sequence = str(np.array(data['sequence'][0]))
-                #keyframe = str(np.array(data['keyframe'][0]))
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
                 gt_depth = data["depth_gt"].squeeze().numpy()
             
             # Handle 3D gt_depth (extract first channel if needed)
-            # if gt_depth.ndim == 3:
-            #    gt_depth = gt_depth[:, :, 0]
+            if gt_depth.ndim == 3:
+                gt_depth = gt_depth[:, :, 0]
+            
+            # Ensure gt_depth is 2D
+            assert gt_depth.ndim == 2, f"Expected 2D depth, got shape {gt_depth.shape}"
 
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
@@ -435,14 +436,23 @@ def evaluate(opt):
             
             # Log to WandB (sample every 25 frames to avoid rate limiting)
             if i % 25 == 0 and len(pred_depth) > 0:
-                # Visualize depth using FULL 2D maps before masking (better visualization)
-                # Resize full maps to smaller size for faster upload
-                h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
-                gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
-                pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
-                mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz)) > 0.5
-                
                 try:
+                    # Visualize depth using FULL 2D maps before masking (better visualization)
+                    # Resize full maps to smaller size for faster upload
+                    h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
+                    
+                    # Ensure proper 2D shapes before resizing
+                    if gt_depth_full.ndim != 2:
+                        print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
+                        gt_depth_full = gt_depth_full[:, :, 0] if gt_depth_full.ndim == 3 else gt_depth_full
+                    if pred_depth_full.ndim != 2:
+                        print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
+                        pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full
+                    
+                    gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
+                    pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
+                    mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz)) > 0.5
+                    
                     # Visualize depth: clip at 95th percentile
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
