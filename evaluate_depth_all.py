@@ -7,6 +7,7 @@ import time
 import torch
 from torch.utils.data import DataLoader
 import scipy.stats as st
+import wandb
 
 from utils.layers import disp_to_depth
 from utils.utils import readlines, compute_errors
@@ -30,6 +31,51 @@ def render_depth(disp):
     disp = disp.astype(np.uint8)
     disp_color = cv2.applyColorMap(disp, cv2.COLORMAP_INFERNO)
     return disp_color
+
+
+def visualize_depth_map(depth, percentile=95):
+    """Visualize depth map with INFERNO colormap
+    
+    Args:
+        depth: Depth map (H, W)
+        percentile: Percentile for clipping to avoid saturation
+    
+    Returns:
+        depth_viz: RGB colored depth visualization
+    """
+    # Clip at percentile
+    depth_clipped = np.clip(depth, 0, np.percentile(depth, percentile))
+    # Normalize to 0-255
+    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
+    # Apply colormap
+    depth_viz = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_INFERNO)
+    return depth_viz
+
+
+def visualize_error_map(gt_depth, pred_depth, percentile=95):
+    """Create error map visualization showing absolute difference
+    
+    Args:
+        gt_depth: Ground truth depth (masked)
+        pred_depth: Predicted depth (masked, same shape as gt_depth)
+        percentile: Percentile for clipping (to avoid saturation)
+    
+    Returns:
+        error_map: RGB colored error map (black/blue = low error, red/white = high error)
+    """
+    # Compute absolute error
+    error = np.abs(gt_depth - pred_depth)
+    
+    # Clip at percentile to avoid saturation
+    error_clipped = np.clip(error, 0, np.percentile(error, percentile))
+    
+    # Normalize to 0-255 for visualization
+    error_normalized = (error_clipped / (error_clipped.max() + 1e-8) * 255.0).astype(np.uint8)
+    
+    # Apply colormap (INFERNO: black/blue -> blue/yellow -> red/white)
+    error_map = cv2.applyColorMap(error_normalized, cv2.COLORMAP_INFERNO)
+    
+    return error_map
 
 
 class DepthModelFactory:
@@ -235,6 +281,11 @@ def evaluate(opt):
         gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
 
     print("-> Evaluating on {} split".format(opt.eval_split))
+    
+    # Initialize WandB for logging
+    #run_name = opt.load_weights_folder.split(os.sep)[-1] if opt.load_weights_folder else "depth_eval"
+    #wandb.init(project="endodac-depth-eval", name=run_name, config=vars(opt))
+    wandb.init(project="II-Testing", entity="respinosa")
 
     if opt.eval_stereo:
         print("   Stereo evaluation")
@@ -315,6 +366,26 @@ def evaluate(opt):
             error = compute_errors(gt_depth, pred_depth)
             if not np.isnan(error).all():
                 errors.append(error)
+            
+            # Log to WandB (sample every 10 frames to avoid too many logs)
+            if i % 10 == 0:
+                # Visualize depth: clip at 95th percentile for better visualization
+                depth_pred_viz = visualize_depth_map(pred_depth)
+                depth_gt_viz = visualize_depth_map(gt_depth)
+                error_map = visualize_error_map(gt_depth, pred_depth, percentile=95)
+                
+                # Convert BGR to RGB for WandB
+                depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
+                depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
+                error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
+                
+                wandb.log({
+                    "depth_pred": wandb.Image(depth_pred_rgb),
+                    "depth_gt": wandb.Image(depth_gt_rgb),
+                    "error_map": wandb.Image(error_map_rgb),
+                    "frame_idx": i,
+                    "abs_error": np.mean(np.abs(gt_depth - pred_depth))
+                })
 
     # Print results
     if not opt.disable_median_scaling:
@@ -336,7 +407,22 @@ def evaluate(opt):
     print("\n       " + ("{:>11}      | " * 7).format("abs_rel", "sq_rel", "rmse", "rmse_log", "a1", "a2", "a3"))
     print("mean:" + ("&{: 12.3f}      " * 7).format(*mean_errors.tolist()) + "\\\\")
     print("cls: " + ("& [{: 6.3f}, {: 6.3f}] " * 7).format(*cls.tolist()) + "\\\\")
-    print("average inference time: {:0.1f} ms".format(np.mean(np.array(inference_times)) * 1000))
+    avg_inference_time = np.mean(np.array(inference_times)) * 1000
+    print("average inference time: {:0.1f} ms".format(avg_inference_time))
+    
+    # Log final metrics to WandB
+    wandb.log({
+        "abs_rel": mean_errors[0],
+        "sq_rel": mean_errors[1],
+        "rmse": mean_errors[2],
+        "rmse_log": mean_errors[3],
+        "a1": mean_errors[4],
+        "a2": mean_errors[5],
+        "a3": mean_errors[6],
+        "avg_inference_time_ms": avg_inference_time
+    })
+    
+    wandb.finish()
     print("\n-> Done!")
 
 
