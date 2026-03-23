@@ -439,12 +439,9 @@ def evaluate(opt):
                 try:
                     # Visualize depth using FULL 2D maps before masking (better visualization)
                     # Resize full maps to smaller size for faster upload
-                    h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
+                    h_viz, w_viz = max(8, int(gt_height / 4)), max(8, int(gt_width / 4))
                     
-                    # Validate visualization dimensions
-                    if h_viz <= 0 or w_viz <= 0:
-                        print(f"Warning: Invalid visualization dimensions h_viz={h_viz}, w_viz={w_viz}, skipping visualization")
-                        continue
+                    print(f"Frame {i}: Preparing visualization with dimensions {gt_height}x{gt_width} -> {h_viz}x{w_viz}")
                     
                     # Ensure proper 2D shapes before resizing
                     if gt_depth_full.ndim != 2:
@@ -454,14 +451,32 @@ def evaluate(opt):
                         print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
                         pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full
                     
-                    # Validate arrays are not empty
+                    # Validate arrays are not empty and have valid values
                     if gt_depth_full.size == 0 or pred_depth_full.size == 0:
                         print(f"Warning: Empty depth arrays, skipping visualization")
                         continue
                     
-                    gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
-                    pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
-                    mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz)) > 0.5
+                    # Check for NaN or inf values
+                    if np.isnan(gt_depth_full).any() or np.isinf(gt_depth_full).any():
+                        print(f"Warning: gt_depth contains NaN or inf, skipping visualization")
+                        continue
+                    if np.isnan(pred_depth_full).any() or np.isinf(pred_depth_full).any():
+                        print(f"Warning: pred_depth contains NaN or inf, skipping visualization")
+                        continue
+                    
+                    # Ensure arrays are proper dtype
+                    gt_depth_full = np.asarray(gt_depth_full, dtype=np.float32)
+                    pred_depth_full = np.asarray(pred_depth_full, dtype=np.float32)
+                    
+                    print(f"  gt_depth_full: shape={gt_depth_full.shape}, dtype={gt_depth_full.dtype}, range=[{gt_depth_full.min():.3f}, {gt_depth_full.max():.3f}]")
+                    print(f"  pred_depth_full: shape={pred_depth_full.shape}, dtype={pred_depth_full.dtype}, range=[{pred_depth_full.min():.3f}, {pred_depth_full.max():.3f}]")
+                    
+                    # Resize with explicit size validation
+                    gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
+                    pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
+                    mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz), interpolation=cv2.INTER_NEAREST) > 0.5
+                    
+                    print(f"  Resized successfully to {gt_depth_resized.shape}")
                     
                     # Visualize depth: clip at 95th percentile
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
@@ -491,8 +506,11 @@ def evaluate(opt):
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth))
                     }, commit=True)
+                    print(f"  Frame {i} logged successfully")
                 except Exception as e:
-                    print(f"Warning: Could not log frame {i} to WandB: {e}")
+                    print(f"Warning: Could not log frame {i} to WandB: {type(e).__name__}: {e}")
+                    import traceback
+                    traceback.print_exc()
 
     # Print results
     if not opt.disable_median_scaling:
