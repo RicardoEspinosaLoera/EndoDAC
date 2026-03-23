@@ -403,7 +403,7 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            _, pred_depth = disp_to_depth(pred_disp, self.opt.min_depth, self.opt.max_depth)
+            _, pred_depth = disp_to_depth(pred_disp, MIN_DEPTH, MAX_DEPTH)
             #pred_depth = 1 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
