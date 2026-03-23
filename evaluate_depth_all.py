@@ -396,8 +396,9 @@ def evaluate(opt):
             pred_depth_full = pred_depth.copy()
             gt_depth_full = gt_depth.copy()
 
-            # Create mask for valid regions
+            # Create mask for valid regions (for both processing and visualization)
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
+            mask_full = mask  # Save full-resolution mask for visualization
 
             # Extract valid regions
             pred_depth = pred_depth[mask]
@@ -428,14 +429,19 @@ def evaluate(opt):
                 h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
                 gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
                 pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
+                mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz)) > 0.5
                 
                 try:
                     # Visualize depth: clip at 95th percentile
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Compute and visualize error map
+                    # Compute error map and REMOVE BACKGROUND / INVALID REGIONS
                     error_data = np.abs(gt_depth_resized - pred_depth_resized)
+                    
+                    # Set invalid regions to 0 (black background)
+                    error_data[~mask_resized] = 0
+                    
                     error_map_viz = visualize_error_map(error_data, percentile=95)
                     
                     # Convert BGR to RGB for WandB
