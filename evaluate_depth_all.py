@@ -40,9 +40,16 @@ def render_depth(disp):
 def visualize_depth_map(depth, percentile=95):
     depth = depth.astype(np.float32)
 
-    # Robust clipping
-    vmax = np.percentile(depth, percentile)
-    vmin = np.percentile(depth, 5)
+    # ✅ mask valid depth
+    valid = depth > 1e-6
+    if np.sum(valid) == 0:
+        return np.zeros((*depth.shape, 3), dtype=np.uint8)
+
+    depth_valid = depth[valid]
+
+    # robust stats ONLY on valid pixels
+    vmax = np.percentile(depth_valid, percentile)
+    vmin = np.percentile(depth_valid, 5)
 
     if vmax - vmin < 1e-6:
         depth_norm = np.zeros_like(depth)
@@ -51,6 +58,9 @@ def visualize_depth_map(depth, percentile=95):
 
     depth_norm = np.clip(depth_norm, 0, 1)
 
+    # optional: set invalid to 0
+    depth_norm[~valid] = 0
+
     depth_color = DEPTH_COLORMAP(depth_norm)
     depth_viz = (depth_color[:, :, :3] * 255).astype(np.uint8)
 
@@ -58,33 +68,29 @@ def visualize_depth_map(depth, percentile=95):
 
 
 def visualize_error_map(gt_depth, pred_depth, percentile=95):
-    """Create error map visualization showing absolute difference
-    
-    Args:
-        gt_depth: Ground truth depth (masked)
-        pred_depth: Predicted depth (masked, same shape as gt_depth)
-        percentile: Percentile for clipping (to avoid saturation)
-    
-    Returns:
-        error_map: RGB colored error map (dark = low error, bright = high error)
-    """
-    # Compute absolute error
-    error = np.abs(gt_depth - pred_depth)
-    
-    # Clip at percentile to avoid saturation
-    error_clipped = np.clip(error, 0, np.percentile(error, percentile))
-    
-    # Normalize to 0-1 for colormap
-    error_normalized = error_clipped / (error_clipped.max() + 1e-8)
-    
-    # Apply plasma colormap
-    error_colored = DEPTH_COLORMAP(error_normalized)
-    # Convert to uint8 RGB (drop alpha channel)
-    error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
-    # Convert RGB to BGR for OpenCV
-    error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
-    
-    return error_map
+    error = np.abs(gt_depth - pred_depth).astype(np.float32)
+
+    valid = gt_depth > 1e-6
+    if np.sum(valid) == 0:
+        return np.zeros((*error.shape, 3), dtype=np.uint8)
+
+    error_valid = error[valid]
+
+    vmax = np.percentile(error_valid, percentile)
+    error_clipped = np.clip(error, 0, vmax)
+
+    error_norm = error_clipped / (vmax + 1e-8)
+
+    # optional smoothing (highly recommended)
+    error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
+
+    error_color = plt.get_cmap('inferno')(error_norm)
+    error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
+
+    # mark invalid as gray (VERY important for papers)
+    error_map[~valid] = [128, 128, 128]
+
+    return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
 
 
 class DepthModelFactory:
@@ -349,7 +355,6 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            #pred_depth = 1 / pred_disp
             pred_disp = np.clip(pred_disp, 1e-6, None)
             pred_depth = 1.0 / pred_disp
             
