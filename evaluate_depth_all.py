@@ -99,27 +99,37 @@ def visualize_depth_map(depth, percentile=95):
 
 
 def visualize_error_map(error, percentile=95):
-    """Create error map visualization
+    """Create error map visualization with NaN masking
     
     Args:
-        error: Error map (H, W) - should already be computed
+        error: Error map (H, W) - may contain NaN for invalid regions
         percentile: Percentile for clipping (to avoid saturation)
     
     Returns:
-        error_map: BGR colored error map (dark = low error, bright = high error)
+        error_map: BGR colored error map (dark = low error, bright = high error, transparent background)
     """
     # FIX DYNAMIC RANGE - CRITICAL FOR ERROR MAP VISUALIZATION
-    # Clip errors at 95th percentile to avoid saturation
-    vmax = np.percentile(error, percentile)
+    # Calculate percentile while ignoring NaN values
+    error_valid = error[~np.isnan(error)]
+    
+    if len(error_valid) == 0:
+        # All values are NaN, return black image
+        return np.zeros((*error.shape, 3), dtype=np.uint8)
+    
+    vmax = np.percentile(error_valid, percentile)
     error_clipped = np.clip(error, 0, vmax)
     
     # Normalize by dividing by vmax (NOT by min-max range)
     # This preserves the structure and makes low-error regions visible
     error_normalized = error_clipped / (vmax + 1e-8)
     
-    # Apply colormap to properly normalized values
+    # Apply colormap to normalized values
     error_colored = _DEPTH_COLORMAP(error_normalized)
     error_map = (error_colored[..., :3] * 255).astype(np.uint8)
+    
+    # For NaN regions, set to black (0, 0, 0) - will show as background
+    nan_mask = np.isnan(error)
+    error_map[nan_mask] = 0
     
     # Convert RGB to BGR for OpenCV
     if error_map.ndim == 3:
@@ -436,13 +446,17 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Compute error map and REMOVE BACKGROUND / INVALID REGIONS
+                    # Compute error map with EXPLICIT MASKING (best practice)
                     error_data = np.abs(gt_depth_resized - pred_depth_resized)
                     
-                    # Set invalid regions to 0 (black background)
-                    error_data[~mask_resized] = 0
+                    # Create mask: valid regions where gt_depth > 0
+                    mask_valid = gt_depth_resized > 0
                     
-                    error_map_viz = visualize_error_map(error_data, percentile=95)
+                    # Set invalid regions to NaN (won't affect percentile, renders as transparent)
+                    error_data_masked = error_data.copy().astype(np.float32)
+                    error_data_masked[~mask_valid] = np.nan
+                    
+                    error_map_viz = visualize_error_map(error_data_masked, percentile=95)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
