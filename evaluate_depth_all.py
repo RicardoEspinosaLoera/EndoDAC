@@ -503,7 +503,10 @@ def evaluate(opt):
                     rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1,2,0)
                     rgb = (rgb * 255).astype(np.uint8)
 
-                    overlay = cv2.addWeighted(rgb, 0.6, error_map_viz, 0.4, 0)
+                    # Resize RGB to match error map
+                    rgb_resized = cv2.resize(rgb, (error_map_viz.shape[1], error_map_viz.shape[0]))
+
+                    overlay = cv2.addWeighted(rgb_resized, 0.6, error_map_viz, 0.4, 0)
                     
                     wandb.log({
                         "depth_pred": wandb.Image(depth_pred_rgb),
