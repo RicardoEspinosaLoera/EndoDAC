@@ -38,26 +38,23 @@ def render_depth(disp):
 
 
 def visualize_depth_map(depth, percentile=95):
-    """Visualize depth map with Plasma colormap
-    
-    Args:
-        depth: Depth map (H, W)
-        percentile: Percentile for clipping to avoid saturation
-    
-    Returns:
-        depth_viz: RGB colored depth visualization
-    """
-    # Clip at percentile
-    depth_clipped = np.clip(depth, 0, np.percentile(depth, percentile))
-    # Normalize to 0-1 for colormap
-    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8))
-    # Apply plasma colormap
-    depth_colored = DEPTH_COLORMAP(depth_normalized)
-    # Convert to uint8 RGB (drop alpha channel)
-    depth_viz = (depth_colored[:, :, :3] * 255).astype(np.uint8)
-    # Convert RGB to BGR for OpenCV
-    depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
-    return depth_viz
+    depth = depth.astype(np.float32)
+
+    # Robust clipping
+    vmax = np.percentile(depth, percentile)
+    vmin = np.percentile(depth, 5)
+
+    if vmax - vmin < 1e-6:
+        depth_norm = np.zeros_like(depth)
+    else:
+        depth_norm = (depth - vmin) / (vmax - vmin)
+
+    depth_norm = np.clip(depth_norm, 0, 1)
+
+    depth_color = DEPTH_COLORMAP(depth_norm)
+    depth_viz = (depth_color[:, :, :3] * 255).astype(np.uint8)
+
+    return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
 def visualize_error_map(gt_depth, pred_depth, percentile=95):
@@ -408,9 +405,8 @@ def evaluate(opt):
                     rgb = (rgb * 255).astype(np.uint8)
 
                     # Resize RGB to match error map
-                    rgb_resized = cv2.resize(rgb, (error_map_viz.shape[1], error_map_viz.shape[0]))
-
-                    overlay = cv2.addWeighted(rgb_resized, 0.6, error_map_viz, 0.4, 0)
+                    rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
+                    overlay = cv2.addWeighted(rgb_resized, 0.6, error_map, 0.4, 0)
                     
                     wandb.log({
                         "depth_pred": wandb.Image(depth_pred_rgb),
