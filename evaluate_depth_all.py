@@ -27,6 +27,7 @@ cv2.setNumThreads(0)
 
 # Initialize plasma colormap for visualization
 _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
+_ERROR_COLORMAP = plt.get_cmap('inferno', 256)
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -100,41 +101,42 @@ def visualize_depth_map(depth, percentile=95):
 
 
 def visualize_error_map(error, percentile=95):
-    """Create error map visualization with NaN masking
-    
-    Args:
-        error: Error map (H, W) - may contain NaN for invalid regions
-        percentile: Percentile for clipping (to avoid saturation)
-    
-    Returns:
-        error_map: BGR colored error map (dark = low error, bright = high error, transparent background)
+    """
+    Improved error visualization:
+    - inferno colormap
+    - proper normalization
+    - invalid regions in gray (not black!)
     """
 
-    error_valid = error[~np.isnan(error)]
-    
+    error = error.astype(np.float32)
+
+    # Mask valid values
+    valid_mask = ~np.isnan(error)
+    error_valid = error[valid_mask]
+
     if len(error_valid) == 0:
-        # All values are NaN, return black image
         return np.zeros((*error.shape, 3), dtype=np.uint8)
-    
+
+    # Robust clipping
     vmax = np.percentile(error_valid, percentile)
     error_clipped = np.clip(error, 0, vmax)
-    
-    # Normalize by dividing by vmax (NOT by min-max range)
-    # This preserves the structure and makes low-error regions visible
-    error_normalized = error_clipped / (vmax + 1e-8)
-    
-    # Apply colormap to normalized values
-    error_colored = _DEPTH_COLORMAP(error_normalized)
-    error_map = (error_colored[..., :3] * 255).astype(np.uint8)
-    
-    # For NaN regions, set to black (0, 0, 0) - will show as background
-    nan_mask = np.isnan(error)
-    error_map[nan_mask] = 0
-    
-    # Convert RGB to BGR for OpenCV
-    if error_map.ndim == 3:
-        error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
-    
+
+    # Normalize [0,1]
+    error_norm = error_clipped / (vmax + 1e-8)
+
+    # Smooth (IMPORTANT for your noisy maps)
+    error_norm = cv2.GaussianBlur(error_norm, (5, 5), 0)
+
+    # Apply colormap
+    error_color = _ERROR_COLORMAP(error_norm)
+    error_map = (error_color[..., :3] * 255).astype(np.uint8)
+
+    # 🔵 Set invalid regions to GRAY (not black!)
+    error_map[~valid_mask] = [128, 128, 128]
+
+    # Convert RGB → BGR
+    error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
+
     return error_map
 
 
@@ -440,27 +442,27 @@ def evaluate(opt):
                     # Resize full maps to smaller size for faster upload
                     h_viz, w_viz = max(8, int(gt_height / 4)), max(8, int(gt_width / 4))
                     
-                    print(f"Frame {i}: Preparing visualization with dimensions {gt_height}x{gt_width} -> {h_viz}x{w_viz}")
+                    #print(f"Frame {i}: Preparing visualization with dimensions {gt_height}x{gt_width} -> {h_viz}x{w_viz}")
                     
                     # Ensure proper 2D shapes before resizing
                     if gt_depth_full.ndim != 2:
-                        print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
+                        #print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
                         gt_depth_full = gt_depth_full[:, :, 0] if gt_depth_full.ndim == 3 else gt_depth_full
                     if pred_depth_full.ndim != 2:
-                        print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
+                        #print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
                         pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full
                     
                     # Validate arrays are not empty and have valid values
                     if gt_depth_full.size == 0 or pred_depth_full.size == 0:
-                        print(f"Warning: Empty depth arrays, skipping visualization")
+                        #print(f"Warning: Empty depth arrays, skipping visualization")
                         continue
                     
                     # Check for NaN or inf values
                     if np.isnan(gt_depth_full).any() or np.isinf(gt_depth_full).any():
-                        print(f"Warning: gt_depth contains NaN or inf, skipping visualization")
+                        #print(f"Warning: gt_depth contains NaN or inf, skipping visualization")
                         continue
                     if np.isnan(pred_depth_full).any() or np.isinf(pred_depth_full).any():
-                        print(f"Warning: pred_depth contains NaN or inf, skipping visualization")
+                        #print(f"Warning: pred_depth contains NaN or inf, skipping visualization")
                         continue
                     
                     # Ensure arrays are proper dtype
@@ -497,11 +499,17 @@ def evaluate(opt):
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
                     depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
                     error_map_rgb = cv2.cvtColor(error_map_viz, cv2.COLOR_BGR2RGB)
+
+                    rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1,2,0)
+                    rgb = (rgb * 255).astype(np.uint8)
+
+                    overlay = cv2.addWeighted(rgb, 0.6, error_map_viz, 0.4, 0)
                     
                     wandb.log({
                         "depth_pred": wandb.Image(depth_pred_rgb),
                         "depth_gt": wandb.Image(depth_gt_rgb),
                         "error_map": wandb.Image(error_map_rgb),
+                        "error_overlay": wandb.Image(overlay),
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth))
                     }, commit=True)
