@@ -26,8 +26,7 @@ import models.monovit as monovit
 cv2.setNumThreads(0)
 
 # Initialize plasma colormap for visualization
-_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
-_ERROR_COLORMAP = plt.get_cmap('inferno', 256)
+DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -38,55 +37,6 @@ def render_depth(disp):
     return disp_color
 
 
-def colormap(inputs, normalize=True, percentile=95):
-    """Apply plasma colormap to visualization inputs
-    
-    Args:
-        inputs: Input array or tensor (2D, 3D, or 4D)
-        normalize: Whether to normalize input to 0-1 range
-        percentile: Percentile for clipping to avoid saturation
-    
-    Returns:
-        vis: Colored visualization as numpy array (H, W, 3) in BGR format
-    """
-    if isinstance(inputs, torch.Tensor):
-        inputs = inputs.detach().cpu().numpy()
-
-    vis = inputs.copy()
-    
-    # Clip at percentile for better visualization
-    if vis.ndim >= 2:
-        vis = np.clip(vis, 0, np.percentile(vis, percentile))
-    
-    if normalize:
-        ma = float(vis.max())
-        mi = float(vis.min())
-        d = ma - mi if ma != mi else 1e5
-        # Invert: closer points (lower depth) = lighter, farther points (higher depth) = darker
-        vis = (ma - vis) / d
-
-    # Apply colormap based on dimensions
-    if vis.ndim == 2:
-        vis = _DEPTH_COLORMAP(vis)
-        vis = vis[..., :3]
-    elif vis.ndim == 3:
-        vis = _DEPTH_COLORMAP(vis)
-        vis = vis[..., :3]
-    elif vis.ndim == 4:
-        vis = vis.transpose([0, 2, 3, 1])
-        vis = _DEPTH_COLORMAP(vis)
-        vis = vis[:, :, :, :3]
-    
-    # Convert to uint8 (0-255 range)
-    vis = (vis * 255).astype(np.uint8)
-    
-    # Convert RGB to BGR for OpenCV compatibility
-    if vis.ndim == 3:
-        vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
-    
-    return vis
-
-
 def visualize_depth_map(depth, percentile=95):
     """Visualize depth map with Plasma colormap
     
@@ -95,48 +45,48 @@ def visualize_depth_map(depth, percentile=95):
         percentile: Percentile for clipping to avoid saturation
     
     Returns:
-        depth_viz: BGR colored depth visualization
+        depth_viz: RGB colored depth visualization
     """
-    return colormap(depth, normalize=True, percentile=percentile)
+    # Clip at percentile
+    depth_clipped = np.clip(depth, 0, np.percentile(depth, percentile))
+    # Normalize to 0-1 for colormap
+    depth_normalized = (depth_clipped / (depth_clipped.max() + 1e-8))
+    # Apply plasma colormap
+    depth_colored = DEPTH_COLORMAP(depth_normalized)
+    # Convert to uint8 RGB (drop alpha channel)
+    depth_viz = (depth_colored[:, :, :3] * 255).astype(np.uint8)
+    # Convert RGB to BGR for OpenCV
+    depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
+    return depth_viz
 
 
-def visualize_error_map(error, percentile=95):
+def visualize_error_map(gt_depth, pred_depth, percentile=95):
+    """Create error map visualization showing absolute difference
+    
+    Args:
+        gt_depth: Ground truth depth (masked)
+        pred_depth: Predicted depth (masked, same shape as gt_depth)
+        percentile: Percentile for clipping (to avoid saturation)
+    
+    Returns:
+        error_map: RGB colored error map (dark = low error, bright = high error)
     """
-    Improved error visualization:
-    - inferno colormap
-    - proper normalization
-    - invalid regions in gray (not black!)
-    """
-
-    error = error.astype(np.float32)
-
-    # Mask valid values
-    valid_mask = ~np.isnan(error)
-    error_valid = error[valid_mask]
-
-    if len(error_valid) == 0:
-        return np.zeros((*error.shape, 3), dtype=np.uint8)
-
-    # Robust clipping
-    vmax = np.percentile(error_valid, percentile)
-    error_clipped = np.clip(error, 0, vmax)
-
-    # Normalize [0,1]
-    error_norm = error_clipped / (vmax + 1e-8)
-
-    # Smooth (IMPORTANT for your noisy maps)
-    error_norm = cv2.GaussianBlur(error_norm, (5, 5), 0)
-
-    # Apply colormap
-    error_color = _ERROR_COLORMAP(error_norm)
-    error_map = (error_color[..., :3] * 255).astype(np.uint8)
-
-    # 🔵 Set invalid regions to GRAY (not black!)
-    error_map[~valid_mask] = [128, 128, 128]
-
-    # Convert RGB → BGR
+    # Compute absolute error
+    error = np.abs(gt_depth - pred_depth)
+    
+    # Clip at percentile to avoid saturation
+    error_clipped = np.clip(error, 0, np.percentile(error, percentile))
+    
+    # Normalize to 0-1 for colormap
+    error_normalized = error_clipped / (error_clipped.max() + 1e-8)
+    
+    # Apply plasma colormap
+    error_colored = DEPTH_COLORMAP(error_normalized)
+    # Convert to uint8 RGB (drop alpha channel)
+    error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
+    # Convert RGB to BGR for OpenCV
     error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
-
+    
     return error_map
 
 
@@ -389,30 +339,27 @@ def evaluate(opt):
             # Get ground truth
             if opt.eval_split == 'endovis':
                 gt_depth = gt_depths[i]
+                #sequence = str(np.array(data['sequence'][0]))
+                #keyframe = str(np.array(data['keyframe'][0]))
                 frame_id = "{:06d}".format(data['frame_id'][0])
             elif opt.eval_split == 'hamlyn' or opt.eval_split == 'c3vd':
                 gt_depth = data["depth_gt"].squeeze().numpy()
             
             # Handle 3D gt_depth (extract first channel if needed)
-            if gt_depth.ndim == 3:
-                gt_depth = gt_depth[:, :, 0]
-            
-            # Ensure gt_depth is 2D
-            assert gt_depth.ndim == 2, f"Expected 2D depth, got shape {gt_depth.shape}"
+            # if gt_depth.ndim == 3:
+            #    gt_depth = gt_depth[:, :, 0]
 
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            _, pred_depth = disp_to_depth(pred_disp, MIN_DEPTH, MAX_DEPTH)
-            #pred_depth = 1 / pred_disp
+            pred_depth = 1 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
             pred_depth_full = pred_depth.copy()
             gt_depth_full = gt_depth.copy()
 
-            # Create mask for valid regions (for both processing and visualization)
+            # Create mask for valid regions
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
-            mask_full = mask  # Save full-resolution mask for visualization
 
             # Extract valid regions
             pred_depth = pred_depth[mask]
@@ -438,56 +385,24 @@ def evaluate(opt):
             
             # Log to WandB (sample every 25 frames to avoid rate limiting)
             if i % 25 == 0 and len(pred_depth) > 0:
+                # Visualize depth using FULL 2D maps before masking (better visualization)
+                # Resize full maps to smaller size for faster upload
+                h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
+                gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
+                pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
+                
                 try:
-                    # Visualize depth using FULL 2D maps before masking (better visualization)
-                    # Resize full maps to smaller size for faster upload
-                    h_viz, w_viz = max(8, int(gt_height / 4)), max(8, int(gt_width / 4))
-                    
-                    #print(f"Frame {i}: Preparing visualization with dimensions {gt_height}x{gt_width} -> {h_viz}x{w_viz}")
-                    
-                    # Ensure proper 2D shapes before resizing
-                    """if gt_depth_full.ndim != 2:
-                        #print(f"Warning: gt_depth_full has wrong shape {gt_depth_full.shape}, converting to 2D")
-                        gt_depth_full = gt_depth_full[:, :, 0] if gt_depth_full.ndim == 3 else gt_depth_full
-                    if pred_depth_full.ndim != 2:
-                        #print(f"Warning: pred_depth_full has wrong shape {pred_depth_full.shape}, converting to 2D")
-                        pred_depth_full = pred_depth_full[:, :, 0] if pred_depth_full.ndim == 3 else pred_depth_full"""
-
-                    
-                    # Ensure arrays are proper dtype
-                    gt_depth_full = np.asarray(gt_depth_full, dtype=np.float32)
-                    pred_depth_full = np.asarray(pred_depth_full, dtype=np.float32)
-                    
-                    #print(f"  gt_depth_full: shape={gt_depth_full.shape}, dtype={gt_depth_full.dtype}, range=[{gt_depth_full.min():.3f}, {gt_depth_full.max():.3f}]")
-                    #print(f"  pred_depth_full: shape={pred_depth_full.shape}, dtype={pred_depth_full.dtype}, range=[{pred_depth_full.min():.3f}, {pred_depth_full.max():.3f}]")
-                    
-                    # Resize with explicit size validation
-                    gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
-                    pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
-                    mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz), interpolation=cv2.INTER_NEAREST) > 0.5
-                    
-                    #print(f"  Resized successfully to {gt_depth_resized.shape}")
-                    
                     # Visualize depth: clip at 95th percentile
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Compute error map with EXPLICIT MASKING (best practice)
-                    error_data = np.abs(gt_depth_resized - pred_depth_resized)
-                    
-                    # Create mask: valid regions where gt_depth > 0
-                    mask_valid = gt_depth_resized > 0
-                    
-                    # Set invalid regions to NaN (won't affect percentile, renders as transparent)
-                    error_data_masked = error_data.copy().astype(np.float32)
-                    error_data_masked[~mask_valid] = np.nan
-                    
-                    error_map_viz = visualize_error_map(error_data_masked, percentile=95)
+                    # Create error map using the visualization function
+                    error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=95)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
                     depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
-                    error_map_rgb = cv2.cvtColor(error_map_viz, cv2.COLOR_BGR2RGB)
+                    error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
 
                     rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1,2,0)
                     rgb = (rgb * 255).astype(np.uint8)
@@ -505,11 +420,8 @@ def evaluate(opt):
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth))
                     }, commit=True)
-                    print(f"  Frame {i} logged successfully")
                 except Exception as e:
-                    print(f"Warning: Could not log frame {i} to WandB: {type(e).__name__}: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    print(f"Warning: Could not log frame {i} to WandB: {e}")
 
     # Print results
     if not opt.disable_median_scaling:
