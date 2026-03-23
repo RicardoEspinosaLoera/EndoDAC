@@ -109,8 +109,7 @@ def visualize_error_map(error, percentile=95):
     Returns:
         error_map: BGR colored error map (dark = low error, bright = high error, transparent background)
     """
-    # FIX DYNAMIC RANGE - CRITICAL FOR ERROR MAP VISUALIZATION
-    # Calculate percentile while ignoring NaN values
+
     error_valid = error[~np.isnan(error)]
     
     if len(error_valid) == 0:
@@ -468,15 +467,15 @@ def evaluate(opt):
                     gt_depth_full = np.asarray(gt_depth_full, dtype=np.float32)
                     pred_depth_full = np.asarray(pred_depth_full, dtype=np.float32)
                     
-                    print(f"  gt_depth_full: shape={gt_depth_full.shape}, dtype={gt_depth_full.dtype}, range=[{gt_depth_full.min():.3f}, {gt_depth_full.max():.3f}]")
-                    print(f"  pred_depth_full: shape={pred_depth_full.shape}, dtype={pred_depth_full.dtype}, range=[{pred_depth_full.min():.3f}, {pred_depth_full.max():.3f}]")
+                    #print(f"  gt_depth_full: shape={gt_depth_full.shape}, dtype={gt_depth_full.dtype}, range=[{gt_depth_full.min():.3f}, {gt_depth_full.max():.3f}]")
+                    #print(f"  pred_depth_full: shape={pred_depth_full.shape}, dtype={pred_depth_full.dtype}, range=[{pred_depth_full.min():.3f}, {pred_depth_full.max():.3f}]")
                     
                     # Resize with explicit size validation
                     gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
                     pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
                     mask_resized = cv2.resize(mask_full.astype(np.float32), (w_viz, h_viz), interpolation=cv2.INTER_NEAREST) > 0.5
                     
-                    print(f"  Resized successfully to {gt_depth_resized.shape}")
+                    #print(f"  Resized successfully to {gt_depth_resized.shape}")
                     
                     # Visualize depth: clip at 95th percentile
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
