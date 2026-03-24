@@ -68,7 +68,7 @@ def visualize_depth_map(depth, percentile=95):
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
-def visualize_error_map(gt_depth, pred_depth, max_error=0.2):
+def visualize_error_map(gt_depth, pred_depth):
     """
     Visualize error map with fixed max error value.
     Returns error map image and Abs Rel metric.
@@ -82,11 +82,11 @@ def visualize_error_map(gt_depth, pred_depth, max_error=0.2):
     error_valid = error[valid]
     
     # Compute Abs Rel for error map scaled to [0, max_error]
-    abs_rel_error_map = np.mean(np.abs(error_valid - max_error) / (max_error + 1e-8))
+    abs_rel_error_map = np.mean(np.abs(error_valid))
 
     # Clip error to [0, max_error]
-    error_clipped = np.clip(error, 0, max_error)
-    error_norm = error_clipped / (max_error + 1e-8)
+    #error_clipped = np.clip(error, 0, max_error)
+    #error_norm = error_clipped / (max_error + 1e-8)
 
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
@@ -363,11 +363,11 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            pred_disp = np.clip(pred_disp, 1e-6, None)
-            pred_depth = 1.0 / pred_disp
+            #pred_disp = np.clip(pred_disp, 1e-6, None)
+            #pred_depth = 1.0 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
-            pred_depth_full = pred_depth.copy()
+            pred_depth_full = pred_disp.copy()
             gt_depth_full = gt_depth.copy()
 
             # Create mask for valid regions
