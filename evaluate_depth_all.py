@@ -61,7 +61,7 @@ def visualize_depth_map(depth, percentile=95):
     # optional: set invalid to 0
     depth_norm[~valid] = 0
 
-    depth_color = DEPTH_COLORMAP(depth_norm)
+    depth_color = _DEPTH_COLORMAP(depth_norm)
     depth_viz = (depth_color[:, :, :3] * 255).astype(np.uint8)
 
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
