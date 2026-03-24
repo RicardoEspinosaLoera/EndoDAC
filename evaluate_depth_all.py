@@ -80,13 +80,14 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
         return np.zeros((*error.shape, 3), dtype=np.uint8), 0.0
 
     error_valid = error[valid]
+    gt_valid = gt_depth[valid]
     
     # Use percentile-based scaling to handle different error ranges
     vmax = np.percentile(error_valid, percentile)
     vmin = np.percentile(error_valid, 5)
     
-    # Compute Abs Rel for error map
-    abs_rel_error_map = np.mean(np.abs(error_valid - vmax) / (vmax + 1e-8))
+    # Compute Abs Rel properly: mean(|error| / |gt|)
+    abs_rel_error_map = np.mean(error_valid / np.abs(gt_valid + 1e-8))
 
     # Clip error to [vmin, vmax]
     error_clipped = np.clip(error, vmin, vmax)
