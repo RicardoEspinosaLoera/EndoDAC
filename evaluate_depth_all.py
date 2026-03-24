@@ -68,9 +68,9 @@ def visualize_depth_map(depth, percentile=95):
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
-def visualize_error_map(gt_depth, pred_depth, max_error=10):
+def visualize_error_map(gt_depth, pred_depth, percentile=95):
     """
-    Visualize error map with fixed max error value.
+    Visualize error map with percentile-based scaling.
     Returns error map image and Abs Rel metric.
     """
     error = np.abs(gt_depth - pred_depth).astype(np.float32)
@@ -81,12 +81,20 @@ def visualize_error_map(gt_depth, pred_depth, max_error=10):
 
     error_valid = error[valid]
     
-    # Compute Abs Rel for error map scaled to [0, max_error]
-    abs_rel_error_map = np.mean(np.abs(error_valid) / (1e-8))
+    # Use percentile-based scaling to handle different error ranges
+    vmax = np.percentile(error_valid, percentile)
+    vmin = np.percentile(error_valid, 5)
+    
+    # Compute Abs Rel for error map
+    abs_rel_error_map = np.mean(np.abs(error_valid - vmax) / (vmax + 1e-8))
 
-    # Clip error to [0, max_error]
-    error_clipped = np.clip(error, 0, max_error)
-    error_norm = error_clipped / (max_error + 1e-8)
+    # Clip error to [vmin, vmax]
+    error_clipped = np.clip(error, vmin, vmax)
+    
+    if vmax - vmin < 1e-6:
+        error_norm = np.zeros_like(error)
+    else:
+        error_norm = (error_clipped - vmin) / (vmax - vmin)
 
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
@@ -411,8 +419,8 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map with fixed max=0.2 and get Abs Rel metric
-                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, max_error=10)
+                    # Create error map with percentile-based scaling and get Abs Rel metric
+                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=95)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
