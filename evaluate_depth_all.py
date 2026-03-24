@@ -403,8 +403,8 @@ def evaluate(opt):
             if not np.isnan(error).all():
                 errors.append(error)
             
-            # Log to WandB (sample every 25 frames to avoid rate limiting)
-            if i % 25 == 0 and len(pred_depth) > 0:
+            # Log to WandB (sample every 5 frames to avoid rate limiting)
+            if i % 5 == 0 and len(pred_depth) > 0:
                 # Visualize depth using FULL 2D maps before masking (better visualization)
                 # Resize full maps to smaller size for faster upload
                 h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
