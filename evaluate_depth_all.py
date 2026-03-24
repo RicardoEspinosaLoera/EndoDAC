@@ -84,7 +84,7 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
 
-    error_color = plt.get_cmap('inferno')(error_norm)
+    error_color = _DEPTH_COLORMAP(error_norm)  # Use jet colormap to match reference image
     error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
 
     # mark invalid as gray (VERY important for papers)
