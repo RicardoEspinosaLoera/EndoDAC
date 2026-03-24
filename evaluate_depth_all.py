@@ -68,19 +68,25 @@ def visualize_depth_map(depth, percentile=95):
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
-def visualize_error_map(gt_depth, pred_depth, percentile=95):
+def visualize_error_map(gt_depth, pred_depth, max_error=0.2):
+    """
+    Visualize error map with fixed max error value.
+    Returns error map image and Abs Rel metric.
+    """
     error = np.abs(gt_depth - pred_depth).astype(np.float32)
 
     valid = gt_depth > 1e-6
     if np.sum(valid) == 0:
-        return np.zeros((*error.shape, 3), dtype=np.uint8)
+        return np.zeros((*error.shape, 3), dtype=np.uint8), 0.0
 
     error_valid = error[valid]
+    
+    # Compute Abs Rel for error map scaled to [0, max_error]
+    abs_rel_error_map = np.mean(np.abs(error_valid - max_error) / (max_error + 1e-8))
 
-    vmax = np.percentile(error_valid, percentile)
-    error_clipped = np.clip(error, 0, vmax)
-
-    error_norm = error_clipped / (vmax + 1e-8)
+    # Clip error to [0, max_error]
+    error_clipped = np.clip(error, 0, max_error)
+    error_norm = error_clipped / (max_error + 1e-8)
 
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
@@ -91,7 +97,7 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     # mark invalid as gray (VERY important for papers)
     error_map[~valid] = [128, 128, 128]
 
-    return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
+    return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), abs_rel_error_map
 
 
 class DepthModelFactory:
@@ -313,6 +319,7 @@ def evaluate(opt):
     errors = []
     ratios = []
     inference_times = []
+    abs_rel_error_maps = []
 
     print("-> Computing predictions with size {}x{}".format(opt.width, opt.height))
 
@@ -404,8 +411,8 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map using the visualization function
-                    error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=95)
+                    # Create error map with fixed max=0.2 and get Abs Rel metric
+                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, max_error=0.2)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
@@ -425,8 +432,10 @@ def evaluate(opt):
                         "error_map": wandb.Image(error_map_rgb),
                         #"error_overlay": wandb.Image(overlay),
                         "frame_idx": i,
-                        "abs_error": np.mean(np.abs(gt_depth - pred_depth))
+                        "abs_error": np.mean(np.abs(gt_depth - pred_depth)),
+                        "abs_rel_error_map": abs_rel_error_map
                     }, commit=True)
+                    abs_rel_error_maps.append(abs_rel_error_map)
                 except Exception as e:
                     print(f"Warning: Could not log frame {i} to WandB: {e}")
 
@@ -456,6 +465,10 @@ def evaluate(opt):
     avg_inference_time = np.mean(np.array(inference_times)) * 1000
     print("average inference time: {:0.1f} ms".format(avg_inference_time))
     
+    # Compute mean Abs Rel for error maps
+    mean_abs_rel_error_map = np.mean(abs_rel_error_maps) if len(abs_rel_error_maps) > 0 else 0.0
+    print(f"mean abs_rel error map (max=0.2): {mean_abs_rel_error_map:.6f}")
+    
     # Log final metrics to WandB
     wandb.log({
         "abs_rel": mean_errors[0],
@@ -465,7 +478,8 @@ def evaluate(opt):
         "a1": mean_errors[4],
         "a2": mean_errors[5],
         "a3": mean_errors[6],
-        "avg_inference_time_ms": avg_inference_time
+        "avg_inference_time_ms": avg_inference_time,
+        "mean_abs_rel_error_map": mean_abs_rel_error_map
     })
     
     wandb.finish()
