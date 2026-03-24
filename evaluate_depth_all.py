@@ -367,7 +367,7 @@ def evaluate(opt):
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
 
             # Extract valid regions
-            pred_depth = pred_depth[mask]
+            pred_depth = pred_disp[mask]
             gt_depth = gt_depth[mask]
 
             # Scale prediction
