@@ -360,7 +360,7 @@ def evaluate(opt):
             #pred_depth = 1.0 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
-            pred_depth_full = pred_depth.copy()
+            pred_depth_full = pred_disp.copy()
             gt_depth_full = gt_depth.copy()
 
             # Create mask for valid regions
