@@ -102,8 +102,8 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     error_color = _ERROR_COLORMAP(error_norm)  # Use jet colormap to match reference image
     error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
 
-    # mark invalid as gray (VERY important for papers)
-    error_map[~valid] = [128, 128, 128]
+    # Don't mask invalid regions - show full visualization
+    # error_map[~valid] = [128, 128, 128]
 
     return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), abs_rel_error_map
 
