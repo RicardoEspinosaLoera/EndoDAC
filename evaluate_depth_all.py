@@ -412,7 +412,7 @@ def evaluate(opt):
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
                     # Create error map with fixed max=0.2 and get Abs Rel metric
-                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, max_error=0.2)
+                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
