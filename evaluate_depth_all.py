@@ -25,8 +25,8 @@ import models.monovit as monovit
 
 cv2.setNumThreads(0)
 
-# Initialize plasma colormap for visualization
-DEPTH_COLORMAP = plt.get_cmap('plasma', 256)
+# Initialize jet colormap for visualization (blue = low, red = high)
+_DEPTH_COLORMAP = plt.get_cmap('jet', 256)
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
