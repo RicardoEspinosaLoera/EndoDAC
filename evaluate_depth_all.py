@@ -26,7 +26,8 @@ import models.monovit as monovit
 cv2.setNumThreads(0)
 
 # Initialize jet colormap for visualization (blue = low, red = high)
-_DEPTH_COLORMAP = plt.get_cmap('jet', 256)
+_ERROR_COLORMAP = plt.get_cmap('jet', 256)
+_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -84,7 +85,7 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
 
-    error_color = _DEPTH_COLORMAP(error_norm)  # Use jet colormap to match reference image
+    error_color = _ERROR_COLORMAP(error_norm)  # Use jet colormap to match reference image
     error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
 
     # mark invalid as gray (VERY important for papers)
@@ -415,14 +416,14 @@ def evaluate(opt):
                     rgb = (rgb * 255).astype(np.uint8)
 
                     # Resize RGB to match error map
-                    rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
-                    overlay = cv2.addWeighted(rgb_resized, 0.6, error_map, 0.4, 0)
+                    #rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
+                    #overlay = cv2.addWeighted(rgb_resized, 0.6, error_map, 0.4, 0)
                     
                     wandb.log({
                         "depth_pred": wandb.Image(depth_pred_rgb),
                         "depth_gt": wandb.Image(depth_gt_rgb),
                         "error_map": wandb.Image(error_map_rgb),
-                        "error_overlay": wandb.Image(overlay),
+                        #"error_overlay": wandb.Image(overlay),
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth))
                     }, commit=True)

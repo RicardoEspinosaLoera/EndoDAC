@@ -24,7 +24,7 @@ import wandb
 
 wandb.init(project="IIEndoDAC-ENDOVIS", entity="respinosa")
 
-_DEPTH_COLORMAP = plt.get_cmap('jet', 256)  # for plotting (blue = low, red = high)
+_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
