@@ -431,11 +431,11 @@ def evaluate(opt):
                     rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1,2,0)
                     rgb = (rgb * 255).astype(np.uint8)
 
-                    # Resize RGB to match error map
-                    #rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
-                    #overlay = cv2.addWeighted(rgb_resized, 0.6, error_map, 0.4, 0)
+                    # Resize RGB to match error map for consistent logging
+                    rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
                     
                     wandb.log({
+                        "input_image": wandb.Image(cv2.cvtColor(rgb_resized, cv2.COLOR_BGR2RGB)),
                         "depth_pred": wandb.Image(depth_pred_rgb),
                         "depth_gt": wandb.Image(depth_gt_rgb),
                         "error_map": wandb.Image(error_map_rgb),
