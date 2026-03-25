@@ -448,8 +448,8 @@ def evaluate(opt):
                 except Exception as e:
                     print(f"Warning: Could not log frame {i} to WandB: {e}")
 
-                print("GT valid %:", np.mean(gt_depth_resized > 0))
-                print("Pred range:", pred_depth_resized.min(), pred_depth_resized.max())
+                #print("GT valid %:", np.mean(gt_depth_resized > 0))
+                #print("Pred range:", pred_depth_resized.min(), pred_depth_resized.max())
 
     # Print results
     if not opt.disable_median_scaling:
