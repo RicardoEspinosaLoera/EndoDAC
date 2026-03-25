@@ -390,7 +390,7 @@ def evaluate(opt):
     # Initialize WandB for logging
     #run_name = opt.load_weights_folder.split(os.sep)[-1] if opt.load_weights_folder else "depth_eval"
     #wandb.init(project="endodac-depth-eval", name=run_name, config=vars(opt))
-    wandb.init(project="II-Testing", entity="respinosa")
+    wandb.init(project="II-Testing-zoomed", entity="respinosa")
 
     if opt.eval_stereo:
         print("   Stereo evaluation")
