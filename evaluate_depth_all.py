@@ -31,11 +31,80 @@ _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
-def render_depth(disp):
-    disp = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
-    disp = disp.astype(np.uint8)
-    disp_color = cv2.applyColorMap(disp, cv2.COLORMAP_INFERNO)
-    return disp_color
+def get_brightness_mask(rgb_image, threshold=100):
+    """
+    Create mask for bright regions in the image.
+    Args:
+        rgb_image: input RGB image (0-255)
+        threshold: brightness threshold (0-255)
+    Returns:
+        binary mask where bright regions = 1
+    """
+    # Convert to grayscale
+    if len(rgb_image.shape) == 3:
+        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = rgb_image
+    
+    # Create brightness mask
+    bright_mask = gray > threshold
+    return bright_mask
+
+
+def apply_brightness_mask(error_map, rgb_image, threshold=100):
+    """
+    Apply brightness mask to error map - keep only bright regions.
+    Dark regions become black/blue.
+    """
+    bright_mask = get_brightness_mask(rgb_image, threshold)
+    
+    # Expand mask to 3 channels
+    bright_mask_3ch = np.stack([bright_mask, bright_mask, bright_mask], axis=2)
+    
+    # Apply mask - keep error map only where image is bright
+    error_map_masked = error_map.copy()
+    error_map_masked[~bright_mask_3ch] = [0, 0, 255]  # Dark regions become blue
+    
+    return error_map_masked
+
+
+def get_brightest_region(rgb_image, region_size=100):
+    """
+    Find the brightest region in the image and return bounding box.
+    """
+    if len(rgb_image.shape) == 3:
+        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = rgb_image
+    
+    h, w = gray.shape
+    
+    # Find brightest point
+    brightest_y, brightest_x = np.unravel_index(np.argmax(gray), gray.shape)
+    
+    # Create bounding box around brightest point
+    y1 = max(0, brightest_y - region_size // 2)
+    y2 = min(h, brightest_y + region_size // 2)
+    x1 = max(0, brightest_x - region_size // 2)
+    x2 = min(w, brightest_x + region_size // 2)
+    
+    return (y1, y2, x1, x2)
+
+
+def create_zoomed_with_marker(error_map, rgb_image, region_size=100):
+    """
+    Create error map with zoomed region marked by box.
+    """
+    y1, y2, x1, x2 = get_brightest_region(rgb_image, region_size)
+    
+    # Zoom into the error map
+    zoomed_error = error_map[y1:y2, x1:x2]
+    
+    # Create marked version with bounding box on full image
+    marked = error_map.copy()
+    cv2.rectangle(marked, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
+    
+    return zoomed_error, marked, (y1, y2, x1, x2)
 
 
 def visualize_depth_map(depth, percentile=95):
@@ -68,10 +137,11 @@ def visualize_depth_map(depth, percentile=95):
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
-def visualize_error_map(gt_depth, pred_depth, percentile=95):
+def visualize_error_map(gt_depth, pred_depth, percentile=75):
     """
     Visualize error map with percentile-based scaling.
     Returns error map image and Abs Rel metric.
+    Percentile: lower value = more sensitive to errors (default 75 instead of 95)
     """
     error = np.abs(gt_depth - pred_depth).astype(np.float32)
 
@@ -82,7 +152,7 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
     error_valid = error[valid]
     gt_valid = gt_depth[valid]
     
-    # Use percentile-based scaling to handle different error ranges
+    # Use percentile-based scaling (lower percentile = more sensitive)
     vmax = np.percentile(error_valid, percentile)
     vmin = np.percentile(error_valid, 5)
     
@@ -96,6 +166,10 @@ def visualize_error_map(gt_depth, pred_depth, percentile=95):
         error_norm = np.zeros_like(error)
     else:
         error_norm = (error_clipped - vmin) / (vmax - vmin)
+    
+    # Apply power scaling to amplify small differences
+    # Use power < 1 to stretch lower errors (e.g., 0.5 = sqrt scaling)
+    error_norm = np.power(error_norm, 0.7)
 
     # optional smoothing (highly recommended)
     error_norm = cv2.GaussianBlur(error_norm, (5,5), 0)
@@ -433,13 +507,32 @@ def evaluate(opt):
 
                     # Resize RGB to match error map for consistent logging
                     rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
+                    rgb_resized_rgb = cv2.cvtColor(rgb_resized, cv2.COLOR_BGR2RGB)
+                    
+                    # Apply brightness mask to error map (keep only bright regions)
+                    error_map_bright = apply_brightness_mask(error_map, rgb_resized, threshold=100)
+                    error_map_bright_rgb = cv2.cvtColor(error_map_bright, cv2.COLOR_BGR2RGB)
+                    
+                    # Create zoomed region with marking
+                    zoomed_error, marked_error, bbox = create_zoomed_with_marker(error_map, rgb_resized, region_size=80)
+                    marked_error_rgb = cv2.cvtColor(marked_error, cv2.COLOR_BGR2RGB)
+                    zoomed_error_rgb = cv2.cvtColor(zoomed_error, cv2.COLOR_BGR2RGB)
+                    
+                    # Mark input image with bounding box
+                    marked_rgb = rgb_resized.copy()
+                    y1, y2, x1, x2 = bbox
+                    cv2.rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
+                    marked_rgb_rgb = cv2.cvtColor(marked_rgb, cv2.COLOR_BGR2RGB)
                     
                     wandb.log({
-                        "input_image": wandb.Image(cv2.cvtColor(rgb_resized, cv2.COLOR_BGR2RGB)),
+                        "input_image": wandb.Image(rgb_resized_rgb),
+                        "input_image_marked": wandb.Image(marked_rgb_rgb),
                         "depth_pred": wandb.Image(depth_pred_rgb),
                         "depth_gt": wandb.Image(depth_gt_rgb),
                         "error_map": wandb.Image(error_map_rgb),
-                        #"error_overlay": wandb.Image(overlay),
+                        "error_map_bright_regions": wandb.Image(error_map_bright_rgb),
+                        "error_map_marked": wandb.Image(marked_error_rgb),
+                        "error_map_zoomed": wandb.Image(zoomed_error_rgb),
                         "frame_idx": i,
                         "abs_error": np.mean(np.abs(gt_depth - pred_depth)),
                         "abs_rel_error_map": abs_rel_error_map
