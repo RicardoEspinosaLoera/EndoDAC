@@ -214,7 +214,9 @@ def visualize_error_map(gt_depth, pred_depth, percentile=75):
     if vmax - vmin < 1e-6:
         error_norm = np.zeros_like(abs_rel_error)
     else:
-        error_norm = (abs_rel_clipped - vmin) / (vmax - vmin)
+        # Invert: low error (vmin) -> 1 (red in jet), high error (vmax) -> 0 (blue in jet)
+        # This gives: Blue = low error, Red = high error
+        error_norm = 1 - (abs_rel_clipped - vmin) / (vmax - vmin)
     
     # Reduce smoothing to preserve detail
     error_norm = cv2.GaussianBlur(error_norm, (3, 3), 0.5)
