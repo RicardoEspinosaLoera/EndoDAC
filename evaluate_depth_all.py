@@ -58,12 +58,10 @@ def apply_brightness_mask(error_map, rgb_image, threshold=100):
     """
     bright_mask = get_brightness_mask(rgb_image, threshold)
     
-    # Expand mask to 3 channels
-    bright_mask_3ch = np.stack([bright_mask, bright_mask, bright_mask], axis=2)
-    
     # Apply mask - keep error map only where image is bright
     error_map_masked = error_map.copy()
-    error_map_masked[~bright_mask_3ch] = [0, 0, 255]  # Dark regions become blue
+    # Use 2D mask directly - numpy will broadcast to all 3 channels
+    error_map_masked[~bright_mask] = [0, 0, 255]  # Dark regions become blue
     
     return error_map_masked
 
