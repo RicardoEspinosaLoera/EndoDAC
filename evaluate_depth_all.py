@@ -31,6 +31,39 @@ _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
+def draw_dashed_rectangle(image, pt1, pt2, color, thickness=1, dash_length=5):
+    """
+    Draw a dashed rectangle on image.
+    Args:
+        image: input image
+        pt1: top-left corner (x1, y1)
+        pt2: bottom-right corner (x2, y2)
+        color: line color (B, G, R)
+        thickness: line thickness
+        dash_length: length of each dash
+    """
+    x1, y1 = pt1
+    x2, y2 = pt2
+    
+    # Top line
+    for i in range(x1, x2, dash_length * 2):
+        cv2.line(image, (i, y1), (min(i + dash_length, x2), y1), color, thickness)
+    
+    # Bottom line
+    for i in range(x1, x2, dash_length * 2):
+        cv2.line(image, (i, y2), (min(i + dash_length, x2), y2), color, thickness)
+    
+    # Left line
+    for i in range(y1, y2, dash_length * 2):
+        cv2.line(image, (x1, i), (x1, min(i + dash_length, y2)), color, thickness)
+    
+    # Right line
+    for i in range(y1, y2, dash_length * 2):
+        cv2.line(image, (x2, i), (x2, min(i + dash_length, y2)), color, thickness)
+    
+    return image
+
+
 def get_brightness_mask(rgb_image, threshold=100):
     """
     Create mask for bright regions in the image.
@@ -108,16 +141,16 @@ def get_brightest_region(rgb_image, region_size=100):
 
 def create_zoomed_with_marker(error_map, rgb_image, region_size=100):
     """
-    Create error map with zoomed region marked by box.
+    Create error map with zoomed region marked by dashed box.
     """
     y1, y2, x1, x2 = get_brightest_region(rgb_image, region_size)
     
     # Zoom into the error map
     zoomed_error = error_map[y1:y2, x1:x2]
     
-    # Create marked version with bounding box on full image
+    # Create marked version with dashed bounding box on full image
     marked = error_map.copy()
-    cv2.rectangle(marked, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
+    draw_dashed_rectangle(marked, (x1, y1), (x2, y2), (0, 255, 0), thickness=1, dash_length=4)
     
     return zoomed_error, marked, (y1, y2, x1, x2)
 
@@ -533,10 +566,10 @@ def evaluate(opt):
                     marked_error_rgb = cv2.cvtColor(marked_error, cv2.COLOR_BGR2RGB)
                     zoomed_error_rgb = cv2.cvtColor(zoomed_error, cv2.COLOR_BGR2RGB)
                     
-                    # Mark input image with bounding box
+                    # Mark input image with dashed bounding box
                     marked_rgb = rgb_resized.copy()
                     y1, y2, x1, x2 = bbox
-                    cv2.rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
+                    draw_dashed_rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 255, 0), thickness=1, dash_length=4)
                     marked_rgb_rgb = cv2.cvtColor(marked_rgb, cv2.COLOR_BGR2RGB)
                     
                     wandb.log({
