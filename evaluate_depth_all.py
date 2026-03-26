@@ -69,6 +69,7 @@ def apply_brightness_mask(error_map, rgb_image, threshold=100):
 def get_brightest_region(rgb_image, region_size=100):
     """
     Find the brightest region in the image and return bounding box.
+    Ensures bounding box is always the same size (region_size x region_size).
     """
     if len(rgb_image.shape) == 3:
         gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
@@ -80,11 +81,27 @@ def get_brightest_region(rgb_image, region_size=100):
     # Find brightest point
     brightest_y, brightest_x = np.unravel_index(np.argmax(gray), gray.shape)
     
-    # Create bounding box around brightest point
-    y1 = max(0, brightest_y - region_size // 2)
-    y2 = min(h, brightest_y + region_size // 2)
-    x1 = max(0, brightest_x - region_size // 2)
-    x2 = min(w, brightest_x + region_size // 2)
+    # Create bounding box around brightest point with fixed size
+    # Center on brightest point
+    y1 = brightest_y - region_size // 2
+    y2 = y1 + region_size
+    x1 = brightest_x - region_size // 2
+    x2 = x1 + region_size
+    
+    # Clamp to image bounds while maintaining size
+    if y1 < 0:
+        y1 = 0
+        y2 = region_size
+    if y2 > h:
+        y2 = h
+        y1 = max(0, h - region_size)
+    
+    if x1 < 0:
+        x1 = 0
+        x2 = region_size
+    if x2 > w:
+        x2 = w
+        x1 = max(0, w - region_size)
     
     return (y1, y2, x1, x2)
 
