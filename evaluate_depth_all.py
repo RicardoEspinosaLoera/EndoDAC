@@ -529,7 +529,7 @@ def evaluate(opt):
                     error_map_bright_rgb = cv2.cvtColor(error_map_bright, cv2.COLOR_BGR2RGB)
                     
                     # Create zoomed region with marking
-                    zoomed_error, marked_error, bbox = create_zoomed_with_marker(error_map, rgb_resized, region_size=80)
+                    zoomed_error, marked_error, bbox = create_zoomed_with_marker(error_map, rgb_resized, region_size=50)
                     marked_error_rgb = cv2.cvtColor(marked_error, cv2.COLOR_BGR2RGB)
                     zoomed_error_rgb = cv2.cvtColor(zoomed_error, cv2.COLOR_BGR2RGB)
                     
