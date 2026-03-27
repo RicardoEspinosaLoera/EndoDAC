@@ -59,6 +59,8 @@ def draw_dashed_rectangle(image, pt1, pt2, color, thickness=2, dash_length=5):
     # Right line
     for i in range(y1, y2, dash_length * 2):
         cv2.line(image, (x2, i), (x2, min(i + dash_length, y2)), color, thickness)
+    
+    return image
 
 
 def find_brightest_roi(gray_image, roi_size=64):
@@ -515,21 +517,34 @@ def evaluate(opt):
 
                     # Create error map with ROI marked (red dashed rectangle)
                     error_marked = error_map.copy()
-                    draw_dashed_rectangle(error_marked, (x1, y1), (x2, y2),
+                    error_marked = draw_dashed_rectangle(error_marked, (x1, y1), (x2, y2),
                                         color=(0, 0, 255), thickness=2, dash_length=4)
                     error_marked_rgb = cv2.cvtColor(error_marked, cv2.COLOR_BGR2RGB)
 
                     # Extract zoomed error map region
-                    error_zoomed = error_map[y1:y2, x1:x2] if (y2 > y1 and x2 > x1) else error_map
-                    error_zoomed_rgb = cv2.cvtColor(error_zoomed, cv2.COLOR_BGR2RGB) if error_zoomed.size > 0 else error_zoomed
+                    if y2 > y1 and x2 > x1:
+                        error_zoomed = error_map[y1:y2, x1:x2]
+                        error_zoomed_rgb = cv2.cvtColor(error_zoomed, cv2.COLOR_BGR2RGB)
+                    else:
+                        error_zoomed_rgb = error_map_rgb  # Fallback to full error map
 
                     # Mark input image with ROI (red dashed rectangle)
                     rgb_marked = rgb_viz.copy()
-                    draw_dashed_rectangle(rgb_marked, (x1, y1), (x2, y2),
+                    rgb_marked = draw_dashed_rectangle(rgb_marked, (x1, y1), (x2, y2),
                                         color=(0, 0, 255), thickness=2, dash_length=4)
                     rgb_marked_rgb = cv2.cvtColor(rgb_marked, cv2.COLOR_BGR2RGB)
 
+                    # Ensure all arrays are uint8 for WandB
+                    rgb_viz_rgb = np.ascontiguousarray(rgb_viz_rgb, dtype=np.uint8)
+                    rgb_marked_rgb = np.ascontiguousarray(rgb_marked_rgb, dtype=np.uint8)
+                    depth_gt_rgb = np.ascontiguousarray(depth_gt_rgb, dtype=np.uint8)
+                    depth_pred_rgb = np.ascontiguousarray(depth_pred_rgb, dtype=np.uint8)
+                    error_map_rgb = np.ascontiguousarray(error_map_rgb, dtype=np.uint8)
+                    error_marked_rgb = np.ascontiguousarray(error_marked_rgb, dtype=np.uint8)
+                    error_zoomed_rgb = np.ascontiguousarray(error_zoomed_rgb, dtype=np.uint8)
+
                     # Log to WandB (following Figure 5 visualization)
+                    print(f"Logging frame {i} to WandB...")
                     wandb.log({
                         "input_image": wandb.Image(rgb_viz_rgb),
                         "input_marked_roi": wandb.Image(rgb_marked_rgb),
@@ -541,12 +556,15 @@ def evaluate(opt):
                         "frame_idx": i,
                         "abs_rel": mean_abs_rel,
                     }, commit=True)
+                    print(f"Successfully logged frame {i}")
                     
                     # Collect for statistics
                     abs_rel_errors.append(mean_abs_rel)
 
                 except Exception as e:
-                    print(f"Warning: Could not log frame {i} to WandB: {e}")
+                    import traceback
+                    print(f"ERROR: Could not log frame {i} to WandB: {e}")
+                    traceback.print_exc()
 
     # Print results
     if not opt.disable_median_scaling:
