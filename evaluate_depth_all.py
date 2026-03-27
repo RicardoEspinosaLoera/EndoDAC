@@ -511,7 +511,7 @@ def evaluate(opt):
 
                     # Find and mark ROI (brightest region with red dashed box)
                     gray_rgb = cv2.cvtColor(rgb_viz, cv2.COLOR_BGR2GRAY)
-                    y1, y2, x1, x2 = find_brightest_roi(gray_rgb, roi_size=32)
+                    y1, y2, x1, x2 = find_brightest_roi(gray_rgb, roi_size=80)
 
                     # Create error map with ROI marked (red dashed rectangle)
                     error_marked = error_map.copy()
