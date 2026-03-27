@@ -30,13 +30,13 @@ _JET_COLORMAP = plt.get_cmap('jet', 256)
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
-def draw_dashed_rectangle(image, pt1, pt2, color, thickness=1, dash_length=5):
+def draw_dashed_rectangle(image, pt1, pt2, color, thickness=2, dash_length=5):
     """
-    Draw a dashed rectangle on image.
+    Draw a dashed rectangle on image (red dashed box for ROI marking).
     Args:
-        image: input image
-        pt1: top-left corner (x1, y1)
-        pt2: bottom-right corner (x2, y2)
+        image: input image (BGR)
+        pt1: top-left corner (x, y)
+        pt2: bottom-right corner (x, y)
         color: line color (B, G, R)
         thickness: line thickness
         dash_length: length of each dash
@@ -59,99 +59,42 @@ def draw_dashed_rectangle(image, pt1, pt2, color, thickness=1, dash_length=5):
     # Right line
     for i in range(y1, y2, dash_length * 2):
         cv2.line(image, (x2, i), (x2, min(i + dash_length, y2)), color, thickness)
-    
-    return image
 
 
-def get_brightness_mask(rgb_image, threshold=100):
+def find_brightest_roi(gray_image, roi_size=64):
     """
-    Create mask for bright regions in the image.
+    Find the brightest region (ROI) in the image.
     Args:
-        rgb_image: input RGB image (0-255)
-        threshold: brightness threshold (0-255)
+        gray_image: grayscale image
+        roi_size: size of ROI (roi_size x roi_size)
     Returns:
-        binary mask where bright regions = 1
+        (y1, y2, x1, x2) bounding box coordinates
     """
-    # Convert to grayscale
-    if len(rgb_image.shape) == 3:
-        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-    else:
-        gray = rgb_image
+    h, w = gray_image.shape
     
-    # Create brightness mask
-    bright_mask = gray > threshold
-    return bright_mask
-
-
-def apply_brightness_mask(error_map, rgb_image, threshold=100):
-    """
-    Apply brightness mask to error map - keep only bright regions.
-    Dark regions become black/blue.
-    """
-    bright_mask = get_brightness_mask(rgb_image, threshold)
+    # Find brightest point using max intensity
+    brightest_y, brightest_x = np.unravel_index(np.argmax(gray_image), gray_image.shape)
     
-    # Apply mask - keep error map only where image is bright
-    error_map_masked = error_map.copy()
-    # Use 2D mask directly - numpy will broadcast to all 3 channels
-    error_map_masked[~bright_mask] = [0, 0, 255]  # Dark regions become blue
+    # Create fixed-size ROI centered on brightest point
+    y1 = max(0, brightest_y - roi_size // 2)
+    y2 = min(h, y1 + roi_size)
+    x1 = max(0, brightest_x - roi_size // 2)
+    x2 = min(w, x1 + roi_size)
     
-    return error_map_masked
-
-
-def get_brightest_region(rgb_image, region_size=100):
-    """
-    Find the brightest region in the image and return bounding box.
-    Ensures bounding box is always the same size (region_size x region_size).
-    """
-    if len(rgb_image.shape) == 3:
-        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-    else:
-        gray = rgb_image
+    # Adjust if ROI exceeds bounds while maintaining size
+    if y2 - y1 < roi_size:
+        if y1 == 0:
+            y2 = min(h, roi_size)
+        else:
+            y1 = max(0, y2 - roi_size)
     
-    h, w = gray.shape
-    
-    # Find brightest point
-    brightest_y, brightest_x = np.unravel_index(np.argmax(gray), gray.shape)
-    
-    # Create bounding box around brightest point with fixed size
-    # Center on brightest point
-    y1 = brightest_y - region_size // 2
-    y2 = y1 + region_size
-    x1 = brightest_x - region_size // 2
-    x2 = x1 + region_size
-    
-    # Clamp to image bounds while maintaining size
-    if y1 < 0:
-        y1 = 0
-        y2 = region_size
-    if y2 > h:
-        y2 = h
-        y1 = max(0, h - region_size)
-    
-    if x1 < 0:
-        x1 = 0
-        x2 = region_size
-    if x2 > w:
-        x2 = w
-        x1 = max(0, w - region_size)
+    if x2 - x1 < roi_size:
+        if x1 == 0:
+            x2 = min(w, roi_size)
+        else:
+            x1 = max(0, x2 - roi_size)
     
     return (y1, y2, x1, x2)
-
-
-def create_zoomed_with_marker(error_map, rgb_image, region_size=100):
-    """
-    Create error map with zoomed region marked by dashed box.
-    """
-    y1, y2, x1, x2 = get_brightest_region(rgb_image, region_size)
-    
-    # Zoom into the error map
-    zoomed_error = error_map[y1:y2, x1:x2]
-    
-    # Create marked version with dashed bounding box on full image
-    marked = error_map.copy()
-    draw_dashed_rectangle(marked, (x1, y1), (x2, y2), (0, 0, 255), thickness=2, dash_length=4)
-    
-    return zoomed_error, marked, (y1, y2, x1, x2)
 
 
 def visualize_depth_map(depth, percentile=95):
