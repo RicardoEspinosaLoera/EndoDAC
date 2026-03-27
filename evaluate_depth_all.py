@@ -94,6 +94,12 @@ def find_brightest_roi(gray_image, roi_size=80):
         else:
             x1 = max(0, x2 - roi_size)
     
+    # Final validation
+    y1, y2 = max(0, y1), min(h, y2)
+    x1, x2 = max(0, x1), min(w, x2)
+    
+    print(f"  ROI: y=[{y1}, {y2}], x=[{x1}, {x2}], h={h}, w={w}")
+    
     return (y1, y2, x1, x2)
 
 
@@ -512,6 +518,7 @@ def evaluate(opt):
                     # Find and mark ROI (brightest region with red dashed box)
                     gray_rgb = cv2.cvtColor(rgb_viz, cv2.COLOR_BGR2GRAY)
                     y1, y2, x1, x2 = find_brightest_roi(gray_rgb, roi_size=80)
+                    print(f"  Image shapes - rgb_viz: {rgb_viz.shape}, error_map: {error_map.shape}")
 
                     # Create error map with ROI marked (red dashed rectangle)
                     error_marked = error_map.copy()
@@ -521,7 +528,14 @@ def evaluate(opt):
 
                     # Extract zoomed error map region
                     error_zoomed = error_map[y1:y2, x1:x2] if (y2 > y1 and x2 > x1) else error_map
-                    error_zoomed_rgb = cv2.cvtColor(error_zoomed, cv2.COLOR_BGR2RGB) if error_zoomed.size > 0 else error_zoomed
+                    # Ensure zoomed region has valid (H, W, 3) shape
+                    if error_zoomed.size > 0 and len(error_zoomed.shape) == 3 and error_zoomed.shape[0] > 0 and error_zoomed.shape[1] > 0:
+                        error_zoomed_rgb = cv2.cvtColor(error_zoomed, cv2.COLOR_BGR2RGB)
+                        print(f"  Zoomed region shape: {error_zoomed.shape}")
+                    else:
+                        # Fallback to full error map if zoomed region is invalid
+                        print(f"  Warning: Invalid zoomed region shape {error_zoomed.shape}, using full error map")
+                        error_zoomed_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
 
                     # Mark input image with ROI (red dashed rectangle)
                     rgb_marked = rgb_viz.copy()
@@ -546,7 +560,9 @@ def evaluate(opt):
                     abs_rel_errors.append(mean_abs_rel)
 
                 except Exception as e:
+                    import traceback
                     print(f"Warning: Could not log frame {i} to WandB: {e}")
+                    traceback.print_exc()
 
     # Print results
     if not opt.disable_median_scaling:
