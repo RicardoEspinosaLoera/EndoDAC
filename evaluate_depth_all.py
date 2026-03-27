@@ -61,7 +61,7 @@ def draw_dashed_rectangle(image, pt1, pt2, color, thickness=2, dash_length=5):
         cv2.line(image, (x2, i), (x2, min(i + dash_length, y2)), color, thickness)
 
 
-def find_brightest_roi(gray_image, roi_size=64):
+def find_brightest_roi(gray_image, roi_size=80):
     """
     Find the brightest region (ROI) in the image.
     Args:
