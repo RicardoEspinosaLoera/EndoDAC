@@ -191,38 +191,46 @@ def visualize_error_map(gt_depth, pred_depth, percentile=75):
     |pred - gt| / |gt| normalized with percentile-based scaling for detail.
     Returns error map image and mean Abs Rel metric.
     """
-    # Calculate pixel-wise Abs Rel error
-    abs_rel_error = np.abs(gt_depth - pred_depth) / (np.abs(gt_depth) + 1e-8)
-    abs_rel_error = abs_rel_error.astype(np.float32)
-
     valid = gt_depth > 1e-6
-    if np.sum(valid) == 0:
-        return np.zeros((*abs_rel_error.shape, 3), dtype=np.uint8), 0.0
-
-    abs_rel_valid = abs_rel_error[valid]
     
-    # Use percentile-based scaling on Abs Rel values for detail
-    vmax = np.percentile(abs_rel_valid, percentile)
+    # Initialize output
+    error_norm = np.zeros_like(gt_depth, dtype=np.float32)
+    
+    if np.sum(valid) == 0:
+        error_color = _ERROR_COLORMAP(error_norm)
+        error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
+        return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), 0.0
+    
+    # Calculate pixel-wise Abs Rel error ONLY on valid regions
+    gt_valid = gt_depth[valid]
+    pred_valid = pred_depth[valid]
+    abs_rel_valid = np.abs(gt_valid - pred_valid) / (np.abs(gt_valid) + 1e-8)
+    
+    # Compute percentiles on valid data only
     vmin = np.percentile(abs_rel_valid, 5)
+    vmax = np.percentile(abs_rel_valid, percentile)
     
     # Compute mean Abs Rel for logging
     abs_rel_error_map = np.mean(abs_rel_valid)
-
-    # Clip to [vmin, vmax]
-    abs_rel_clipped = np.clip(abs_rel_error, vmin, vmax)
     
-    if vmax - vmin < 1e-6:
-        error_norm = np.zeros_like(abs_rel_error)
+    # Normalize valid pixels only
+    if vmax - vmin > 1e-6:
+        # Blue = low error (0), Red = high error (1)
+        normalized_valid = np.clip((abs_rel_valid - vmin) / (vmax - vmin), 0, 1)
+        error_norm[valid] = normalized_valid
     else:
-        # Invert: low error (vmin) -> 1 (red in jet), high error (vmax) -> 0 (blue in jet)
-        # This gives: Blue = low error, Red = high error
-        error_norm = 1 - (abs_rel_clipped - vmin) / (vmax - vmin)
+        error_norm[valid] = 0.5  # Uniform error if no variance
     
-    # Reduce smoothing to preserve detail
+    # Set invalid pixels to 0 (blue = no error info)
+    error_norm[~valid] = 0
+    
+    # Slight smoothing to preserve detail
     error_norm = cv2.GaussianBlur(error_norm, (3, 3), 0.5)
-
+    
     error_color = _ERROR_COLORMAP(error_norm)  # Use jet colormap
     error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
+    
+    print(f"  Error range: [{vmin:.4f}, {vmax:.4f}], Mean: {abs_rel_error_map:.4f}")
 
     return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), abs_rel_error_map
 
