@@ -25,18 +25,19 @@ import models.monovit as monovit
 
 cv2.setNumThreads(0)
 
-# Jet colormap for error visualization: blue (low error) -> red (high error)
-_JET_COLORMAP = plt.get_cmap('jet', 256)
+# Initialize jet colormap for visualization (blue = low, red = high)
+_ERROR_COLORMAP = plt.get_cmap('jet', 256)
+_DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
-def draw_dashed_rectangle(image, pt1, pt2, color, thickness=2, dash_length=5):
+def draw_dashed_rectangle(image, pt1, pt2, color, thickness=1, dash_length=5):
     """
-    Draw a dashed rectangle on image (red dashed box for ROI marking).
+    Draw a dashed rectangle on image.
     Args:
-        image: input image (BGR)
-        pt1: top-left corner (x, y)
-        pt2: bottom-right corner (x, y)
+        image: input image
+        pt1: top-left corner (x1, y1)
+        pt2: bottom-right corner (x2, y2)
         color: line color (B, G, R)
         thickness: line thickness
         dash_length: length of each dash
@@ -63,124 +64,168 @@ def draw_dashed_rectangle(image, pt1, pt2, color, thickness=2, dash_length=5):
     return image
 
 
-def find_brightest_roi(gray_image, roi_size=64):
+def get_brightness_mask(rgb_image, threshold=100):
     """
-    Find the brightest region (ROI) in the image.
+    Create mask for bright regions in the image.
     Args:
-        gray_image: grayscale image
-        roi_size: size of ROI (roi_size x roi_size)
+        rgb_image: input RGB image (0-255)
+        threshold: brightness threshold (0-255)
     Returns:
-        (y1, y2, x1, x2) bounding box coordinates
+        binary mask where bright regions = 1
     """
-    h, w = gray_image.shape
+    # Convert to grayscale
+    if len(rgb_image.shape) == 3:
+        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = rgb_image
     
-    # Find brightest point using max intensity
-    brightest_y, brightest_x = np.unravel_index(np.argmax(gray_image), gray_image.shape)
+    # Create brightness mask
+    bright_mask = gray > threshold
+    return bright_mask
+
+
+def apply_brightness_mask(error_map, rgb_image, threshold=100):
+    """
+    Apply brightness mask to error map - keep only bright regions.
+    Dark regions become black/blue.
+    """
+    bright_mask = get_brightness_mask(rgb_image, threshold)
     
-    # Create fixed-size ROI centered on brightest point
-    y1 = max(0, brightest_y - roi_size // 2)
-    y2 = min(h, y1 + roi_size)
-    x1 = max(0, brightest_x - roi_size // 2)
-    x2 = min(w, x1 + roi_size)
+    # Apply mask - keep error map only where image is bright
+    error_map_masked = error_map.copy()
+    # Use 2D mask directly - numpy will broadcast to all 3 channels
+    error_map_masked[~bright_mask] = [0, 0, 255]  # Dark regions become blue
     
-    # Adjust if ROI exceeds bounds while maintaining size
-    if y2 - y1 < roi_size:
-        if y1 == 0:
-            y2 = min(h, roi_size)
-        else:
-            y1 = max(0, y2 - roi_size)
+    return error_map_masked
+
+
+def get_brightest_region(rgb_image, region_size=100):
+    """
+    Find the brightest region in the image and return bounding box.
+    Ensures bounding box is always the same size (region_size x region_size).
+    """
+    if len(rgb_image.shape) == 3:
+        gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = rgb_image
     
-    if x2 - x1 < roi_size:
-        if x1 == 0:
-            x2 = min(w, roi_size)
-        else:
-            x1 = max(0, x2 - roi_size)
+    h, w = gray.shape
+    
+    # Find brightest point
+    brightest_y, brightest_x = np.unravel_index(np.argmax(gray), gray.shape)
+    
+    # Create bounding box around brightest point with fixed size
+    # Center on brightest point
+    y1 = brightest_y - region_size // 2
+    y2 = y1 + region_size
+    x1 = brightest_x - region_size // 2
+    x2 = x1 + region_size
+    
+    # Clamp to image bounds while maintaining size
+    if y1 < 0:
+        y1 = 0
+        y2 = region_size
+    if y2 > h:
+        y2 = h
+        y1 = max(0, h - region_size)
+    
+    if x1 < 0:
+        x1 = 0
+        x2 = region_size
+    if x2 > w:
+        x2 = w
+        x1 = max(0, w - region_size)
     
     return (y1, y2, x1, x2)
 
 
-def visualize_depth_map(depth, percentile=95):
-    """Visualize depth map with inferno colormap and percentile normalization."""
-    depth = depth.astype(np.float32)
-    valid = depth > 1e-6
+def create_zoomed_with_marker(error_map, rgb_image, region_size=100):
+    """
+    Create error map with zoomed region marked by dashed box.
+    """
+    y1, y2, x1, x2 = get_brightest_region(rgb_image, region_size)
     
+    # Zoom into the error map
+    zoomed_error = error_map[y1:y2, x1:x2]
+    
+    # Create marked version with dashed bounding box on full image
+    marked = error_map.copy()
+    draw_dashed_rectangle(marked, (x1, y1), (x2, y2), (0, 0, 255), thickness=2, dash_length=4)
+    
+    return zoomed_error, marked, (y1, y2, x1, x2)
+
+
+def visualize_depth_map(depth, percentile=95):
+    depth = depth.astype(np.float32)
+
+    # ✅ mask valid depth
+    valid = depth > 1e-6
     if np.sum(valid) == 0:
         return np.zeros((*depth.shape, 3), dtype=np.uint8)
-    
+
     depth_valid = depth[valid]
-    vmin = np.percentile(depth_valid, 5)
+
+    # robust stats ONLY on valid pixels
     vmax = np.percentile(depth_valid, percentile)
-    
+    vmin = np.percentile(depth_valid, 5)
+
     if vmax - vmin < 1e-6:
         depth_norm = np.zeros_like(depth)
     else:
         depth_norm = (depth - vmin) / (vmax - vmin)
-    
+
     depth_norm = np.clip(depth_norm, 0, 1)
+
+    # optional: set invalid to 0
     depth_norm[~valid] = 0
-    
-    inferno = plt.get_cmap('inferno', 256)
-    depth_colored = inferno(depth_norm)
-    depth_map = (depth_colored[:, :, :3] * 255).astype(np.uint8)
-    
-    return cv2.cvtColor(depth_map, cv2.COLOR_RGB2BGR)
+
+    depth_color = _DEPTH_COLORMAP(depth_norm)
+    depth_viz = (depth_color[:, :, :3] * 255).astype(np.uint8)
+
+    return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
 def visualize_error_map(gt_depth, pred_depth, max_abs_rel=0.2):
     """
-    Visualize pixel-wise Abs Rel error map using jet colormap.
-    Blue = low error, Red = high error
-    
-    Args:
-        gt_depth: ground truth depth (2D)
-        pred_depth: predicted depth (2D, must be depth not disparity)
-        max_abs_rel: reference scale for normalization
-    
-    Returns:
-        error_map: BGR error map image (H, W, 3)
-        mean_abs_rel: mean Abs Rel error on valid pixels
+    Visualize pixel-wise Abs Rel error map with ABSOLUTE (not percentile) scaling.
+    |pred - gt| / |gt| normalized to [0, max_abs_rel] for fair model comparison.
+    Returns error map image and mean Abs Rel metric.
     """
-    gt_depth = gt_depth.astype(np.float32)
-    pred_depth = pred_depth.astype(np.float32)
-    
-    # Create mask for valid pixels
     valid = gt_depth > 1e-6
-    
-    if np.sum(valid) == 0:
-        error_norm = np.zeros_like(gt_depth, dtype=np.float32)
-        error_colored = _JET_COLORMAP(error_norm)
-        error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
-        return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), 0.0
     
     # Initialize output
     error_norm = np.zeros_like(gt_depth, dtype=np.float32)
     
-    # Calculate Abs Rel ONLY on valid pixels: |pred - gt| / |gt|
+    if np.sum(valid) == 0:
+        error_color = _ERROR_COLORMAP(error_norm)
+        error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
+        return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), 0.0
+    
+    # Calculate pixel-wise Abs Rel error ONLY on valid regions
     gt_valid = gt_depth[valid]
     pred_valid = pred_depth[valid]
-    abs_rel_valid = np.abs(pred_valid - gt_valid) / (np.abs(gt_valid) + 1e-8)
+    abs_rel_valid = np.abs(gt_valid - pred_valid) / (np.abs(gt_valid) + 1e-8)
     
-    # Mean Abs Rel for logging
-    mean_abs_rel = np.mean(abs_rel_valid)
+    # Compute mean Abs Rel for logging
+    abs_rel_error_map = np.mean(abs_rel_valid)
     
-    # Normalize to [0, 1] using absolute scale [0, max_abs_rel]
-    # This ensures fair comparison across models
-    error_norm[valid] = np.clip(abs_rel_valid / max_abs_rel, 0.0, 1.0)
-    # Invalid pixels stay 0 (blue)
+    # Normalize with FIXED scale: [0, max_abs_rel] -> [0, 1]
+    # This allows fair comparison across models
+    normalized_valid = np.clip(abs_rel_valid / max_abs_rel, 0, 1)
+    error_norm[valid] = normalized_valid
     
-    # Apply slight smoothing
+    # Set invalid pixels to 0 (blue = no error info)
+    error_norm[~valid] = 0
+    
+    # Slight smoothing to preserve detail
     error_norm = cv2.GaussianBlur(error_norm, (3, 3), 0.5)
     
-    # Apply jet colormap
-    error_colored = _JET_COLORMAP(error_norm)
-    error_map = (error_colored[:, :, :3] * 255).astype(np.uint8)
+    error_color = _ERROR_COLORMAP(error_norm)  # Use jet colormap
+    error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
     
-    # Convert RGB to BGR for OpenCV
-    error_map = cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR)
-    
-    print(f"  Abs Rel - Mean: {mean_abs_rel:.4f}, Min: {np.min(abs_rel_valid):.4f}, Max: {np.max(abs_rel_valid):.4f}")
-    
-    return error_map, mean_abs_rel
+    print(f"  Abs Rel stats: Mean={abs_rel_error_map:.4f}, Min={np.min(abs_rel_valid):.4f}, Max={np.max(abs_rel_valid):.4f}")
+
+    return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), abs_rel_error_map
 
 
 class DepthModelFactory:
@@ -402,7 +447,7 @@ def evaluate(opt):
     errors = []
     ratios = []
     inference_times = []
-    abs_rel_errors = []
+    abs_rel_error_maps = []
 
     print("-> Computing predictions with size {}x{}".format(opt.width, opt.height))
 
@@ -446,125 +491,109 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            # ✓ CRITICAL FIX: Convert disparity to depth (was using disparity as depth!)
-            pred_depth = 1.0 / np.clip(pred_disp, 1e-6, None)
-
-            # Save full 2D versions for visualization
+            pred_depth = 1.0 / np.clip(pred_disp, 1e-6, None)  # Convert disparity to depth
+            
+            # Save full 2D versions for visualization BEFORE masking
             pred_depth_full = pred_depth.copy()
             gt_depth_full = gt_depth.copy()
 
             # Create mask for valid regions
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
 
-            # Extract valid pixel values using mask
-            # ✓ CRITICAL FIX: Use pred_depth not pred_disp (was extracting with wrong array!)
-            pred_depth_masked = pred_depth[mask]
-            gt_depth_masked = gt_depth[mask]
+            # Extract valid regions
+            pred_depth = pred_disp[mask]
+            gt_depth = gt_depth[mask]
 
             # Scale prediction
-            pred_depth_masked = pred_depth_masked * opt.pred_depth_scale_factor
-
+            pred_depth *= opt.pred_depth_scale_factor
+            
+            # Compute median scaling ratio
             scale_ratio = 1.0
             if not opt.disable_median_scaling:
-                ratio = np.median(gt_depth_masked) / np.median(pred_depth_masked)
+                ratio = np.median(gt_depth) / np.median(pred_depth)
                 if not np.isnan(ratio).all():
                     ratios.append(ratio)
                     scale_ratio = ratio
-                pred_depth_masked = pred_depth_masked * ratio
+                pred_depth *= ratio
+            
+            # Apply same scaling to full depth maps for consistent visualization
+            pred_depth_full *= opt.pred_depth_scale_factor * scale_ratio
+            gt_depth_full *= 1.0  # GT doesn't need scaling
 
             # Clip to valid range
-            pred_depth_masked = np.clip(pred_depth_masked, MIN_DEPTH, MAX_DEPTH)
-            gt_depth_masked = np.clip(gt_depth_masked, MIN_DEPTH, MAX_DEPTH)
+            pred_depth[pred_depth < MIN_DEPTH] = MIN_DEPTH
+            pred_depth[pred_depth > MAX_DEPTH] = MAX_DEPTH
 
             # Compute errors
-            error = compute_errors(gt_depth_masked, pred_depth_masked)
+            error = compute_errors(gt_depth, pred_depth)
             if not np.isnan(error).all():
                 errors.append(error)
-
-            # Apply scaling to full depth maps for visualization consistency
-            pred_depth_full = pred_depth_full * opt.pred_depth_scale_factor * scale_ratio
             
-            #  Log to WandB (sample frames to avoid rate limiting)
-            if i % 5 == 0:
+            # Log to WandB (sample every 5 frames to avoid rate limiting)
+            if i % 5 == 0 and len(pred_depth) > 0:
+                # Visualize depth using FULL 2D maps before masking (better visualization)
+                # Resize full maps to smaller size for faster upload
+                h_viz, w_viz = int(gt_height / 4), int(gt_width / 4)
+                #gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz))
+                #pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz))
+
+                gt_depth_resized = cv2.resize(gt_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_NEAREST)
+                pred_depth_resized = cv2.resize(pred_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
+                
                 try:
-                    # Downscale for faster WandB upload
-                    scale = 4
-                    h_viz, w_viz = gt_height // scale, gt_width // scale
-                    gt_depth_viz = cv2.resize(gt_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_NEAREST)
-                    pred_depth_viz = cv2.resize(pred_depth_full, (w_viz, h_viz), interpolation=cv2.INTER_LINEAR)
-
-                    # Get input image
-                    rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1, 2, 0)
-                    rgb = (rgb * 255).astype(np.uint8)
-                    rgb_viz = cv2.resize(rgb, (w_viz, h_viz))
-                    rgb_viz_rgb = cv2.cvtColor(rgb_viz, cv2.COLOR_BGR2RGB)
-
-                    # Visualize depth maps (inferno colormap)
-                    depth_gt_map = visualize_depth_map(gt_depth_viz, percentile=95)
-                    depth_pred_map = visualize_depth_map(pred_depth_viz, percentile=95)
-                    depth_gt_rgb = cv2.cvtColor(depth_gt_map, cv2.COLOR_BGR2RGB)
-                    depth_pred_rgb = cv2.cvtColor(depth_pred_map, cv2.COLOR_BGR2RGB)
-
-                    # Create error map (jet colormap: blue = low error, red = high error)
-                    error_map, mean_abs_rel = visualize_error_map(
-                        gt_depth_viz, pred_depth_viz, max_abs_rel=0.2
-                    )
+                    # Visualize depth: clip at 95th percentile
+                    depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
+                    depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
+                    
+                    # Create error map - pixel-wise Abs Rel with ABSOLUTE [0, 0.2] scale for fair comparison
+                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, max_abs_rel=0.2)
+                    
+                    # Convert BGR to RGB for WandB
+                    depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
+                    depth_gt_rgb = cv2.cvtColor(depth_gt_viz, cv2.COLOR_BGR2RGB)
                     error_map_rgb = cv2.cvtColor(error_map, cv2.COLOR_BGR2RGB)
 
-                    # Find and mark ROI (brightest region with red dashed box)
-                    gray_rgb = cv2.cvtColor(rgb_viz, cv2.COLOR_BGR2GRAY)
-                    y1, y2, x1, x2 = find_brightest_roi(gray_rgb, roi_size=32)
+                    rgb = data[("color", 0, 0)].cpu().numpy()[0].transpose(1,2,0)
+                    rgb = (rgb * 255).astype(np.uint8)
 
-                    # Create error map with ROI marked (red dashed rectangle)
-                    error_marked = error_map.copy()
-                    error_marked = draw_dashed_rectangle(error_marked, (x1, y1), (x2, y2),
-                                        color=(0, 0, 255), thickness=2, dash_length=4)
-                    error_marked_rgb = cv2.cvtColor(error_marked, cv2.COLOR_BGR2RGB)
-
-                    # Extract zoomed error map region
-                    if y2 > y1 and x2 > x1:
-                        error_zoomed = error_map[y1:y2, x1:x2]
-                        error_zoomed_rgb = cv2.cvtColor(error_zoomed, cv2.COLOR_BGR2RGB)
-                    else:
-                        error_zoomed_rgb = error_map_rgb  # Fallback to full error map
-
-                    # Mark input image with ROI (red dashed rectangle)
-                    rgb_marked = rgb_viz.copy()
-                    rgb_marked = draw_dashed_rectangle(rgb_marked, (x1, y1), (x2, y2),
-                                        color=(0, 0, 255), thickness=2, dash_length=4)
-                    rgb_marked_rgb = cv2.cvtColor(rgb_marked, cv2.COLOR_BGR2RGB)
-
-                    # Ensure all arrays are uint8 for WandB
-                    rgb_viz_rgb = np.ascontiguousarray(rgb_viz_rgb, dtype=np.uint8)
-                    rgb_marked_rgb = np.ascontiguousarray(rgb_marked_rgb, dtype=np.uint8)
-                    depth_gt_rgb = np.ascontiguousarray(depth_gt_rgb, dtype=np.uint8)
-                    depth_pred_rgb = np.ascontiguousarray(depth_pred_rgb, dtype=np.uint8)
-                    error_map_rgb = np.ascontiguousarray(error_map_rgb, dtype=np.uint8)
-                    error_marked_rgb = np.ascontiguousarray(error_marked_rgb, dtype=np.uint8)
-                    error_zoomed_rgb = np.ascontiguousarray(error_zoomed_rgb, dtype=np.uint8)
-
-                    # Log to WandB (following Figure 5 visualization)
-                    print(f"Logging frame {i} to WandB...")
-                    wandb.log({
-                        "input_image": wandb.Image(rgb_viz_rgb),
-                        "input_marked_roi": wandb.Image(rgb_marked_rgb),
-                        "depth_gt": wandb.Image(depth_gt_rgb),
-                        "depth_pred": wandb.Image(depth_pred_rgb),
-                        "error_map_jet": wandb.Image(error_map_rgb),
-                        "error_map_with_roi": wandb.Image(error_marked_rgb),
-                        "error_map_roi_detail": wandb.Image(error_zoomed_rgb),
-                        "frame_idx": i,
-                        "abs_rel": mean_abs_rel,
-                    }, commit=True)
-                    print(f"Successfully logged frame {i}")
+                    # Resize RGB to match error map for consistent logging
+                    rgb_resized = cv2.resize(rgb, (error_map.shape[1], error_map.shape[0]))
+                    rgb_resized_rgb = cv2.cvtColor(rgb_resized, cv2.COLOR_BGR2RGB)
                     
-                    # Collect for statistics
-                    abs_rel_errors.append(mean_abs_rel)
-
+                    # Apply brightness mask to error map (keep only bright regions)
+                    error_map_bright = apply_brightness_mask(error_map, rgb_resized, threshold=100)
+                    error_map_bright_rgb = cv2.cvtColor(error_map_bright, cv2.COLOR_BGR2RGB)
+                    
+                    # Create zoomed region with marking
+                    zoomed_error, marked_error, bbox = create_zoomed_with_marker(error_map, rgb_resized, region_size=100)
+                    marked_error_rgb = cv2.cvtColor(marked_error, cv2.COLOR_BGR2RGB)
+                    zoomed_error_rgb = cv2.cvtColor(zoomed_error, cv2.COLOR_BGR2RGB)
+                    
+                    # Mark input image with dashed bounding box
+                    marked_rgb = rgb_resized.copy()
+                    y1, y2, x1, x2 = bbox
+                    draw_dashed_rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 0, 255), thickness=2, dash_length=4)
+                    marked_rgb_rgb = cv2.cvtColor(marked_rgb, cv2.COLOR_BGR2RGB)
+                    
+                    wandb.log({
+                        "input_image": wandb.Image(rgb_resized_rgb),
+                        "input_image_marked": wandb.Image(marked_rgb_rgb),
+                        "depth_pred": wandb.Image(depth_pred_rgb),
+                        "depth_gt": wandb.Image(depth_gt_rgb),
+                        "error_map": wandb.Image(error_map_rgb),
+                        "error_map_bright_regions": wandb.Image(error_map_bright_rgb),
+                        "error_map_marked": wandb.Image(marked_error_rgb),
+                        "error_map_zoomed": wandb.Image(zoomed_error_rgb),
+                        "frame_idx": i,
+                        "abs_error": np.mean(np.abs(gt_depth - pred_depth)),
+                        "abs_rel_error_map": abs_rel_error_map
+                    }, commit=True)
+                    abs_rel_error_maps.append(abs_rel_error_map)
                 except Exception as e:
-                    import traceback
-                    print(f"ERROR: Could not log frame {i} to WandB: {e}")
-                    traceback.print_exc()
+                    print(f"Warning: Could not log frame {i} to WandB: {e}")
+
+                #print("GT valid %:", np.mean(gt_depth_resized > 0))
+                #print("Pred range:", pred_depth_resized.min(), pred_depth_resized.max())
 
     # Print results
     if not opt.disable_median_scaling:
@@ -574,7 +603,7 @@ def evaluate(opt):
 
     errors = np.array(errors)
     mean_errors = np.mean(errors, axis=0)
-
+    
     # Compute 95% confidence intervals
     cls = []
     for i in range(len(mean_errors)):
@@ -586,21 +615,26 @@ def evaluate(opt):
     print("\n       " + ("{:>11}      | " * 7).format("abs_rel", "sq_rel", "rmse", "rmse_log", "a1", "a2", "a3"))
     print("mean:" + ("&{: 12.3f}      " * 7).format(*mean_errors.tolist()) + "\\\\")
     print("cls: " + ("& [{: 6.3f}, {: 6.3f}] " * 7).format(*cls.tolist()) + "\\\\")
-    print("average inference time: {:0.1f} ms".format(np.mean(np.array(inference_times)) * 1000))
-
-    # Final WandB logging
-    mean_abs_rel = np.mean(abs_rel_errors) if len(abs_rel_errors) > 0 else 0.0
+    avg_inference_time = np.mean(np.array(inference_times)) * 1000
+    print("average inference time: {:0.1f} ms".format(avg_inference_time))
+    
+    # Compute mean Abs Rel for error maps
+    mean_abs_rel_error_map = np.mean(abs_rel_error_maps) if len(abs_rel_error_maps) > 0 else 0.0
+    print(f"mean abs_rel error map (max=0.2): {mean_abs_rel_error_map:.6f}")
+    
+    # Log final metrics to WandB
     wandb.log({
-        "final/abs_rel": mean_errors[0],
-        "final/sq_rel": mean_errors[1],
-        "final/rmse": mean_errors[2],
-        "final/rmse_log": mean_errors[3],
-        "final/a1": mean_errors[4],
-        "final/a2": mean_errors[5],
-        "final/a3": mean_errors[6],
-        "final/avg_inference_time_ms": np.mean(np.array(inference_times)) * 1000,
+        "abs_rel": mean_errors[0],
+        "sq_rel": mean_errors[1],
+        "rmse": mean_errors[2],
+        "rmse_log": mean_errors[3],
+        "a1": mean_errors[4],
+        "a2": mean_errors[5],
+        "a3": mean_errors[6],
+        "avg_inference_time_ms": avg_inference_time,
+        "mean_abs_rel_error_map": mean_abs_rel_error_map
     })
-
+    
     wandb.finish()
     print("\n-> Done!")
 
