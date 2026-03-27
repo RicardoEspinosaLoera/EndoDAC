@@ -515,11 +515,18 @@ def evaluate(opt):
             # Scale prediction
             pred_depth *= opt.pred_depth_scale_factor
             
+            # Compute median scaling ratio
+            scale_ratio = 1.0
             if not opt.disable_median_scaling:
                 ratio = np.median(gt_depth) / np.median(pred_depth)
                 if not np.isnan(ratio).all():
                     ratios.append(ratio)
+                    scale_ratio = ratio
                 pred_depth *= ratio
+            
+            # Apply same scaling to full depth maps for consistent visualization
+            pred_depth_full *= opt.pred_depth_scale_factor * scale_ratio
+            gt_depth_full *= 1.0  # GT doesn't need scaling
 
             # Clip to valid range
             pred_depth[pred_depth < MIN_DEPTH] = MIN_DEPTH
