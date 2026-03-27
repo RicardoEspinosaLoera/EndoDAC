@@ -544,17 +544,27 @@ def evaluate(opt):
                     rgb_marked_rgb = cv2.cvtColor(rgb_marked, cv2.COLOR_BGR2RGB)
 
                     # Log to WandB (following Figure 5 visualization)
-                    wandb.log({
-                        "input_image": wandb.Image(rgb_viz_rgb),
-                        "input_marked_roi": wandb.Image(rgb_marked_rgb),
-                        "depth_gt": wandb.Image(depth_gt_rgb),
-                        "depth_pred": wandb.Image(depth_pred_rgb),
-                        "error_map_jet": wandb.Image(error_map_rgb),
-                        "error_map_with_roi": wandb.Image(error_marked_rgb),
-                        "error_map_roi_detail": wandb.Image(error_zoomed_rgb),
-                        "frame_idx": i,
-                        "abs_rel": mean_abs_rel,
-                    }, commit=True)
+                    try:
+                        log_dict = {
+                            "input_image": wandb.Image(rgb_viz_rgb),
+                            "input_marked_roi": wandb.Image(rgb_marked_rgb),
+                            "depth_gt": wandb.Image(depth_gt_rgb),
+                            "depth_pred": wandb.Image(depth_pred_rgb),
+                            "error_map_jet": wandb.Image(error_map_rgb),
+                            "error_map_with_roi": wandb.Image(error_marked_rgb),
+                            "error_map_roi_detail": wandb.Image(error_zoomed_rgb),
+                            "frame_idx": i,
+                            "abs_rel": mean_abs_rel,
+                        }
+                        print(f"  Logging to WandB with {len(log_dict)} items")
+                        print(f"    - rgb_viz_rgb: {rgb_viz_rgb.shape if hasattr(rgb_viz_rgb, 'shape') else type(rgb_viz_rgb)}")
+                        print(f"    - error_zoomed_rgb: {error_zoomed_rgb.shape if hasattr(error_zoomed_rgb, 'shape') else type(error_zoomed_rgb)}")
+                        wandb.log(log_dict, commit=True)
+                        print(f"  Successfully logged frame {i} to WandB")
+                    except Exception as e_wandb:
+                        print(f"  ERROR in wandb.log: {e_wandb}")
+                        import traceback
+                        traceback.print_exc()
                     
                     # Collect for statistics
                     abs_rel_errors.append(mean_abs_rel)
