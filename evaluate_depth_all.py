@@ -491,10 +491,11 @@ def evaluate(opt):
             # Resize prediction to match ground truth
             gt_height, gt_width = gt_depth.shape[:2]
             pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-            pred_depth = 1.0 / np.clip(pred_disp, 1e-6, None)  # Convert disparity to depth
+            #pred_disp = np.clip(pred_disp, 1e-6, None)
+            #pred_depth = 1.0 / pred_disp
             
             # Save full 2D versions for visualization BEFORE masking
-            pred_depth_full = pred_depth.copy()
+            pred_depth_full = pred_disp.copy()
             gt_depth_full = gt_depth.copy()
 
             # Create mask for valid regions
