@@ -509,7 +509,7 @@ def evaluate(opt):
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
 
             # Extract valid regions
-            pred_depth = pred_disp[mask]
+            pred_depth = pred_depth[mask]
             gt_depth = gt_depth[mask]
 
             # Scale prediction
@@ -523,6 +523,11 @@ def evaluate(opt):
                     ratios.append(ratio)
                     scale_ratio = ratio
                 pred_depth *= ratio
+                # Debug: print scaling info to identify model differences
+                if i % 5 == 0:
+                    print(f"Frame {i}: GT range=[{np.min(gt_depth):.4f}, {np.max(gt_depth):.4f}], "
+                          f"Pred raw range=[{np.min(pred_depth/ratio):.4f}, {np.max(pred_depth/ratio):.4f}], "
+                          f"Scale ratio={ratio:.4f}")
             
             # Apply same scaling to full depth maps for consistent visualization
             pred_depth_full *= opt.pred_depth_scale_factor * scale_ratio
