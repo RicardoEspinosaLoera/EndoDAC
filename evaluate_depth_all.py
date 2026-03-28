@@ -185,10 +185,10 @@ def visualize_depth_map(depth, percentile=95):
     return cv2.cvtColor(depth_viz, cv2.COLOR_RGB2BGR)
 
 
-def visualize_error_map(gt_depth, pred_depth, max_abs_rel=0.2):
+def visualize_error_map(gt_depth, pred_depth, percentile=75):
     """
-    Visualize pixel-wise Abs Rel error map with ABSOLUTE (not percentile) scaling.
-    |pred - gt| / |gt| normalized to [0, max_abs_rel] for fair model comparison.
+    Visualize pixel-wise Abs Rel error map.
+    |pred - gt| / |gt| normalized with percentile-based scaling for adaptive range.
     Returns error map image and mean Abs Rel metric.
     """
     valid = gt_depth > 1e-6
@@ -206,13 +206,20 @@ def visualize_error_map(gt_depth, pred_depth, max_abs_rel=0.2):
     pred_valid = pred_depth[valid]
     abs_rel_valid = np.abs(gt_valid - pred_valid) / (np.abs(gt_valid) + 1e-8)
     
+    # Compute percentiles on valid data only (adaptive scaling)
+    vmin = np.percentile(abs_rel_valid, 5)
+    vmax = np.percentile(abs_rel_valid, percentile)
+    
     # Compute mean Abs Rel for logging
     abs_rel_error_map = np.mean(abs_rel_valid)
     
-    # Normalize with FIXED scale: [0, max_abs_rel] -> [0, 1]
-    # This allows fair comparison across models
-    normalized_valid = np.clip(abs_rel_valid / max_abs_rel, 0, 1)
-    error_norm[valid] = normalized_valid
+    # Normalize valid pixels only to [0, 1]
+    if vmax - vmin > 1e-6:
+        # Blue = low error (0), Red = high error (1)
+        normalized_valid = np.clip((abs_rel_valid - vmin) / (vmax - vmin), 0, 1)
+        error_norm[valid] = normalized_valid
+    else:
+        error_norm[valid] = 0.5  # Uniform error if no variance
     
     # Set invalid pixels to 0 (blue = no error info)
     error_norm[~valid] = 0
@@ -223,7 +230,7 @@ def visualize_error_map(gt_depth, pred_depth, max_abs_rel=0.2):
     error_color = _ERROR_COLORMAP(error_norm)  # Use jet colormap
     error_map = (error_color[:, :, :3] * 255).astype(np.uint8)
     
-    print(f"  Abs Rel stats: Mean={abs_rel_error_map:.4f}, Min={np.min(abs_rel_valid):.4f}, Max={np.max(abs_rel_valid):.4f}")
+    print(f"  Abs Rel: range=[{vmin:.4f}, {vmax:.4f}], mean={abs_rel_error_map:.4f}")
 
     return cv2.cvtColor(error_map, cv2.COLOR_RGB2BGR), abs_rel_error_map
 
@@ -546,8 +553,8 @@ def evaluate(opt):
                     depth_pred_viz = visualize_depth_map(pred_depth_resized, percentile=95)
                     depth_gt_viz = visualize_depth_map(gt_depth_resized, percentile=95)
                     
-                    # Create error map - pixel-wise Abs Rel with ABSOLUTE [0, 0.2] scale for fair comparison
-                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, max_abs_rel=0.2)
+                    # Create error map - pixel-wise Abs Rel with percentile-based adaptive scaling
+                    error_map, abs_rel_error_map = visualize_error_map(gt_depth_resized, pred_depth_resized, percentile=75)
                     
                     # Convert BGR to RGB for WandB
                     depth_pred_rgb = cv2.cvtColor(depth_pred_viz, cv2.COLOR_BGR2RGB)
