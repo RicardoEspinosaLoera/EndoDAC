@@ -503,7 +503,7 @@ def evaluate(opt):
             
             # Save full 2D versions for visualization BEFORE masking
             pred_depth_full = pred_depth.copy()
-            gt_depth_full = gt_depth.copy()
+            gt_depth_full = gt_depth.copy().astype(np.float32)  # Convert to float for consistency
 
             # Create mask for valid regions
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
