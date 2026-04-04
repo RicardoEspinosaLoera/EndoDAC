@@ -215,8 +215,22 @@ def test_simple(args):
                 
                 # Resize to target output size (260, 288)
                 if isinstance(depth, torch.Tensor):
+                    # Ensure tensor has 4 dimensions: [B, C, H, W]
+                    if depth.dim() == 2:
+                        # [H, W] → [1, 1, H, W]
+                        depth = depth.unsqueeze(0).unsqueeze(0)
+                    elif depth.dim() == 3:
+                        # [B, H, W] or [C, H, W]
+                        if depth.shape[0] == 1 and depth.shape[1] * depth.shape[2] > 100:
+                            # Likely [B=1, H, W], add channel dimension
+                            depth = depth.unsqueeze(1)  # [1, 1, H, W]
+                        else:
+                            # Likely [C, H, W], add batch dimension
+                            depth = depth.unsqueeze(0)  # [1, C, H, W]
+                    # If already 4D [B, C, H, W], use as is
+                    
                     depth = torch.nn.functional.interpolate(
-                        depth.unsqueeze(1), (260, 288), mode="bilinear", align_corners=False)
+                        depth, (260, 288), mode="bilinear", align_corners=False)
                     depth = depth.squeeze().cpu().numpy()
                 
                 # Ensure depth is positive and in millimeters
