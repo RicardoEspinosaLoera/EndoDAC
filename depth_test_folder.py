@@ -55,6 +55,15 @@ def parse_args():
     parser.add_argument('--include_cls_token', action='store_true',
                         help='Include CLS token in EndoDAC and HaDepth models', required=False)
     
+    parser.add_argument('--min_depth', type=float, default=0.1,
+                        help='Minimum depth for disp_to_depth conversion', required=False)
+    parser.add_argument('--max_depth', type=float, default=150.0,
+                        help='Maximum depth for disp_to_depth conversion', required=False)
+    
+    parser.add_argument('--dataset', type=str, default='hamlyn',
+                        choices=['hamlyn', 'endovis', 'c3vd'],
+                        help='Dataset type (hamlyn, endovis, c3vd) for default depth bounds', required=False)
+    
     return parser.parse_args()
 
 def disp_to_depth(disp, min_depth, max_depth):
@@ -163,7 +172,16 @@ def test_simple(args):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("-> Loading model from ", args.load_weights_folder)
     print("-> Model type: ", args.model_type)
+    print("-> Dataset: ", args.dataset)
 
+    # Set depth bounds based on dataset if using defaults
+    if args.dataset == 'hamlyn':
+        if args.max_depth == 150.0:  # Using default
+            args.max_depth = 300.0  # Hamlyn typically has max depth around 300mm
+            print("-> Using Hamlyn-specific max_depth: 300.0 mm")
+    
+    print(f"-> Depth bounds: min={args.min_depth}, max={args.max_depth}")
+    
     # Loading pretrained model
     print("   Loading pretrained model")
     
@@ -171,6 +189,7 @@ def test_simple(args):
     
     # Load input data
     dir_list = os.listdir(args.images_path)
+    depth_stats = {'min': [], 'max': [], 'mean': [], 'unique_values': []}
     
     for idx, i in enumerate(dir_list):
         if not i.lower().endswith(('.jpg', '.jpeg', '.png')):
@@ -195,7 +214,7 @@ def test_simple(args):
                     output, (original_height, original_width), mode="bilinear", align_corners=False)
                 
                 disp_resized_np = disp_resized.squeeze().cpu().numpy()
-                _, scaled_depth = disp_to_depth(disp_resized_np, 0.1, 100)
+                _, scaled_depth = disp_to_depth(disp_resized_np, args.min_depth, args.max_depth)
                 depth = scaled_depth * 52.864  # Metric scale (mm)
                 depth[depth > 300] = 300
         
@@ -224,7 +243,7 @@ def test_simple(args):
                 
                 # Convert disparity to depth using min/max depth bounds
                 disp_resized_np = disp_resized.squeeze().cpu().numpy()
-                _, depth = disp_to_depth(disp_resized_np, 0.1, 100)
+                _, depth = disp_to_depth(disp_resized_np, args.min_depth, args.max_depth)
                 
                 # Scale depth to millimeters
                 depth = depth * 52.864
@@ -232,12 +251,37 @@ def test_simple(args):
 
         # Save depth as uint16 PNG (keeping original output format)
         im_depth = depth.astype(np.uint16)
+        
+        # Collect statistics
+        depth_stats['min'].append(np.min(depth))
+        depth_stats['max'].append(np.max(depth))
+        depth_stats['mean'].append(np.mean(depth))
+        unique_vals = len(np.unique(depth))
+        depth_stats['unique_values'].append(unique_vals)
+        
+        if idx < 3 or idx % 50 == 0:  # Print stats for first 3 and every 50th image
+            print(f"   Image {i}: depth range=[{np.min(depth):.2f}, {np.max(depth):.2f}], "
+                  f"mean={np.mean(depth):.2f}, unique_values={unique_vals}")
+        
         im = pil.fromarray(im_depth)
         output_name = i.replace(".jpg","")
         output_file = os.path.join(args.output_path, "{}.png".format(output_name))
         im.save(output_file)
 
     print('-> Done!')
+    
+    # Print summary statistics
+    if depth_stats['min']:
+        print("\n--- Depth Statistics Summary ---")
+        print(f"Overall depth range: [{np.mean(depth_stats['min']):.2f}, {np.mean(depth_stats['max']):.2f}] mm")
+        print(f"Average mean depth: {np.mean(depth_stats['mean']):.2f} mm")
+        print(f"Average unique values per image: {np.mean(depth_stats['unique_values']):.0f}")
+        
+        if np.mean(depth_stats['unique_values']) < 100:
+            print("\n⚠️ WARNING: Very few unique depth values detected!")
+            print("This suggests the depth predictions may be poorly distributed.")
+            print("Try adjusting --min_depth and --max_depth parameters.")
+            print(f"Current: --min_depth {args.min_depth} --max_depth {args.max_depth}")
 
 
 if __name__ == '__main__':
