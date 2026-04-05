@@ -186,12 +186,13 @@ def test_simple(args):
                 os.path.join(args.images_path, i), 
                 resize_width=WIDTH, 
                 resize_height=HEIGHT)
+            original_height, original_width = original_size
             
             with torch.no_grad():
                 encoder, depth_decoder = model
                 output = depth_decoder(encoder(input_image))[("disp", 0)]
                 disp_resized = torch.nn.functional.interpolate(
-                    output, (260, 288), mode="bilinear", align_corners=False)
+                    output, (original_height, original_width), mode="bilinear", align_corners=False)
                 
                 disp_resized_np = disp_resized.squeeze().cpu().numpy()
                 _, scaled_depth = disp_to_depth(disp_resized_np, 0.1, 100)
@@ -205,6 +206,7 @@ def test_simple(args):
                 os.path.join(args.images_path, i), 
                 resize_width=WIDTH, 
                 resize_height=HEIGHT)
+            original_height, original_width = original_size
             
             with torch.no_grad():
                 # Model internally resizes to 224x280
@@ -216,9 +218,9 @@ def test_simple(args):
                 else:
                     disp = output
                 
-                # Resize disparity to target output size (260, 288)
+                # Resize disparity to ORIGINAL image dimensions
                 disp_resized = torch.nn.functional.interpolate(
-                    disp, (260, 288), mode="bilinear", align_corners=False)
+                    disp, (original_height, original_width), mode="bilinear", align_corners=False)
                 
                 # Convert disparity to depth using min/max depth bounds
                 disp_resized_np = disp_resized.squeeze().cpu().numpy()
