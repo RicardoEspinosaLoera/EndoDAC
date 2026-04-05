@@ -198,27 +198,7 @@ def test_simple(args):
         print(f"Processing {idx+1}/{len(dir_list)}: {i}")
         
         # Load and preprocess image based on model type
-        if model_type == 'monovit':
-            # MonoVIT expects 384x512
-            HEIGHT, WIDTH = 384, 512
-            input_image, original_size = load_and_preprocess_image(
-                os.path.join(args.images_path, i), 
-                resize_width=WIDTH, 
-                resize_height=HEIGHT)
-            original_height, original_width = original_size
-            
-            with torch.no_grad():
-                encoder, depth_decoder = model
-                output = depth_decoder(encoder(input_image))[("disp", 0)]
-                disp_resized = torch.nn.functional.interpolate(
-                    output, (original_height, original_width), mode="bilinear", align_corners=False)
-                
-                disp_resized_np = disp_resized.squeeze().cpu().numpy()
-                _, scaled_depth = disp_to_depth(disp_resized_np, args.min_depth, args.max_depth)
-                depth = scaled_depth * 52.864  # Metric scale (mm)
-                depth[depth > 300] = 300
-        
-        elif model_type in ['endodac', 'hadepth']:
+        if model_type in ['endodac', 'hadepth']:
             # EndoDAC/HaDepth will internally resize to 224x280, so pass image at reasonable size
             HEIGHT, WIDTH = 384, 512
             input_image, original_size = load_and_preprocess_image(
