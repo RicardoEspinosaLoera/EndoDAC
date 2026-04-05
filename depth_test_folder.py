@@ -204,38 +204,22 @@ def test_simple(args):
                     input_image, (224, 280), mode="bilinear", align_corners=False)
                 output = model(input_resized)
                 
-                # Handle different output formats
+                # Extract disparity from output dict
                 if isinstance(output, dict):
-                    depth = output.get("depth", output.get("disp", None))
-                    if depth is None:
-                        # Try to get the first value if it's a dict
-                        depth = list(output.values())[0]
+                    disp = output[("disp", 0)]
                 else:
-                    depth = output
+                    disp = output
                 
-                # Resize to target output size (260, 288)
-                if isinstance(depth, torch.Tensor):
-                    # Ensure tensor has 4 dimensions: [B, C, H, W]
-                    if depth.dim() == 2:
-                        # [H, W] → [1, 1, H, W]
-                        depth = depth.unsqueeze(0).unsqueeze(0)
-                    elif depth.dim() == 3:
-                        # [B, H, W] or [C, H, W]
-                        if depth.shape[0] == 1 and depth.shape[1] * depth.shape[2] > 100:
-                            # Likely [B=1, H, W], add channel dimension
-                            depth = depth.unsqueeze(1)  # [1, 1, H, W]
-                        else:
-                            # Likely [C, H, W], add batch dimension
-                            depth = depth.unsqueeze(0)  # [1, C, H, W]
-                    # If already 4D [B, C, H, W], use as is
-                    
-                    depth = torch.nn.functional.interpolate(
-                        depth, (260, 288), mode="bilinear", align_corners=False)
-                    depth = depth.squeeze().cpu().numpy()
+                # Resize disparity to target output size (260, 288)
+                disp_resized = torch.nn.functional.interpolate(
+                    disp, (260, 288), mode="bilinear", align_corners=False)
                 
-                # Ensure depth is positive and in millimeters
-                depth = np.abs(depth)
-                depth = depth * 52.864  # Convert to millimeters
+                # Convert disparity to depth using min/max depth bounds
+                disp_resized_np = disp_resized.squeeze().cpu().numpy()
+                _, depth = disp_to_depth(disp_resized_np, 0.1, 100)
+                
+                # Scale depth to millimeters
+                depth = depth * 52.864
                 depth[depth > 300] = 300  # Clip maximum depth
 
         # Save depth as uint16 PNG (keeping original output format)
