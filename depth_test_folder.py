@@ -200,9 +200,7 @@ def test_simple(args):
         elif model_type in ['endodac', 'hadepth']:
             with torch.no_grad():
                 # For EndoDAC and HaDepth models
-                input_resized = torch.nn.functional.interpolate(
-                    input_image, (224, 280), mode="bilinear", align_corners=False)
-                output = model(input_resized)
+                output = model(input_image)
                 
                 # Extract disparity from output dict
                 if isinstance(output, dict):
@@ -225,7 +223,7 @@ def test_simple(args):
         # Save depth as uint16 PNG (keeping original output format)
         im_depth = depth.astype(np.uint16)
         im = pil.fromarray(im_depth)
-        output_name = i.replace(".jpg", "").replace(".jpeg", "").replace(".png", "")
+        output_name = i.replace(".jpg","")
         output_file = os.path.join(args.output_path, "{}.png".format(output_name))
         im.save(output_file)
 
