@@ -168,7 +168,6 @@ def test_simple(args):
     print("   Loading pretrained model")
     
     model, input_size, model_type = load_model(args.model_type, args.load_weights_folder, args)
-    HEIGHT, WIDTH = input_size
     
     # Load input data
     dir_list = os.listdir(args.images_path)
@@ -179,13 +178,15 @@ def test_simple(args):
             
         print(f"Processing {idx+1}/{len(dir_list)}: {i}")
         
-        input_image, original_size = load_and_preprocess_image(
-            os.path.join(args.images_path, i), 
-            resize_width=WIDTH, 
-            resize_height=HEIGHT)
-        
-        # Process image based on model type
+        # Load and preprocess image based on model type
         if model_type == 'monovit':
+            # MonoVIT expects 384x512
+            HEIGHT, WIDTH = 384, 512
+            input_image, original_size = load_and_preprocess_image(
+                os.path.join(args.images_path, i), 
+                resize_width=WIDTH, 
+                resize_height=HEIGHT)
+            
             with torch.no_grad():
                 encoder, depth_decoder = model
                 output = depth_decoder(encoder(input_image))[("disp", 0)]
@@ -198,8 +199,15 @@ def test_simple(args):
                 depth[depth > 300] = 300
         
         elif model_type in ['endodac', 'hadepth']:
+            # EndoDAC/HaDepth will internally resize to 224x280, so pass image at reasonable size
+            HEIGHT, WIDTH = 384, 512
+            input_image, original_size = load_and_preprocess_image(
+                os.path.join(args.images_path, i), 
+                resize_width=WIDTH, 
+                resize_height=HEIGHT)
+            
             with torch.no_grad():
-                # For EndoDAC and HaDepth models
+                # Model internally resizes to 224x280
                 output = model(input_image)
                 
                 # Extract disparity from output dict
