@@ -195,13 +195,16 @@ def test_simple(args):
                 
                 # DEBUG: Check raw disparity range
                 if idx < 1:
-                    print(f"   RAW DISPARITY RANGE: [{np.min(disp_resized_np):.6f}, {np.max(disp_resized_np):.6f}]")
+                    print(f"   RAW OUTPUT RANGE: [{np.min(disp_resized_np):.6f}, {np.max(disp_resized_np):.6f}]")
                     print(f"   MEAN: {np.mean(disp_resized_np):.6f}, STD: {np.std(disp_resized_np):.6f}")
+                    print(f"   Using scale: {args.scale}, saturation_depth: {args.saturation_depth}")
                 
-                # Convert disparity to depth using normalized bounds, then scale to metric depth
-                _, scaled_depth = disp_to_depth(disp_resized_np, 0.1, 100)
-                depth = scaled_depth * args.scale
-                depth[depth > args.saturation_depth] = args.saturation_depth
+                # For HaDepth: use raw output directly as depth (skip disp_to_depth conversion)
+                depth = disp_resized_np * args.scale
+                
+                # Only clip if values exceed saturation depth
+                if np.max(depth) > args.saturation_depth:
+                    depth[depth > args.saturation_depth] = args.saturation_depth
 
         # Save depth as uint16 PNG (keeping original output format)
         im_depth = depth.astype(np.uint16)
