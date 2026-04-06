@@ -199,8 +199,8 @@ def test_simple(args):
                     print(f"   MEAN: {np.mean(disp_resized_np):.6f}, STD: {np.std(disp_resized_np):.6f}")
                     print(f"   Using scale: {args.scale}, saturation_depth: {args.saturation_depth}")
                 
-                # For HaDepth: use raw output directly as depth (skip disp_to_depth conversion)
-                depth = disp_resized_np * args.scale
+                # For HaDepth: invert the output (it outputs disparity, not depth)
+                depth = 1.0 / (disp_resized_np + 1e-8) * args.scale
                 
                 # Only clip if values exceed saturation depth
                 if np.max(depth) > args.saturation_depth:
