@@ -184,10 +184,14 @@ def test_simple(args):
                 
                 # Convert disparity to depth using min/max depth bounds
                 disp_resized_np = disp_resized.squeeze().cpu().numpy()
-                _, depth = disp_to_depth(disp_resized_np, args.min_depth, args.max_depth)
                 
-                # Scale depth to millimeters
-                depth = depth * 52.864
+                # DEBUG: Check raw disparity range
+                if idx < 1:
+                    print(f"   RAW DISPARITY RANGE: [{np.min(disp_resized_np):.6f}, {np.max(disp_resized_np):.6f}]")
+                    print(f"   MEAN: {np.mean(disp_resized_np):.6f}, STD: {np.std(disp_resized_np):.6f}")
+                
+                # Try using raw disparity as depth directly (without disp_to_depth conversion)
+                depth = disp_resized_np * 52.864
                 depth[depth > 300] = 300  # Clip maximum depth
 
         # Save depth as uint16 PNG (keeping original output format)
