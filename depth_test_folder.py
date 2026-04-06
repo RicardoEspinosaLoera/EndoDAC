@@ -190,8 +190,10 @@ def test_simple(args):
                     print(f"   RAW DISPARITY RANGE: [{np.min(disp_resized_np):.6f}, {np.max(disp_resized_np):.6f}]")
                     print(f"   MEAN: {np.mean(disp_resized_np):.6f}, STD: {np.std(disp_resized_np):.6f}")
                 
-                # Convert disparity to depth properly (inverts the relationship)
-                _, depth = disp_to_depth(disp_resized_np, args.min_depth, args.max_depth)
+                # Convert disparity to depth using normalized bounds, then scale to metric depth
+                _, scaled_depth = disp_to_depth(disp_resized_np, 0.1, 100)
+                depth = scaled_depth * args.scale
+                depth[depth > args.max_depth] = args.max_depth
 
         # Save depth as uint16 PNG (keeping original output format)
         im_depth = depth.astype(np.uint16)
