@@ -18,7 +18,6 @@ from torchvision import transforms
 
 import models.endodac as endodac
 import models.hadepth as hadepth
-import models.monovit as monovit
 
 
 def parse_args():
@@ -91,23 +90,7 @@ def load_model(model_type, weights_folder, args):
     """Load the appropriate depth estimation model"""
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     
-    if model_type == 'endodac':
-        print("-> Loading EndoDAC model")
-        depther_path = os.path.join(weights_folder, "depth_model.pth")
-        depther_dict = torch.load(depther_path, map_location=device)
-        
-        depther = endodac.endodac(
-            backbone_size="base", r=args.lora_rank, lora_type=args.lora_type,
-            image_shape=(224, 280), pretrained_path=args.pretrained_path,
-            residual_block_indexes=args.residual_block_indexes,
-            include_cls_token=args.include_cls_token)
-        model_dict = depther.state_dict()
-        depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
-        depther.cuda()
-        depther.eval()
-        return depther, (224, 280), 'endodac'
-    
-    elif model_type == 'hadepth':
+    if model_type == 'hadepth':
         print("-> Loading HaDepth model")
         depther_path = os.path.join(weights_folder, "depth_model.pth")
         depther_dict = torch.load(depther_path, map_location=device)
@@ -115,38 +98,16 @@ def load_model(model_type, weights_folder, args):
         depther = hadepth.hadepth(
             backbone_size="base",
             r=args.lora_rank,
-            lora_type=args.lora_type,
+            lora_type="dvlora",
             image_shape=(224, 280),
             pretrained_path=args.pretrained_path,
             residual_block_indexes=args.residual_block_indexes,
             include_cls_token=args.include_cls_token)
         model_dict = depther.state_dict()
-        depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
+        depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict})
         depther.cuda()
         depther.eval()
         return depther, (224, 280), 'hadepth'
-    
-    elif model_type == 'monovit':
-        print("-> Loading MonoVIT model")
-        encoder_path = os.path.join(weights_folder, "encoder.pth")
-        decoder_path = os.path.join(weights_folder, "depth.pth")
-        encoder_dict = torch.load(encoder_path, map_location=device)
-        
-        encoder = monovit.mpvit_small()
-        encoder.num_ch_enc = [64, 128, 216, 288, 288]
-        depth_decoder = monovit.DepthDecoderT()
-        
-        model_dict = encoder.state_dict()
-        encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})
-        depth_decoder.load_state_dict(torch.load(decoder_path, map_location=device))
-        
-        encoder.cuda()
-        encoder.eval()
-        depth_decoder.cuda()
-        depth_decoder.eval()
-        
-        # Return tuple with encoder, decoder, input size, model type
-        return (encoder, depth_decoder), (384, 512), 'monovit'
     
     else:
         raise ValueError(f"Unknown model type: {model_type}")
