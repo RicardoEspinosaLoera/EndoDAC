@@ -63,6 +63,14 @@ def parse_args():
                         choices=['hamlyn', 'endovis', 'c3vd'],
                         help='Dataset type (hamlyn, endovis, c3vd) for default depth bounds', required=False)
     
+    parser.add_argument('--scale', type=float, default=52.864,
+                        help='Image depth scaling. For Hamlyn dataset the weighted average baseline is 52.864',
+                        required=False)
+    
+    parser.add_argument('--saturation_depth', type=float, default=300.0,
+                        help='Saturation depth of the estimated depth images. For Hamlyn dataset it is 300 mm by default',
+                        required=False)
+    
     return parser.parse_args()
 
 def disp_to_depth(disp, min_depth, max_depth):
@@ -135,13 +143,13 @@ def test_simple(args):
     print("-> Model type: ", args.model_type)
     print("-> Dataset: ", args.dataset)
 
-    # Set depth bounds based on dataset if using defaults
+    # Set saturation depth based on dataset if using defaults
     if args.dataset == 'hamlyn':
-        if args.max_depth == 150.0:  # Using default
-            args.max_depth = 300.0  # Hamlyn typically has max depth around 300mm
-            print("-> Using Hamlyn-specific max_depth: 300.0 mm")
+        if args.saturation_depth == 300.0:  # Using default
+            args.saturation_depth = 300.0  # Hamlyn typically has max depth around 300mm
+            print("-> Using Hamlyn-specific saturation_depth: 300.0 mm")
     
-    print(f"-> Depth bounds: min={args.min_depth}, max={args.max_depth}")
+    print(f"-> Depth scale: {args.scale}, saturation_depth: {args.saturation_depth}")
     
     # Loading pretrained model
     print("   Loading pretrained model")
@@ -193,7 +201,7 @@ def test_simple(args):
                 # Convert disparity to depth using normalized bounds, then scale to metric depth
                 _, scaled_depth = disp_to_depth(disp_resized_np, 0.1, 100)
                 depth = scaled_depth * args.scale
-                depth[depth > args.max_depth] = args.max_depth
+                depth[depth > args.saturation_depth] = args.saturation_depth
 
         # Save depth as uint16 PNG (keeping original output format)
         im_depth = depth.astype(np.uint16)
