@@ -98,7 +98,7 @@ def load_model(model_type, weights_folder, args):
         depther = hadepth.hadepth(
             backbone_size="base",
             r=args.lora_rank,
-            lora_type="dora",
+            lora_type="dvlora",
             image_shape=(224, 280),
             pretrained_path=args.pretrained_path,
             residual_block_indexes=args.residual_block_indexes,
