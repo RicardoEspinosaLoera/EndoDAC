@@ -585,7 +585,7 @@ def evaluate(opt):
                     # Mark input image with dashed bounding box
                     marked_rgb = rgb_resized.copy()
                     y1, y2, x1, x2 = bbox
-                    draw_dashed_rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 0, 255), thickness=2, dash_length=4)
+                    draw_dashed_rectangle(marked_rgb, (x1, y1), (x2, y2), (0, 0, 255), thickness=4, dash_length=4)
                     marked_rgb_rgb = cv2.cvtColor(marked_rgb, cv2.COLOR_BGR2RGB)
                     
                     wandb.log({
