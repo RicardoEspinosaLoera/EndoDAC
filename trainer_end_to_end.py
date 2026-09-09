@@ -60,7 +60,10 @@ class Trainer:
             residual_block_indexes=self.opt.residual_block_indexes,
             include_cls_token=self.opt.include_cls_token)
         self.models["depth_model"].to(self.device)
-        self.parameters_to_train += list(filter(lambda p: p.requires_grad, self.models["depth_model"].parameters()))
+        # Every depth-model parameter goes to the optimizer, not only those trainable right
+        # now: mark_only_part_as_trainable() switches DV-LoRA from lora_A/lora_B to
+        # lora_U/lora_V after --warm_up_step, and Adam skips parameters whose grad is None.
+        self.parameters_to_train += list(self.models["depth_model"].parameters())
 
         # Optical Flow Encoder
         """self.models["position_encoder"] = encoders.ResnetEncoder(
@@ -188,6 +191,11 @@ class Trainer:
             self.ssim = SSIM()
             self.ssim.to(self.device)
 
+        if self.opt.iif_loss == "ssim":
+            # separate instance so --no_ssim does not disable the IIF branch
+            self.iif_ssim = SSIM()
+            self.iif_ssim.to(self.device)
+
         self.spatial_transform = SpatialTransformer((self.opt.height, self.opt.width))
         self.spatial_transform.to(self.device)
 
@@ -287,10 +295,9 @@ class Trainer:
         for name, param in self.models["depth_model"].named_parameters():
             if "seed_" not in name:
                 param.requires_grad = True
-        if self.step < self.opt.warm_up_step:
-            warm_up = True
-        else:
-            warm_up = False
+        warm_up = self.step < self.opt.warm_up_step
+        if self.step == self.opt.warm_up_step:
+            print("Warm-up finished at step {}: DV-LoRA now trains lora_U/lora_V (lora_A/lora_B frozen)".format(self.step))
         endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
         for param in self.models["pose_encoder"].parameters():
             param.requires_grad = True
@@ -331,12 +338,20 @@ class Trainer:
             self.models["intrinsics_head"].eval()
 
 
-    def get_illumination_invariant_loss(self, pred, target):
-        features_p = get_illumination_invariant_features(pred)
-        features_t = get_illumination_invariant_features(target)
-        ssim_loss = self.ssim(features_p, features_t).mean(1, True)
- 
-        return ssim_loss
+    def get_illumination_invariant_loss(self, pred, target=None, features_t=None):
+        """Illumination-invariant loss on Robinson descriptors, (B,1,H,W) in [0,1].
+
+        `features_t` lets the caller pass a precomputed target descriptor so it
+        is not recomputed for every scale / frame.
+        """
+        features_p = get_illumination_invariant_features(pred, eps=self.opt.iif_eps)
+        if features_t is None:
+            features_t = get_illumination_invariant_features(target, eps=self.opt.iif_eps)
+
+        if self.opt.iif_loss == "l2":
+            return get_illumination_invariant_l2(features_p, features_t)
+        # "ssim": kept as an ablation; its ratio form is concave in the descriptor error
+        return self.iif_ssim(features_p, features_t).mean(1, True)
 
     def get_highlight_mask(self, image):
         """
@@ -649,6 +664,10 @@ class Trainer:
         losses = {}
         total_loss = 0
 
+        # target is the same for every scale / frame: compute its descriptor once
+        features_t = get_illumination_invariant_features(
+            inputs[("color", 0, 0)], eps=self.opt.iif_eps)
+
 
         for scale in self.opt.scales:
             loss = 0
@@ -693,7 +712,7 @@ class Trainer:
                 #Illuminations invariant loss
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color_refined", frame_id, scale)]
-                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred,target) * reprojection_loss_mask_iil_combined).sum() / reprojection_loss_mask_iil_combined.sum()
+                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred, features_t=features_t) * reprojection_loss_mask_iil_combined).sum() / (reprojection_loss_mask_iil_combined.sum() + 1e-6)
  
             
             loss += loss_reprojection / 2.0

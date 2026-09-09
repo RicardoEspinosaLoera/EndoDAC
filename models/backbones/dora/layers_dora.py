@@ -85,13 +85,22 @@ class Linear(nn.Linear, LoRALayer):
     def cal(self, weight1, lora1):
         return weight1.T
 
+    def _init_magnitude(self):
+        # At construction the base weight is still random (pretrained weights are loaded
+        # afterwards), so the magnitude is taken lazily from the weight actually in use.
+        # Copy in place: re-creating the Parameter would orphan the optimizer's reference.
+        if getattr(self, "_magnitude_ready", False):
+            return
+        if torch.count_nonzero(self.lora_B) == 0:  # fresh adapter, not a resumed checkpoint
+            with torch.no_grad():
+                self.weigh_m_wdecomp.copy_(torch.linalg.norm(self.weight, dim=1).view(-1, 1))
+        self._magnitude_ready = True
+
     def forward(self, x: torch.Tensor):
         def T(w):
             return w.T if self.fan_in_fan_out else w
         if self.r > 0 and not self.merged:
-            if torch.linalg.norm(self.lora_B) == 0:
-                self.weigh_m_wdecomp = nn.Parameter(torch.linalg.norm(self.weight, dim=1).view(-1,1))
-                self.weigh_m_wdecomp.requires_grad = True
+            self._init_magnitude()
             new_weight = self.weight + (self.lora_B @ self.lora_A) * self.scaling
             norm_scale = self.weigh_m_wdecomp.view(-1) / torch.linalg.norm(new_weight, dim=1).detach()
             org_result = F.linear(x, T(self.weight))

@@ -1,14 +1,33 @@
 import torch.nn as nn
 import models.backbones as backbones
 
+# Parameter-name policy for the two training phases (EndoDAC DV-LoRA warm-up).
+_ALWAYS_TRAINABLE = ('residual_', 'conv_depth_')                       # residual blocks / conv neck
+_ADAPTER_FACTORS = ('lora_A', 'lora_B', 'lora_E', 'weigh_m_wdecomp')   # LoRA, DV-LoRA, FLoRA, DoRA
+_DV_VECTORS = ('lora_U', 'lora_V')                                     # DV-LoRA scaling vectors
+
+
 def mark_only_part_as_trainable(model: nn.Module, bias: str = 'none', warm_up: bool = True) -> None:
+    """Freeze everything except the adapter parameters of the current phase.
+
+    Warm-up trains the low-rank factors. Afterwards DV-LoRA layers (those owning
+    lora_U/lora_V) freeze their factors and train only the vectors; layers of any
+    other adapter type have no vectors and keep training their factors, otherwise
+    nothing in them would learn after warm-up.
+    """
+    dv_layers = {n.rsplit('.', 1)[0] for n, _ in model.named_parameters() if n.endswith('lora_U')}
     for n, p in model.named_parameters():
-        if warm_up:
-            if 'lora_A' not in n and 'lora_B' not in n and 'residual_' not in n and 'conv_depth_' not in n :
-                p.requires_grad = False
+        if any(k in n for k in _ALWAYS_TRAINABLE):
+            continue
+        owner, _, leaf = n.rpartition('.')
+        if leaf in _ADAPTER_FACTORS:
+            trainable = warm_up or owner not in dv_layers
+        elif leaf in _DV_VECTORS:
+            trainable = not warm_up
         else:
-            if 'lora_U' not in n and 'lora_V' not in n and 'residual_' not in n and 'conv_depth_' not in n :
-                p.requires_grad = False
+            trainable = False
+        if not trainable:
+            p.requires_grad = False
     if bias == 'none':
         return
     elif bias == 'all':

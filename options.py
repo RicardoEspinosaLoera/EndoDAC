@@ -264,6 +264,16 @@ class MonodepthOptions:
                                    type=float,
                                    help="illumination invariant weight",
                                    default=0.1)
+        self.parser.add_argument("--iif_loss",
+                                 type=str,
+                                 help="comparator for the illumination invariant descriptors: "
+                                      "l2 (0.25*||u_p-u_t||^2, linear gradient) or ssim (ablation)",
+                                 choices=["l2", "ssim"],
+                                 default="l2")
+        self.parser.add_argument("--iif_eps",
+                                 type=float,
+                                 help="additive floor on the descriptor norm; gates textureless pixels",
+                                 default=1e-4)
 
         # EVALUATION options
         self.parser.add_argument("--save_recon",

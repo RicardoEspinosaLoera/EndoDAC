@@ -4,6 +4,8 @@ import torch.nn as nn
 import models.backbones as backbones
 from models.backbones.mylora import Linear as LoraLinear
 from models.backbones.mylora import DVLinear as DVLinear
+from models.backbones.flora import Linear as FLinear
+from models.backbones.dora import Linear as DLinear
 from .layers import HeadDepth
 from .layers import mark_only_part_as_trainable,_make_scratch, _make_fusion_block
 
@@ -180,6 +182,14 @@ class endodac(nn.Module):
                 elif lora_type == "lora":
                     blk.mlp.fc1 = LoraLinear(mlp_in_features, mlp_hidden_features, r=self.r)
                     blk.mlp.fc2 = LoraLinear(mlp_hidden_features, mlp_out_features, r=self.r)
+                elif lora_type == "flora":
+                    blk.mlp.fc1 = FLinear(mlp_in_features, mlp_hidden_features, r=self.r)
+                    blk.mlp.fc2 = FLinear(mlp_hidden_features, mlp_out_features, r=self.r)
+                elif lora_type == "dora":
+                    blk.mlp.fc1 = DLinear(mlp_in_features, mlp_hidden_features, r=self.r)
+                    blk.mlp.fc2 = DLinear(mlp_hidden_features, mlp_out_features, r=self.r)
+                else:
+                    raise ValueError(f"unknown lora_type '{lora_type}'; expected dvlora, lora, flora, dora or none")
             
         self.encoder = encoder
         self.depth_head = DPTHead(self.embedding_dim, self.depth_head_feature, use_bn, out_channels=self.depth_head_out_channel, use_clstoken=use_cls_token)

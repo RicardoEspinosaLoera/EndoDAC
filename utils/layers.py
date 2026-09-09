@@ -550,42 +550,62 @@ def get_texu_mask(non_rigid, rigid):
    
     return texu_mask
 
-def get_illumination_invariant_features(img):
-    # Convert to grayscale if RGB
+def get_illumination_invariant_features(img, eps=1e-4):
+    """Illumination-invariant descriptor: unit-norm Robinson compass responses.
+
+    Only four of the eight Robinson kernels are used -- the other four are
+    their exact negatives and carry no extra information. The norm uses an
+    additive floor (not a clamp) so the descriptor decays smoothly to zero on
+    textureless pixels instead of amplifying noise to unit length.
+
+    Args:
+        img : (B,C,H,W) image; converted to grayscale if C != 1
+        eps : additive floor on the squared norm; gates pixels whose gradient
+              energy is below ~sqrt(eps)
+
+    Returns:
+        u : (B,4,H,W) descriptor, ||u|| -> 1 on texture, -> 0 on flat regions.
+            Invariant to I -> c*I + b (c > 0) exactly, and to smooth
+            spatially-varying / monotone tone changes to first order.
+    """
+    if img.dim() == 3:
+        img = img.unsqueeze(0)
     if img.shape[1] != 1:
         img_gray = transforms.functional.rgb_to_grayscale(img, 1)
     else:
         img_gray = img
 
-    if img_gray.dim() == 3:
-        img_gray = img_gray.unsqueeze(0)
+    # Robinson compass kernels; each sums to zero (additive invariance)
+    K = torch.tensor([
+        [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
+        [[0, 1, 2], [-1, 0, 1], [-2, -1, 0]],
+        [[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
+        [[2, 1, 0], [1, 0, -1], [0, -1, -2]],
+    ], dtype=img_gray.dtype, device=img_gray.device).unsqueeze(1)  # (4,1,3,3)
 
-    device = img_gray.device
+    # replicate-pad (not zero-pad) so a flat image gives exactly zero at the border
+    r = F.conv2d(F.pad(img_gray, (1, 1, 1, 1), mode="replicate"), K)  # (B,4,H,W)
+    norm = torch.sqrt((r * r).sum(1, keepdim=True) + eps)  # multiplicative invariance
+    return r / norm
 
-    # Robinson directional kernels
-    K = [
-        torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32, device=device),
-        torch.tensor([[0, 1, 2], [-1, 0, 1], [-2, -1, 0]], dtype=torch.float32, device=device),
-        torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], dtype=torch.float32, device=device),
-        torch.tensor([[2, 1, 0], [1, 0, -1], [0, -1, -2]], dtype=torch.float32, device=device),
-        torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32, device=device),
-        torch.tensor([[0, -1, -2], [1, 0, -1], [2, 1, 0]], dtype=torch.float32, device=device),
-        torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32, device=device),
-        torch.tensor([[-2, -1, 0], [-1, 0, 1], [0, 1, 2]], dtype=torch.float32, device=device),
-    ]
 
-    # Convolve
-    responses = [F.conv2d(img_gray, k.view(1, 1, 3, 3), padding=1) for k in K]
+def get_illumination_invariant_l2(u_p, u_t, window=3):
+    """Distance between two unit-norm descriptors, in [0, 1].
 
-    # Normalize for contrast invariance
-    sq_D = sum([r**2 for r in responses])
-    NormD = torch.sqrt(torch.clamp(sq_D, min=1e-9))
-    responses_norm = [r / NormD for r in responses]
+    0.25 * ||u_p - u_t||^2 equals (1 - cos) / 2 on textured pixels, 0 when both
+    are flat, and 0.25 when texture exists in only one image. Its gradient is
+    linear in the error, unlike SSIM's ratio form. The optional box filter gives
+    the same spatial tolerance as SSIM's 3x3 window.
 
-    # Concatenate into multi-channel descriptor
-    t = torch.cat(responses_norm, dim=1)
+    Returns:
+        d : (B,1,H,W)
+    """
+    d = 0.25 * (u_p - u_t).pow(2).sum(1, keepdim=True)
+    if window > 1:
+        p = window // 2
+        d = F.avg_pool2d(F.pad(d, (p, p, p, p), mode="reflect"), window, 1)
+    return d
 
-    return t
 
 def get_feature_oclution_mask(img):
     kernel = torch.tensor([[1, 1, 1],[1, 1, 1],[1, 1, 1]]).to(device=img.device).type(torch.cuda.FloatTensor)
