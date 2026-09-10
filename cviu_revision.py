@@ -13,8 +13,10 @@ Stages (each is idempotent: finished work is skipped unless --force is given):
   stats         sequence-level aggregation, bootstrap CIs, paired tests, LaTeX tables
   report        markdown report and figures
   all           predict, illum-fit, illum-params, illum-sens, da3, stats, report (not train)
+  full          train, then everything in `all`; stops if any training job failed
 
 Examples:
+  python cviu_revision.py full --gpus 0 1 2 3          # the whole revision in one go (run it in tmux)
   python cviu_revision.py train --gpus 0 1 2 3 --dry_run
   python cviu_revision.py train --gpus 0 --only E3 E8 --extra_flags "--num_epochs 1"
   python cviu_revision.py predict --datasets scared
@@ -309,10 +311,11 @@ def stage_train(cfg, args):
     for j in jobs:
         print("  {:<22} {}".format(j["name"], " ".join(shlex.quote(c) for c in j["cmd"])))
     if args.dry_run or not jobs:
-        return
+        return 0
 
     gpus = [str(g) for g in (args.gpus or ["0"])]
     q = queue.Queue()
+    failed = []
     for j in jobs:
         q.put(j)
     log_dir = ensure_dir(os.path.join(cfg["out_dir"], "train_logs"))
@@ -337,6 +340,7 @@ def stage_train(cfg, args):
                     f.write("git {}\nhours {:.2f}\ncmd {}\n".format(manifest["git"], secs / 3600.0, " ".join(j["cmd"])))
                 print("[train] {} finished in {:.1f} h".format(j["name"], secs / 3600.0))
             else:
+                failed.append(j["name"])
                 print("[train] {} FAILED (rc={}) after {:.0f} s, see {}\n----- log tail -----\n{}--------------------".format(
                     j["name"], rc, secs, log, tail(log)))
                 if secs < 180:  # died before training started: a setup error, not worth repeating 25 times
@@ -355,6 +359,9 @@ def stage_train(cfg, args):
         t.start()
     for t in threads:
         t.join()
+    if failed:
+        print("[train] {} job(s) failed: {}".format(len(failed), failed))
+    return len(failed)
 
 
 # --------------------------------------------------------------------------------------
@@ -1495,7 +1502,7 @@ ALL_ORDER = ["predict", "illum-fit", "illum-params", "illum-sens", "da3", "stats
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=list(STAGES) + ["all"])
+    ap.add_argument("stage", choices=list(STAGES) + ["all", "full"])
     ap.add_argument("--config", default=os.path.join(ROOT, "cviu_config.yaml"))
     ap.add_argument("--gpus", nargs="*", help="GPU ids for train (one subprocess per GPU)")
     ap.add_argument("--only", nargs="*", help="restrict to these runs / methods")
@@ -1509,12 +1516,21 @@ def main():
     args = ap.parse_args()
     cfg = load_config(args.config)
     ensure_dir(cfg["out_dir"])
-    stages = ALL_ORDER if args.stage == "all" else [args.stage]
+    if args.stage == "all":
+        stages = ALL_ORDER
+    elif args.stage == "full":
+        stages = ["train"] if args.dry_run else ["train"] + ALL_ORDER
+    else:
+        stages = [args.stage]
     failed = []
     for s in stages:
         print("=" * 20, s, "=" * 20)
         try:
-            STAGES[s](cfg, args)
+            n_failed = STAGES[s](cfg, args)
+            if s == "train" and n_failed and len(stages) > 1:
+                print("[full] {} training job(s) failed; not continuing to the analysis stages. "
+                      "Fix the error and rerun 'full' (finished runs are skipped).".format(n_failed))
+                sys.exit(1)
         except Exception:
             traceback.print_exc()
             failed.append(s)
