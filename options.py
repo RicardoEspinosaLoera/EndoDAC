@@ -263,7 +263,7 @@ class MonodepthOptions:
         self.parser.add_argument("--illumination_invariant",
                                    type=float,
                                    help="illumination invariant weight",
-                                   default=0.5)
+                                   default=0.1)
         self.parser.add_argument("--iif_loss",
                                  type=str,
                                  help="comparator for the illumination invariant descriptors: "
