@@ -11,10 +11,21 @@ synthetic geometry, and the `stats`/`report` stages on synthetic per-frame rows.
 anywhere: `predict`, `illum-params`, `illum-sens`, `da3` (need the server, the datasets and the
 checkpoints); `_da3_infer()` is the only function that touches the DA3 API and may need a
 one-line adjustment to the installed version. The E/R/C grid was launched on the server on
-2026-09-10. The DA3-encoder rows (D3, D3-EndoDAC, N0; §6) were added afterwards and need the
-`depth_anything_3` package on the server plus a 1-epoch dry run
-(`python cviu_revision.py train --gpus 0 --only D3 --extra_flags "--num_epochs 1"`) before
-relaunching `train`, which skips the finished runs.
+2026-09-10. The DA3-encoder rows (D3, D3-EndoDAC; §6) need the `depth_anything_3` package, which
+requires Python 3.9-3.13 and torch 2; the server's training env is Python 3.8, so they run from
+a second conda env passed as `--python <env>/bin/python` (the default env skips them with a
+warning). Recipe:
+
+```
+conda create -n da3 python=3.10 -y && conda activate da3
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118   # match the driver
+git clone https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e Depth-Anything-3
+pip install -r requirements.txt            # this repo's deps (kornia, wandb, tensorboardX, scikit-image, ...)
+python cviu_revision.py train --gpus 0 --only D3 --extra_flags "--num_epochs 1" --python $(which python)
+```
+
+`predict`/`illum-*` for the D3 rows must also be run with that interpreter (they build the DA3
+encoder in-process). N0 needs nothing extra.
 
 Reviewer asks → experiments:
 

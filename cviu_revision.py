@@ -252,7 +252,7 @@ def device_of(args):
 # stage: train
 # --------------------------------------------------------------------------------------
 
-def preflight(cfg, runs_with_da3=()):
+def preflight(cfg):
     """Everything a training subprocess needs, checked before the grid is launched."""
     problems = []
     dp = cfg["data"]["scared"]
@@ -277,12 +277,13 @@ def preflight(cfg, runs_with_da3=()):
         rc = subprocess.call([py, "-c", "import " + mods], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if rc != 0:
             problems.append("'{}' cannot import all of: {} (wrong interpreter / env?)".format(py, mods))
-        if runs_with_da3 and subprocess.call([py, "-c", "import depth_anything_3.api"], cwd=ROOT,
-                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
-            problems.append("runs {} need the depth_anything_3 package in '{}': git clone "
-                            "https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e . "
-                            "(the DA3 weights download from Hugging Face on first use)".format(runs_with_da3, py))
     return problems
+
+
+def has_da3(py):
+    """True if the training interpreter can import the depth_anything_3 package."""
+    return subprocess.call([py, "-c", "import depth_anything_3.api"], cwd=ROOT,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
 
 
 def tail(path, n=25):
@@ -296,16 +297,27 @@ def tail(path, n=25):
 def stage_train(cfg, args):
     runs = all_runs(cfg)
     selected = [r for r in runs if not args.only or r in args.only]
-    da3_runs = [r for r in selected if "--backbone_weights da3" in runs[r]["flags"]]
-    problems = preflight(cfg, da3_runs)
+    problems = preflight(cfg)
     for p in problems:
         print("[train] PREFLIGHT: " + p)
     if problems and not args.dry_run and not args.skip_preflight:
         print("[train] fix the above (or pass --skip_preflight) before launching")
         sys.exit(1)
+    # DA3-encoder rows need the depth_anything_3 package (Python >= 3.9, torch >= 2). If the
+    # training interpreter lacks it they are left out here, so the rest of the grid still runs;
+    # launch them later with an interpreter that has it: --python /path/to/env/bin/python
+    da3_runs = [r for r in selected if "--backbone_weights da3" in runs[r]["flags"]]
+    if da3_runs and not has_da3(cfg["python"]):
+        print("[train] '{}' cannot import depth_anything_3: {} need it (git clone "
+              "https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e ., Python>=3.9). "
+              "Run them with: python cviu_revision.py train --python <interpreter with DA3> --only {}".format(
+                  cfg["python"], da3_runs, " ".join(da3_runs)))
+        if not args.dry_run and not args.skip_preflight:
+            print("[train] skipping {} for now".format(da3_runs))
+            selected = [r for r in selected if r not in da3_runs]
     jobs = []
     for run, spec in runs.items():
-        if args.only and run not in args.only:
+        if run not in selected:
             continue
         for seed in run_seeds(cfg, run):
             name = run_name(run, seed)
@@ -1524,6 +1536,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stage", choices=list(STAGES) + ["all", "full"])
     ap.add_argument("--config", default=os.path.join(ROOT, "cviu_config.yaml"))
+    ap.add_argument("--python", help="interpreter for the training subprocesses (overrides the config)")
     ap.add_argument("--gpus", nargs="*", help="GPU ids for train (one subprocess per GPU)")
     ap.add_argument("--only", nargs="*", help="restrict to these runs / methods")
     ap.add_argument("--datasets", nargs="*", help="restrict predict/da3 to these datasets")
@@ -1535,6 +1548,8 @@ def main():
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
     cfg = load_config(args.config)
+    if args.python:
+        cfg["python"] = args.python
     ensure_dir(cfg["out_dir"])
     if args.stage == "all":
         stages = ALL_ORDER
