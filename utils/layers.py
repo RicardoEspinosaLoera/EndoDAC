@@ -607,13 +607,23 @@ def get_illumination_invariant_l2(u_p, u_t, window=3):
     return d
 
 
-def get_feature_oclution_mask(img):
-    kernel = torch.tensor([[1, 1, 1],[1, 1, 1],[1, 1, 1]]).to(device=img.device).type(torch.cuda.FloatTensor)
-    padding = (3 - 1) // 2  # Padding to maintain input size
-    o = F.conv2d(img, kernel.view(1, 1, 3, 3), padding=padding)
-    t = torch.cat((o,o,o,o,o,o,o,o), dim = 1)
-    
-    return t
+def get_feature_oclution_mask(mask):
+    """Erode a validity mask by the 3x3 support of the Robinson descriptor.
+
+    get_illumination_invariant_features() mixes each pixel's 3x3 neighbourhood,
+    so a descriptor is only trustworthy where every pixel of that neighbourhood
+    is valid. Replicate padding matches the descriptor's own padding, so the
+    image border is not eroded.
+
+    Args:
+        mask : (B,1,H,W) float, 1 = valid (automask-valid and non-specular)
+
+    Returns:
+        (B,1,H,W) float, 1 where the full 3x3 support is valid
+    """
+    kernel = torch.ones(1, 1, 3, 3, dtype=mask.dtype, device=mask.device)
+    count = F.conv2d(F.pad(mask, (1, 1, 1, 1), mode="replicate"), kernel)
+    return (count > 8.5).to(mask.dtype)
 
 def get_corresponding_map(data):
     """

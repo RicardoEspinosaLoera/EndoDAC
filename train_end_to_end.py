@@ -21,6 +21,6 @@ def random_seeds(seed):
 	torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
-    random_seeds(314)
+    random_seeds(opts.seed)
     trainer = Trainer(opts)
     trainer.train()

@@ -279,6 +279,36 @@ class MonodepthOptions:
         self.parser.add_argument("--save_recon",
                                  help="if set saves reconstruction files",
                                  action="store_true")
+
+        # CVIU revision switches (see CVIU_REVISION_PLAN.md); defaults reproduce MonoIIF
+        self.parser.add_argument("--illum_calib",
+                                 type=str,
+                                 choices=["none", "global", "local"],
+                                 default="local",
+                                 help="illumination calibration of the warped source: none, "
+                                      "one affine (c, b) pair per image, or the spatially "
+                                      "varying LightingDecoder maps")
+        self.parser.add_argument("--photometric",
+                                 type=str,
+                                 choices=["highlight", "standard"],
+                                 default="highlight",
+                                 help="photometric loss: HADepth highlight-aware SSIM+L1 or "
+                                      "monodepth2 SSIM+L1, both averaged over automask-valid pixels")
+        self.parser.add_argument("--depth_backbone",
+                                 type=str,
+                                 choices=["endodac", "resnet18"],
+                                 default="endodac",
+                                 help="depth network: Depth Anything + DV-LoRA (endodac) or the "
+                                      "ResNet-18 U-Net control")
+        self.parser.add_argument("--seed",
+                                 type=int,
+                                 help="random seed for training",
+                                 default=314)
+        self.parser.add_argument("--wandb_mode",
+                                 type=str,
+                                 choices=["online", "offline", "disabled"],
+                                 default="online",
+                                 help="wandb logging mode for the trainer")
     def parse(self):
         self.options = self.parser.parse_args()
         return self.options

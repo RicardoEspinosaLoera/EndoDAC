@@ -21,8 +21,7 @@ from utils.layers import *
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 import wandb
-
-wandb.init(project="EndoDAC_IIL", entity="cv_inside")
+from models.resnet_depth import ResnetDepth
 
 _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
@@ -32,6 +31,11 @@ class Trainer:
     def __init__(self, options):
         self.opt = options
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
+
+        # wandb is started here (not at import) so evaluation scripts can import the
+        # trainer, and --wandb_mode disabled/offline works for grid runs.
+        wandb.init(project="EndoDAC_IIL", entity="cv_inside", mode=self.opt.wandb_mode,
+                   name=self.opt.model_name, config=vars(self.opt))
 
         # checking height and width are multiples of 32
         assert self.opt.height % 32 == 0, "'height' must be a multiple of 32"
@@ -54,11 +58,16 @@ class Trainer:
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        self.models["depth_model"] = endodac.endodac(
-            backbone_size = "base", r=self.opt.lora_rank, lora_type=self.opt.lora_type,
-            image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
-            residual_block_indexes=self.opt.residual_block_indexes,
-            include_cls_token=self.opt.include_cls_token)
+        if self.opt.depth_backbone == "endodac":
+            self.models["depth_model"] = endodac.endodac(
+                backbone_size = "base", r=self.opt.lora_rank, lora_type=self.opt.lora_type,
+                image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
+                residual_block_indexes=self.opt.residual_block_indexes,
+                include_cls_token=self.opt.include_cls_token)
+        else:
+            # CVIU ablation control: the same losses on a ResNet-18 U-Net (monodepth2 architecture)
+            self.models["depth_model"] = ResnetDepth(
+                self.opt.num_layers, self.opt.weights_init == "pretrained", self.opt.scales)
         self.models["depth_model"].to(self.device)
         # Every depth-model parameter goes to the optimizer, not only those trainable right
         # now: mark_only_part_as_trainable() switches DV-LoRA from lora_A/lora_B to
@@ -104,9 +113,16 @@ class Trainer:
                     num_input_features=1,
                     num_frames_to_predict_for=2)
 
-                self.models["lighting"] = decoders.LightingDecoder(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
-                self.models["lighting"].to(self.device)
-                self.parameters_to_train += list(self.models["lighting"].parameters())
+                # Illumination calibration of the warped source (CVIU ablation, --illum_calib):
+                # local = spatially varying affine (LightingDecoder), global = one affine pair
+                # per image (GlobalLightingHead), none = no lighting model at all.
+                if self.opt.illum_calib == "local":
+                    self.models["lighting"] = decoders.LightingDecoder(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
+                elif self.opt.illum_calib == "global":
+                    self.models["lighting"] = decoders.GlobalLightingHead(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
+                if "lighting" in self.models:
+                    self.models["lighting"].to(self.device)
+                    self.parameters_to_train += list(self.models["lighting"].parameters())
 
             elif self.opt.pose_model_type == "shared":
                 self.models["pose"] = decoders.PoseDecoder(
@@ -295,10 +311,11 @@ class Trainer:
         for name, param in self.models["depth_model"].named_parameters():
             if "seed_" not in name:
                 param.requires_grad = True
-        warm_up = self.step < self.opt.warm_up_step
-        if self.step == self.opt.warm_up_step:
-            print("Warm-up finished at step {}: DV-LoRA now trains lora_U/lora_V (lora_A/lora_B frozen)".format(self.step))
-        endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
+        if self.opt.depth_backbone == "endodac":
+            warm_up = self.step < self.opt.warm_up_step
+            if self.step == self.opt.warm_up_step:
+                print("Warm-up finished at step {}: DV-LoRA now trains lora_U/lora_V (lora_A/lora_B frozen)".format(self.step))
+            endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
         for param in self.models["pose_encoder"].parameters():
             param.requires_grad = True
         for param in self.models["pose"].parameters():
@@ -307,8 +324,9 @@ class Trainer:
             param.requires_grad = True"""
         """for param in self.models["transform"].parameters():
             param.requires_grad = True"""
-        for param in self.models["lighting"].parameters():
-            param.requires_grad = True
+        if "lighting" in self.models:
+            for param in self.models["lighting"].parameters():
+                param.requires_grad = True
         
         if self.opt.learn_intrinsics:
             for param in self.models["intrinsics_head"].parameters():
@@ -320,7 +338,8 @@ class Trainer:
         self.models["depth_model"].train()
         self.models["pose_encoder"].train()
         self.models["pose"].train()
-        self.models["lighting"].train()
+        if "lighting" in self.models:
+            self.models["lighting"].train()
         #self.models["transform_encoder"].train()
         #self.models["transform"].train()
         if self.opt.learn_intrinsics:
@@ -403,54 +422,34 @@ class Trainer:
         return mask
 
     def compute_highlight_aware_loss(self, pred, target, reprojection_loss_mask, alpha=0.85):
-        """
-        Highlight-aware photometric loss from HADepth (Eq. 9–11).
+        """Highlight-aware photometric loss (HADepth Eq. 9-11), masked as a whole.
+
+        The per-pixel map alpha*SSIM + (1-alpha)*L1 is averaged over the pixels that
+        are both automask-valid and non-specular. Masking only the L1 term (as
+        before) left 85% of the loss unmasked, which silently disabled both the
+        highlight handling and monodepth2's automasking.
 
         Args:
-            pred   : Synthesized image I_{s->t} (B,3,H,W)
-            target : Target image I_t          (B,3,H,W)
-            reprojection_loss_mask : Mask for reprojection loss (B,1,H,W)
-            alpha  : SSIM weight (default 0.85)
+            pred   : synthesized image I_{s->t} (B,3,H,W)
+            target : target image I_t (B,3,H,W)
+            reprojection_loss_mask : automask, 1 = supervise (B,1,H,W)
+            alpha  : SSIM weight
 
         Returns:
-            loss : scalar
-            mask : highlight mask (B,1,H,W)
+            loss : scalar, mean over the supervised pixels of the batch
+            highlight_mask : (B,1,H,W), 1 = non-highlight, 0 = highlight. It does
+                             not include the automask; callers combine the two.
         """
+        highlight_mask = self.get_highlight_mask(target)
+        mask = highlight_mask * reprojection_loss_mask
 
-        # --------------------------------------------------
-        # 1) Compute highlight mask from target image
-        # --------------------------------------------------
-        mask = self.get_highlight_mask(target)
-        mask = mask * reprojection_loss_mask  # combine with reprojection loss mask to focus on valid pixels
-        # --------------------------------------------------
-        # 2) SSIM term (NOT masked)
-        # --------------------------------------------------
         ssim_map = kornia.losses.ssim_loss(
-            pred, target, window_size=7, reduction='none'
-        )  # (B,1,H,W)
+            pred, target, window_size=7, reduction='none').mean(1, True)  # (B,1,H,W)
+        l1_map = torch.abs(pred - target).mean(1, True)                   # (B,1,H,W)
+        photo_map = alpha * ssim_map + (1 - alpha) * l1_map
 
-        ssim_term = ssim_map.mean(dim=[1, 2, 3])  # per image
-
-        # --------------------------------------------------
-        # 3) Masked L1 term (only L1 is masked!)
-        # --------------------------------------------------
-        masked_pred = pred * mask
-        masked_target = target * mask
-
-        l1_map = torch.abs(masked_pred - masked_target).mean(dim=1, keepdim=True)
-
-        valid_pixels = mask.sum(dim=[2, 3], keepdim=True) + 1e-6
-
-        l1_term = (
-            l1_map.sum(dim=[2, 3], keepdim=True) / valid_pixels
-        ).squeeze()
-
-        # --------------------------------------------------
-        # 4) Final loss (Eq. 11)
-        # --------------------------------------------------
-        loss = alpha * ssim_term + (1 - alpha) * l1_term
-
-        return loss.mean(), mask
+        loss = (photo_map * mask).sum() / (mask.sum() + 1e-6)
+        return loss, highlight_mask
 
 
     def train(self):
@@ -625,7 +624,16 @@ class Trainer:
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0])
                     
-                    outputs_lighting = self.models["lighting"](pose_inputs[0])
+                    if "lighting" in self.models:
+                        outputs_lighting = self.models["lighting"](pose_inputs[0])
+                    else:
+                        # --illum_calib none: identity calibration (c=1, b=0); the (B,1,1,1)
+                        # maps are broadcast to full resolution by the interpolation below
+                        ones = torch.ones(pose_inputs[0][-1].shape[0], 1, 1, 1, device=self.device)
+                        outputs_lighting = {}
+                        for scale in self.opt.scales:
+                            outputs_lighting[("contrast", scale)] = ones
+                            outputs_lighting[("brightness", scale)] = torch.zeros_like(ones)
                     
                     #Lighting      
                     for scale in self.opt.scales:
@@ -664,15 +672,17 @@ class Trainer:
         losses = {}
         total_loss = 0
 
+        use_iif = self.opt.illumination_invariant > 0
         # target is the same for every scale / frame: compute its descriptor once
         features_t = get_illumination_invariant_features(
-            inputs[("color", 0, 0)], eps=self.opt.iif_eps)
+            inputs[("color", 0, 0)], eps=self.opt.iif_eps) if use_iif else None
 
 
         for scale in self.opt.scales:
             loss = 0
             loss_reprojection = 0
             loss_ilumination_invariant = 0
+            iif_coverage = 0
 
             if self.opt.v1_multiscale:
                 source_scale = scale
@@ -693,30 +703,31 @@ class Trainer:
                 rep_identity = self.compute_reprojection_loss(pred, target)
                 
                 reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
-                reprojection_loss_mask_iil = get_feature_oclution_mask(reprojection_loss_mask)
 
-                #Losses
-                #target = outputs[("color_refined", frame_id, scale)] #Lighting
+                # Photometric loss on the illumination-corrected warp, averaged over the
+                # automask-valid pixels. "highlight" (HADepth) additionally drops specular
+                # pixels from both its SSIM and L1 terms; "standard" is monodepth2's SSIM+L1.
                 pred = outputs[("color_refined", frame_id, scale)]
-                
-                # Use highlight-aware photometric loss
-                target = inputs[("color", 0, 0)]
-                loss_highlight_aware, highlight_mask = self.compute_highlight_aware_loss(pred, target, reprojection_loss_mask)
-                loss_reprojection += loss_highlight_aware
+                if self.opt.photometric == "highlight":
+                    loss_photo, highlight_mask = self.compute_highlight_aware_loss(pred, target, reprojection_loss_mask)
+                else:
+                    photo_map = self.compute_reprojection_loss(pred, target)
+                    loss_photo = (photo_map * reprojection_loss_mask).sum() / (reprojection_loss_mask.sum() + 1e-6)
+                    highlight_mask = torch.ones_like(reprojection_loss_mask)
+                loss_reprojection += loss_photo
 
-                #combined masks
-                combined_mask = reprojection_loss_mask * highlight_mask
-                reprojection_loss_mask_iil_combined = reprojection_loss_mask_iil * highlight_mask
-
-                
-                #Illuminations invariant loss
-                target = inputs[("color", 0, 0)]
-                pred = outputs[("color_refined", frame_id, scale)]
-                loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred, features_t=features_t) * reprojection_loss_mask_iil_combined).sum() / (reprojection_loss_mask_iil_combined.sum() + 1e-6)
+                if use_iif:
+                    # Illumination-invariant loss. The Robinson descriptor at a pixel mixes
+                    # its 3x3 neighbourhood, so supervise only pixels whose whole support is
+                    # automask-valid and non-specular (3x3 erosion of the joint mask).
+                    iif_mask = get_feature_oclution_mask(reprojection_loss_mask * highlight_mask)
+                    iif_coverage += iif_mask.mean().detach()
+                    loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred, features_t=features_t) * iif_mask).sum() / (iif_mask.sum() + 1e-6)
  
             
             loss += loss_reprojection / 2.0
             loss += self.opt.illumination_invariant * loss_ilumination_invariant / 2.0
+            losses["iif_mask_coverage/{}".format(scale)] = iif_coverage / (len(self.opt.frame_ids) - 1)
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
             smooth_loss = get_smooth_loss(norm_disp, color)

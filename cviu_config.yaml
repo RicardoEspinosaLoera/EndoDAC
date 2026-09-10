@@ -1,0 +1,72 @@
+# Configuration for cviu_revision.py (see CVIU_REVISION_PLAN.md).
+# Every key is optional; missing keys fall back to DEFAULT_CONFIG in the script.
+
+data:
+  scared: /mnt/data-hdd2/Beilei/Dataset/SCARED
+  hamlyn: /mnt/data-hdd2/Beilei/Dataset/Hamlyn
+  c3vd:   /mnt/data-hdd2/Beilei/Dataset/C3VD
+
+log_dir: ./logs                 # where train_end_to_end.py writes <model_name>/models/weights_*
+out_dir: ./results/cviu         # everything this script produces
+pretrained_path: ./pretrained_model
+python: python                  # interpreter used for the training subprocesses
+num_workers: 4
+
+train:
+  # appended to every run; the run's own flags come after and win on conflicts
+  common_flags: "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline"
+  seeds: [314]                  # single-seed runs
+  multi_seeds: [314, 1, 2]      # runs listed below get all three
+  multi_seed_runs: [E3, E8, C0, C1, R1, R2]
+  checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
+  runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
+
+proposed: E8                    # the MonoIIF row every paired test is against
+datasets: [scared, hamlyn, c3vd]
+save_pred: true                 # also dump float16 disparities to out_dir/pred/
+
+# Competing methods for Tables 4-6. type: endodac | hadepth | afsfm | endosfml | monovit | npy
+methods:
+  EndoDAC_MICCAI:
+    type: endodac
+    weights: ./logs/endodac_fullmodel/models/weights_19
+    lora_type: dvlora
+    residual_block_indexes: [2, 5, 8, 11]
+  AF_SfMLearner:
+    type: afsfm
+    weights: ./logs/Model_MIA
+  # Endo_SfMLearner: {type: endosfml, weights: ./logs/endosfmlearner}
+  # MonoViT:         {type: monovit,  weights: ./logs/monovit}
+  # HADepth:         {type: hadepth,  weights: ./logs/hadepth/models/weights_19}
+  # Monodepth2:
+  #   type: npy
+  #   kind: disp            # disp | depth
+  #   align: median         # median | affine (disparity shift+scale, as mytest_da.py)
+  #   files: {scared: ./logs/monodepth2/disps_scared_split.npy}
+  # DepthAnything_v1_zeroshot:
+  #   type: npy
+  #   kind: disp
+  #   align: affine
+  #   files: {scared: ./disps_endovis_split_DA.npy}
+
+da3:
+  models: [depth-anything/DA3MONO-LARGE, depth-anything/DA3-BASE]
+  affine_rows: true             # additionally report disparity shift+scale alignment
+
+illum:
+  runs: [E8]                    # trained runs analysed by illum-params / illum-sens
+  seed: 314
+  sequences: [sequence1, sequence2]
+  patch_sizes: [64, 32, 16, 8]
+  alpha: 0.10                   # LightingDecoder bounds
+  beta: 0.05
+  ridge: 0.01
+  sens_stride: 5                # every k-th pair for the sensitivity sweep
+  gains: [0.8, 0.9, 1.0, 1.1, 1.2]
+  biases: [-0.05, -0.025, 0.0, 0.025, 0.05]
+
+stats:
+  n_boot: 10000
+  alpha: 0.05
+  paired_metrics: [abs_rel, sq_rel, rmse, a1]
+  table_methods: null           # order of rows in the main tables; null = all, proposed last

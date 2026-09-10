@@ -218,6 +218,7 @@ class C3VDDataset(data.Dataset):
         do_flip = self.is_train and random.random() > 0.5
 
         # Load color image and depth
+        inputs["sequence"] = scan["sequence"]  # scene name, for sequence-level statistics
         inputs[("color", 0, 0)] = self.get_color(image_path, do_flip)
         inputs["depth_gt"] = self.get_depth(depth_path, do_flip)
 

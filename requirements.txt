@@ -14,3 +14,9 @@ open3d
 scikit-image
 --extra-index-url https://pypi.nvidia.com
 cuml-cu11
+kornia
+wandb
+matplotlib
+pyyaml
+tifffile
+scipy
