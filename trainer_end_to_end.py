@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 import wandb
 
-wandb.init(project="cv_inside/EndoDAC_IIL", entity="respinosa")
+wandb.init(project="EndoDAC_IIL", entity="cv_inside")
 
 _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
