@@ -273,10 +273,14 @@ def preflight(cfg):
     if shutil.which(py) is None and not os.path.exists(py):
         problems.append("python interpreter not found: {}".format(py))
     else:
-        mods = "torch, kornia, wandb, tensorboardX, skimage, cv2, matplotlib"
-        rc = subprocess.call([py, "-c", "import " + mods], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if rc != 0:
-            problems.append("'{}' cannot import all of: {} (wrong interpreter / env?)".format(py, mods))
+        missing = []
+        for mod in ("torch", "kornia", "wandb", "tensorboardX", "skimage", "cv2", "matplotlib", "yaml", "scipy"):
+            if subprocess.call([py, "-c", "import " + mod], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+                missing.append(mod)
+        if missing:
+            pip_names = {"skimage": "scikit-image", "cv2": "opencv-python", "yaml": "pyyaml"}
+            problems.append("'{}' cannot import {}: {} -m pip install {}".format(
+                py, missing, py, " ".join(pip_names.get(m, m) for m in missing)))
     return problems
 
 
