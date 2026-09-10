@@ -274,13 +274,18 @@ def preflight(cfg):
         problems.append("python interpreter not found: {}".format(py))
     else:
         missing = []
-        for mod in ("torch", "kornia", "wandb", "tensorboardX", "skimage", "cv2", "matplotlib", "yaml", "scipy"):
+        for mod in ("torch", "kornia", "wandb", "tensorboardX", "skimage", "cv2", "matplotlib",
+                    "yaml", "scipy", "fvcore", "PIL"):
             if subprocess.call([py, "-c", "import " + mod], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
                 missing.append(mod)
         if missing:
-            pip_names = {"skimage": "scikit-image", "cv2": "opencv-python", "yaml": "pyyaml"}
+            pip_names = {"skimage": "scikit-image", "cv2": "opencv-python-headless", "yaml": "pyyaml", "PIL": "pillow"}
             problems.append("'{}' cannot import {}: {} -m pip install {}".format(
                 py, missing, py, " ".join(pip_names.get(m, m) for m in missing)))
+        elif subprocess.call([py, "-c", "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"],
+                             cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+            problems.append("'{}' has torch but torch.cuda.is_available() is False (CPU-only wheel or the "
+                            "driver is not visible): {} -c \"import torch; print(torch.__version__, torch.version.cuda)\"".format(py, py))
     return problems
 
 
