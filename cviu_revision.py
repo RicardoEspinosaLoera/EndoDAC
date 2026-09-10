@@ -33,6 +33,7 @@ import json
 import os
 import queue
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -239,8 +240,50 @@ def device_of(args):
 # stage: train
 # --------------------------------------------------------------------------------------
 
+def preflight(cfg):
+    """Everything a training subprocess needs, checked before 26 jobs are launched."""
+    problems = []
+    dp = cfg["data"]["scared"]
+    if not os.path.isdir(dp):
+        problems.append("data.scared is not a directory: {}".format(dp))
+    else:
+        folder, frame = readlines(os.path.join(SPLITS, "train_files.txt"))[0].split()[:2]
+        img = os.path.join(dp, folder, "data", frame + ".jpg")  # SCAREDRAWDataset.get_image_path
+        if not os.path.exists(img):
+            problems.append("first training image not found: {} (dataset layout or data.scared)".format(img))
+    pw = os.path.join(cfg["pretrained_path"], "depth_anything_vitb14.pth")
+    if not os.path.exists(pw):
+        problems.append("Depth Anything weights not found: {} (README: pretrained_model/)".format(pw))
+    gt = os.path.join(SPLITS, "gt_depths.npz")
+    if not os.path.exists(gt):
+        problems.append("{} missing: python export_gt_depth.py --data_path {} --split endovis --useage eval".format(gt, dp))
+    py = cfg["python"]
+    if shutil.which(py) is None and not os.path.exists(py):
+        problems.append("python interpreter not found: {}".format(py))
+    else:
+        mods = "torch, kornia, wandb, tensorboardX, skimage, cv2, matplotlib"
+        rc = subprocess.call([py, "-c", "import " + mods], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if rc != 0:
+            problems.append("'{}' cannot import all of: {} (wrong interpreter / env?)".format(py, mods))
+    return problems
+
+
+def tail(path, n=25):
+    try:
+        with open(path, errors="replace") as f:
+            return "".join(f.readlines()[-n:])
+    except OSError:
+        return ""
+
+
 def stage_train(cfg, args):
     runs = all_runs(cfg)
+    problems = preflight(cfg)
+    for p in problems:
+        print("[train] PREFLIGHT: " + p)
+    if problems and not args.dry_run and not args.skip_preflight:
+        print("[train] fix the above (or pass --skip_preflight) before launching")
+        sys.exit(1)
     jobs = []
     for run, spec in runs.items():
         if args.only and run not in args.only:
@@ -288,13 +331,23 @@ def stage_train(cfg, args):
                 lf.write("# {}\n# {}\n".format(time.strftime("%Y-%m-%d %H:%M:%S"), " ".join(j["cmd"])))
                 lf.flush()
                 rc = subprocess.call(j["cmd"], cwd=ROOT, env=env, stdout=lf, stderr=subprocess.STDOUT)
-            hours = (time.time() - t0) / 3600.0
+            secs = time.time() - t0
             if rc == 0:
                 with open(os.path.join(cfg["log_dir"], j["name"], "cviu_done.txt"), "w") as f:
-                    f.write("git {}\nhours {:.2f}\ncmd {}\n".format(manifest["git"], hours, " ".join(j["cmd"])))
-                print("[train] {} finished in {:.1f} h".format(j["name"], hours))
+                    f.write("git {}\nhours {:.2f}\ncmd {}\n".format(manifest["git"], secs / 3600.0, " ".join(j["cmd"])))
+                print("[train] {} finished in {:.1f} h".format(j["name"], secs / 3600.0))
             else:
-                print("[train] {} FAILED (rc={}) after {:.1f} h, see {}".format(j["name"], rc, hours, log))
+                print("[train] {} FAILED (rc={}) after {:.0f} s, see {}\n----- log tail -----\n{}--------------------".format(
+                    j["name"], rc, secs, log, tail(log)))
+                if secs < 180:  # died before training started: a setup error, not worth repeating 25 times
+                    print("[train] failed within 3 minutes: aborting the remaining jobs; fix the error and relaunch "
+                          "(finished runs are skipped)")
+                    while True:
+                        try:
+                            q.get_nowait()
+                            q.task_done()
+                        except queue.Empty:
+                            break
             q.task_done()
 
     threads = [threading.Thread(target=worker, args=(g,), daemon=True) for g in gpus]
@@ -1449,6 +1502,7 @@ def main():
     ap.add_argument("--datasets", nargs="*", help="restrict predict/da3 to these datasets")
     ap.add_argument("--extra_flags", default="", help="appended to every training command (e.g. \"--num_epochs 1\")")
     ap.add_argument("--dry_run", action="store_true", help="train: print the commands only")
+    ap.add_argument("--skip_preflight", action="store_true", help="train: launch even if the pre-flight checks fail")
     ap.add_argument("--force", action="store_true", help="redo work whose outputs exist")
     ap.add_argument("--all_seeds", action="store_true", help="illum-params: every seed of the run")
     ap.add_argument("--cpu", action="store_true")
