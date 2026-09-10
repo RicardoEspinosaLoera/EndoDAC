@@ -10,9 +10,11 @@ with `options.py`, checkpoint selection, real split pairing, the affine fit and 
 synthetic geometry, and the `stats`/`report` stages on synthetic per-frame rows. Not yet run
 anywhere: `predict`, `illum-params`, `illum-sens`, `da3` (need the server, the datasets and the
 checkpoints); `_da3_infer()` is the only function that touches the DA3 API and may need a
-one-line adjustment to the installed version. First thing on the server:
-`python cviu_revision.py train --gpus 0 --only E3 E8 C1 R1 --extra_flags "--num_epochs 1"`
-then `python cviu_revision.py predict --datasets scared` and `python cviu_revision.py illum-fit`.
+one-line adjustment to the installed version. The E/R/C grid was launched on the server on
+2026-09-10. The DA3-encoder rows (D3, D3-EndoDAC, N0; §6) were added afterwards and need the
+`depth_anything_3` package on the server plus a 1-epoch dry run
+(`python cviu_revision.py train --gpus 0 --only D3 --extra_flags "--num_epochs 1"`) before
+relaunching `train`, which skips the finished runs.
 
 Reviewer asks → experiments:
 
@@ -140,14 +142,22 @@ Report (E3 − E1) and (E1 − E0) as the backbone/adaptation share of the total
 | C2 local affine (MonoIIF) | `local` (same run as E8) |
 | C2-α/β sweep (optional) | `local` with decoder bounds α,β ∈ {0.05/0.025, 0.10/0.05, 0.20/0.10} |
 
+### D-grid: Depth Anything 3 encoder and no-foundation control (Q2, R3; see §6)
+
+| Run | Flags beyond common |
+|---|---|
+| D3 MonoIIF on DA3-Base encoder | `--backbone_weights da3` |
+| D3-EndoDAC (E3 recipe on DA3-Base) | `--backbone_weights da3 --illum_calib none --illumination_invariant 0 --photometric standard` |
+| N0 MonoIIF on a random-init ViT-B | `--backbone_weights none` |
+
 ### Seeds
 
-3 seeds (314, 1, 2) for E3, E8, C0, C1, R1, R2; 1 seed for the rest. Seed SD of the overall
+3 seeds (314, 1, 2) for E3, E8, C0, C1, R1, R2, D3; 1 seed for the rest. Seed SD of the overall
 mean is reported as training variability, separately from the sequence-level CI.
 
-Count: 14 single-seed runs + 12 extra-seed runs = 26 runs. Measure one 1-epoch dry run first
-(`--num_epochs 1 --dry_run`) and multiply; on 4 GPUs expect a few days.
-Minimum viable subset if budget is short (8 runs): E1, E3, E8, E8−IIF, C0, C1, R1, R2.
+Count: 17 grid runs, 31 jobs with the extra seeds (`train.skip_runs` in the config drops
+entries). Measure one 1-epoch dry run first and multiply; on 8 GPUs expect a few days.
+Minimum viable subset if budget is short (9 runs): E1, E3, E8, E8−IIF, C0, C1, R1, R2, D3.
 
 ---
 
@@ -247,19 +257,33 @@ DA3 (ByteDance-Seed, 2025) is a multi-view "depth-ray" model on a plain DINOv2-s
 transformer; monocular use is one input view. Public weights: DA3-Small/Base/Large/Giant and
 DA3-Mono-Large (relative depth), on Hugging Face under `depth-anything/`.
 
-1. **Zero-shot rows** (cheap, do first): DA3-Mono-Large and DA3-Base/Large in single-view mode on
+1. **Zero-shot rows** (cheap, do first): DA3-Mono-Large and DA3-Base in single-view mode on
    the three test sets. DA3 predicts depth, not disparity, so use median scaling on depth like
    every other row; also give the affine-aligned number used for DA v1 in `mytest_da.py` for
-   parity. Saved as `.npy` → `predict` → `stats`.
-2. **Adapted row (stretch)**: DA3-Base encoder weights remapped into the repo's
-   `vision_transformer.py` (same DINOv2 block layout, MLP `fc1/fc2` where DV-LoRA is inserted),
-   trained with the full MonoIIF recipe = "MonoIIF-DA3". Gate: proceed only if the state dict
-   loads with no unmatched encoder keys and a 1-epoch dry run trains; otherwise drop it.
-3. **Limitations text** (if 2 is dropped): DA3's monocular model is Large-only (~0.3 B params)
-   so the trainable-parameter budget and inference cost are not comparable with ViT-B; its
-   target is multi-view geometry and its DPT head differs, so the contribution being reviewed
-   (adaptation + illumination modelling) is tested on DA-v1/v2 where the backbone is held fixed;
-   zero-shot DA3 numbers are reported for reference.
+   parity. Stage `da3` → `per_frame.csv` → `stats`.
+2. **Adapted rows (D-grid, implemented)**: DA3-Base's encoder is *not* a vanilla DINOv2 (from
+   block 4 on it uses QK-norm, RoPE and alternating attention, and its DualDPT head takes
+   1536-dim inputs), so its weights cannot be copied onto the repo's ViT. Instead
+   `models/endodac/da3_backbone.py` wraps DA3's own `DinoV2` module (loaded through the
+   `depth_anything_3` package, Apache-2.0) behind endodac's encoder interface: DV-LoRA is
+   inserted into its `mlp.fc1/fc2` with the pretrained weights kept, the Conv-neck is re-created
+   as forward hooks on blocks 2/5/8/11 (same `residual_` prefix, same trainable policy), and
+   the repo's DPT head is initialised from DA v1 but fully trained because a head trained on
+   DA v1 features does not match DA3 features (`--train_depth_head` is forced on; report the
+   larger trainable count honestly). Inputs stay in [0, 1] like the DA v1 path. Selected with
+   `--backbone_weights da3` (`--da3_model_id`, default `depth-anything/da3-base`).
+   - **D3** = full MonoIIF recipe on the DA3 encoder (3 seeds); **D3-EndoDAC** = E3 recipe on
+     the DA3 encoder. (D3 − D3-EndoDAC) vs (E8 − E3) shows whether the method's gain transfers
+     to the newer foundation model; D3 vs E8 is the backbone comparison the reviewer asked for.
+   - **N0** = full recipe with a randomly initialised ViT-B (`--backbone_weights none`): the
+     "no foundation weights" control for the backbone-share question of R3.
+   - Gate: the wrapper was verified only against a stand-in ViT; the first server dry run
+     (`--only D3 --extra_flags "--num_epochs 1"`) must show the DA3 encoder printout, a sane
+     trainable-parameter count and a decreasing loss. If the installed DA3 version differs in
+     its ViT API, `DA3Encoder.get_intermediate_layers` is the place to adapt.
+3. **Limitations text**: DA3's monocular model is Large-only (~0.3 B params), so it enters only
+   as a zero-shot row; DA3-Base is compared both zero-shot and adapted (D3); DA3's multi-view
+   depth-ray head is replaced by the repo's DPT head, so D3 measures the encoder, not DA3's head.
 
 ---
 

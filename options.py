@@ -300,6 +300,22 @@ class MonodepthOptions:
                                  default="endodac",
                                  help="depth network: Depth Anything + DV-LoRA (endodac) or the "
                                       "ResNet-18 U-Net control")
+        self.parser.add_argument("--backbone_weights",
+                                 type=str,
+                                 choices=["da1", "da3", "none"],
+                                 default="da1",
+                                 help="foundation weights of the ViT-B encoder: Depth Anything v1 "
+                                      "(pretrained_model/depth_anything_vitb14.pth), Depth Anything 3 "
+                                      "(its own DinoV2 from the depth_anything_3 package), or random init")
+        self.parser.add_argument("--da3_model_id",
+                                 type=str,
+                                 default="depth-anything/da3-base",
+                                 help="Hugging Face id or local folder of the DA3 checkpoint")
+        self.parser.add_argument("--train_depth_head",
+                                 type=str2bool,
+                                 default=False,
+                                 help="train the whole DPT head (always on when the head init does not "
+                                      "match the encoder, i.e. backbone_weights != da1)")
         self.parser.add_argument("--seed",
                                  type=int,
                                  help="random seed for training",

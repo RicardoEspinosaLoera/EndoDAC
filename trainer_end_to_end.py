@@ -63,7 +63,9 @@ class Trainer:
                 backbone_size = "base", r=self.opt.lora_rank, lora_type=self.opt.lora_type,
                 image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
                 residual_block_indexes=self.opt.residual_block_indexes,
-                include_cls_token=self.opt.include_cls_token)
+                include_cls_token=self.opt.include_cls_token,
+                backbone_weights=self.opt.backbone_weights, da3_model_id=self.opt.da3_model_id,
+                train_depth_head=self.opt.train_depth_head)
         else:
             # CVIU ablation control: the same losses on a ResNet-18 U-Net (monodepth2 architecture)
             self.models["depth_model"] = ResnetDepth(
@@ -316,6 +318,9 @@ class Trainer:
             if self.step == self.opt.warm_up_step:
                 print("Warm-up finished at step {}: DV-LoRA now trains lora_U/lora_V (lora_A/lora_B frozen)".format(self.step))
             endodac.mark_only_part_as_trainable(self.models["depth_model"], warm_up=warm_up)
+            if getattr(self.models["depth_model"], "train_depth_head", False):
+                for param in self.models["depth_model"].depth_head.parameters():
+                    param.requires_grad = True
         for param in self.models["pose_encoder"].parameters():
             param.requires_grad = True
         for param in self.models["pose"].parameters():

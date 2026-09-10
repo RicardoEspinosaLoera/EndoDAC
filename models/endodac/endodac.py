@@ -9,6 +9,16 @@ from models.backbones.dora import Linear as DLinear
 from .layers import HeadDepth
 from .layers import mark_only_part_as_trainable,_make_scratch, _make_fusion_block
 
+def _copy_linear(old, new):
+    """Copy weight/bias of a pretrained nn.Linear into its LoRA replacement (same shapes)."""
+    with torch.no_grad():
+        if getattr(old, "weight", None) is not None and new.weight.shape == old.weight.shape:
+            new.weight.copy_(old.weight)
+        if getattr(old, "bias", None) is not None and getattr(new, "bias", None) is not None \
+                and new.bias.shape == old.bias.shape:
+            new.bias.copy_(old.bias)
+
+
 class DPTHead(nn.Module):
     def __init__(self, in_channels, features=128, use_bn=False, out_channels=[96, 192, 384, 768], use_clstoken=False):
         super(DPTHead, self).__init__()
@@ -131,7 +141,10 @@ class endodac(nn.Module):
                  residual_block_indexes=[],
                  include_cls_token=True,
                  use_cls_token=False,
-                 use_bn=False):
+                 use_bn=False,
+                 backbone_weights="da1",
+                 da3_model_id="depth-anything/da3-base",
+                 train_depth_head=False):
         super(endodac, self).__init__()
 
         assert r > 0
@@ -167,12 +180,19 @@ class endodac(nn.Module):
         self.embedding_dim = self.embedding_dims[self.backbone_size]
         self.depth_head_feature = self.depth_head_features[self.backbone_size]
         self.depth_head_out_channel = self.depth_head_out_channels[self.backbone_size]
-        encoder = self.backbone[self.backbone_size]
+        if backbone_weights == "da3":
+            # Depth Anything 3 encoder (its own DinoV2 with QK-norm / RoPE), weights already loaded
+            from .da3_backbone import DA3Encoder
+            encoder = DA3Encoder(da3_model_id, residual_block_indexes=residual_block_indexes,
+                                 out_layers=self.intermediate_layers[self.backbone_size])
+        else:
+            encoder = self.backbone[self.backbone_size]
 
         self.image_shape = image_shape
-        
+
         if lora_type != "none":
             for t_layer_i, blk in enumerate(encoder.blocks):
+                old_fc1, old_fc2 = blk.mlp.fc1, blk.mlp.fc2
                 mlp_in_features = blk.mlp.fc1.in_features
                 mlp_hidden_features = blk.mlp.fc1.out_features
                 mlp_out_features = blk.mlp.fc2.out_features
@@ -190,19 +210,37 @@ class endodac(nn.Module):
                     blk.mlp.fc2 = DLinear(mlp_hidden_features, mlp_out_features, r=self.r)
                 else:
                     raise ValueError(f"unknown lora_type '{lora_type}'; expected dvlora, lora, flora, dora or none")
-            
+                # keep the base weights an already-loaded encoder (DA3) carries; for the DA v1
+                # path they are overwritten by load_state_dict below anyway
+                _copy_linear(old_fc1, blk.mlp.fc1)
+                _copy_linear(old_fc2, blk.mlp.fc2)
+
         self.encoder = encoder
         self.depth_head = DPTHead(self.embedding_dim, self.depth_head_feature, use_bn, out_channels=self.depth_head_out_channel, use_clstoken=use_cls_token)
-        
+
         if pretrained_path is not None:
             pretrained_path = os.path.join(pretrained_path, "depth_anything_{}.pth".format(self.backbone_arch))
-            pretrained_dict = torch.load(pretrained_path)
-            model_dict = self.state_dict()
-            self.load_state_dict(pretrained_dict, strict=False)
-            print("load pretrained weight from {}\n".format(pretrained_path))
+            if os.path.exists(pretrained_path):
+                pretrained_dict = torch.load(pretrained_path, map_location="cpu")
+                if backbone_weights != "da1":
+                    # only the DPT head is taken from Depth Anything v1 (as an initialisation);
+                    # the encoder is DA3's or random
+                    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k.startswith("depth_head.")}
+                self.load_state_dict(pretrained_dict, strict=False)
+                print("load pretrained weight from {} ({} keys)\n".format(pretrained_path, len(pretrained_dict)))
+            elif backbone_weights == "da1":
+                raise FileNotFoundError("Depth Anything v1 weights not found: {}".format(pretrained_path))
+            else:
+                print("no {}: DPT head starts from random init".format(pretrained_path))
 
+        # A DPT head initialised from Depth Anything v1 only matches the DA v1 encoder; with any
+        # other encoder the whole head has to train (EndoDAC freezes all but its conv_depth heads).
+        self.train_depth_head = bool(train_depth_head) or backbone_weights != "da1"
         mark_only_part_as_trainable(self.encoder)
         mark_only_part_as_trainable(self.depth_head)
+        if self.train_depth_head:
+            for p in self.depth_head.parameters():
+                p.requires_grad = True
     def forward(self, pixel_values):
         pixel_values = torch.nn.functional.interpolate(pixel_values, size=self.image_shape, mode="bilinear", align_corners=True)
         h, w = pixel_values.shape[-2:]

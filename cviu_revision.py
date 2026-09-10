@@ -78,15 +78,16 @@ DEFAULT_CONFIG = {
         "common_flags": "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline",
         "seeds": [314],
         "multi_seeds": [314, 1, 2],
-        "multi_seed_runs": ["E3", "E8", "C0", "C1", "R1", "R2"],
+        "multi_seed_runs": ["E3", "E8", "C0", "C1", "R1", "R2", "D3"],
         "checkpoint": "best",
         "runs": {},
+        "skip_runs": [],
     },
     "proposed": "E8",
     "datasets": ["scared", "hamlyn", "c3vd"],
     "save_pred": True,
     "methods": {},
-    "da3": {"models": ["depth-anything/DA3MONO-LARGE", "depth-anything/DA3-BASE"], "affine_rows": True},
+    "da3": {"models": ["depth-anything/da3mono-large", "depth-anything/da3-base"], "affine_rows": True},
     "illum": {"runs": ["E8"], "seed": 314, "sequences": ["sequence1", "sequence2"],
               "patch_sizes": [64, 32, 16, 8], "alpha": 0.10, "beta": 0.05, "ridge": 0.01,
               "sens_stride": 5, "gains": [0.8, 0.9, 1.0, 1.1, 1.2],
@@ -123,8 +124,15 @@ GRID = {
            "flags": "--depth_backbone resnet18"},
     # C-grid: illumination model
     "C1": {"group": "C", "desc": "global affine calibration", "flags": "--illum_calib global"},
+    # D-grid: Depth Anything 3 encoder (its own DinoV2 with QK-norm/RoPE) under the same recipe
+    "D3": {"group": "D", "desc": "MonoIIF with DA3-Base encoder", "flags": "--backbone_weights da3"},
+    "D3-EndoDAC": {"group": "D", "desc": "EndoDAC recipe with DA3-Base encoder",
+                   "flags": "--backbone_weights da3 --illum_calib none --illumination_invariant 0 --photometric standard"},
+    "N0": {"group": "D", "desc": "MonoIIF with a randomly initialised encoder (no foundation weights)",
+           "flags": "--backbone_weights none"},
 }
-ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "E8-DVLoRA", "R1", "R2"]
+ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "E8-DVLoRA", "R1", "R2",
+                  "N0", "D3-EndoDAC", "D3"]
 CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)")]
 
 
@@ -157,6 +165,8 @@ def all_runs(cfg):
     runs = copy.deepcopy(GRID)
     for name, spec in (cfg["train"].get("runs") or {}).items():
         runs.setdefault(name, {"group": "X", "desc": name, "flags": ""}).update(spec)
+    for name in cfg["train"].get("skip_runs") or []:
+        runs.pop(name, None)
     return runs
 
 
@@ -242,8 +252,8 @@ def device_of(args):
 # stage: train
 # --------------------------------------------------------------------------------------
 
-def preflight(cfg):
-    """Everything a training subprocess needs, checked before 26 jobs are launched."""
+def preflight(cfg, runs_with_da3=()):
+    """Everything a training subprocess needs, checked before the grid is launched."""
     problems = []
     dp = cfg["data"]["scared"]
     if not os.path.isdir(dp):
@@ -267,6 +277,11 @@ def preflight(cfg):
         rc = subprocess.call([py, "-c", "import " + mods], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if rc != 0:
             problems.append("'{}' cannot import all of: {} (wrong interpreter / env?)".format(py, mods))
+        if runs_with_da3 and subprocess.call([py, "-c", "import depth_anything_3.api"], cwd=ROOT,
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+            problems.append("runs {} need the depth_anything_3 package in '{}': git clone "
+                            "https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e . "
+                            "(the DA3 weights download from Hugging Face on first use)".format(runs_with_da3, py))
     return problems
 
 
@@ -280,7 +295,9 @@ def tail(path, n=25):
 
 def stage_train(cfg, args):
     runs = all_runs(cfg)
-    problems = preflight(cfg)
+    selected = [r for r in runs if not args.only or r in args.only]
+    da3_runs = [r for r in selected if "--backbone_weights da3" in runs[r]["flags"]]
+    problems = preflight(cfg, da3_runs)
     for p in problems:
         print("[train] PREFLIGHT: " + p)
     if problems and not args.dry_run and not args.skip_preflight:
@@ -466,10 +483,13 @@ def load_depth_model_from_run(cfg, run, seed, device):
         model = ResnetDepth(opt["num_layers"], False, opt["scales"])
     else:
         import models.endodac as endodac
+        # pretrained_path=None: the checkpoint holds every weight, no need to reload DA v1
         model = endodac.endodac(backbone_size="base", r=opt["lora_rank"], lora_type=opt["lora_type"],
-                                image_shape=(224, 280), pretrained_path=_pretrained_or_none(cfg),
+                                image_shape=(224, 280), pretrained_path=None,
                                 residual_block_indexes=opt["residual_block_indexes"],
-                                include_cls_token=opt.get("include_cls_token", True))
+                                include_cls_token=opt.get("include_cls_token", True),
+                                backbone_weights=opt.get("backbone_weights", "da1"),
+                                da3_model_id=opt.get("da3_model_id", "depth-anything/da3-base"))
     md = model.state_dict()
     model.load_state_dict({k: v for k, v in sd.items() if k in md}, strict=False)
     return model.to(device).eval(), opt, wf
