@@ -475,7 +475,10 @@ class Trainer:
                     # a1 = a1_new
                     self.save_model(mode='epoch')
             self.save_model(mode='last')
-    
+        # completion marker, so an orchestrator can tell a finished run from an interrupted one
+        with open(os.path.join(self.log_path, "train_complete.txt"), "w") as f:
+            f.write("epochs {}\n".format(self.opt.num_epochs))
+
     def run_epoch(self):
         """Run a single epoch of training and validation
         """

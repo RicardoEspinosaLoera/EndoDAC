@@ -297,6 +297,71 @@ def da3_weights_path(cfg):
     return os.path.join(cfg["pretrained_path"], "da3_base.safetensors")
 
 
+def gpu_status():
+    """{gpu index: (MiB used, MiB total)} from nvidia-smi; {} when it is not available."""
+    try:
+        out = subprocess.check_output(["nvidia-smi", "--query-gpu=index,memory.used,memory.total",
+                                       "--format=csv,noheader,nounits"], stderr=subprocess.DEVNULL).decode()
+    except Exception:
+        return {}
+    status = {}
+    for line in out.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            status[parts[0]] = (int(parts[1]), int(parts[2]))
+    return status
+
+
+def running_cviu_runs():
+    """model names of train_end_to_end.py processes of this grid that are still alive."""
+    try:
+        out = subprocess.check_output(["ps", "-eo", "args"], stderr=subprocess.DEVNULL).decode(errors="replace")
+    except Exception:
+        return set()
+    names = set()
+    for line in out.splitlines():
+        if "train_end_to_end.py" in line and "--model_name" in line:
+            toks = line.split()
+            i = toks.index("--model_name") if "--model_name" in toks else -1
+            if 0 <= i < len(toks) - 1 and toks[i + 1].startswith("cviu_"):
+                names.add(toks[i + 1])
+    return names
+
+
+def log_shows_completion(log_path):
+    """True if the last launch recorded in a train log ran all its epochs without an error.
+
+    Covers runs whose launcher died while the training process went on: nobody wrote their
+    cviu_done.txt, but their output kept going to the log (one "Evaluating" line per epoch).
+    """
+    try:
+        with open(log_path, errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return False
+    starts = [i for i, l in enumerate(lines) if l.startswith("# ") and "train_end_to_end.py" in l]
+    if not starts:
+        return False
+    toks = lines[starts[-1]].split()
+    epochs = [int(toks[i + 1]) for i in range(len(toks) - 1) if toks[i] == "--num_epochs" and toks[i + 1].isdigit()]
+    section = lines[starts[-1]:]
+    n_eval = sum(1 for l in section if l.strip() == "Evaluating")
+    return bool(epochs) and n_eval >= epochs[-1] and not any(l.startswith("Traceback") for l in section)
+
+
+def run_is_done(cfg, name, alive=()):
+    run_dir = os.path.join(cfg["log_dir"], name)
+    if os.path.exists(os.path.join(run_dir, "cviu_done.txt")) or os.path.exists(os.path.join(run_dir, "train_complete.txt")):
+        return True
+    if name in alive or not os.path.isdir(os.path.join(run_dir, "models", "weights_last")):
+        return False
+    if log_shows_completion(os.path.join(cfg["out_dir"], "train_logs", name + ".log")):
+        with open(os.path.join(run_dir, "cviu_done.txt"), "w") as f:
+            f.write("recovered from its train log (the launcher was gone when it finished)\n")
+        return True
+    return False
+
+
 def tail(path, n=25):
     try:
         with open(path, errors="replace") as f:
@@ -323,15 +388,20 @@ def stage_train(cfg, args):
         if not args.dry_run and not args.skip_preflight:
             print("[train] skipping {} for now".format(da3_runs))
             selected = [r for r in selected if r not in da3_runs]
+    alive = running_cviu_runs()   # e.g. jobs left running after their launcher died
+    if alive:
+        print("[train] still training from an earlier launch: {}".format(sorted(alive)))
     jobs = []
     for run, spec in runs.items():
         if run not in selected:
             continue
         for seed in run_seeds(cfg, run):
             name = run_name(run, seed)
-            done = os.path.join(cfg["log_dir"], name, "cviu_done.txt")
-            if os.path.exists(done) and not args.force:
+            if run_is_done(cfg, name, alive) and not args.force:
                 print("[train] {} done, skipping".format(name))
+                continue
+            if name in alive:
+                print("[train] {} is still running, skipping (it would write into the same folder)".format(name))
                 continue
             cmd = [cfg["python"], os.path.join(ROOT, "train_end_to_end.py"),
                    "--data_path", cfg["data"]["scared"], "--log_dir", cfg["log_dir"],
@@ -351,6 +421,17 @@ def stage_train(cfg, args):
         return 0
 
     gpus = [str(g) for g in (args.gpus or ["0"])]
+    status = gpu_status()
+    busy = [g for g in gpus if g in status and status[g][0] > max(1024, 0.05 * status[g][1])]
+    if busy:
+        print("[train] GPUs already in use (MiB used/total): {}".format(
+            ", ".join("{}: {}/{}".format(g, *status[g]) for g in busy)))
+        if not args.use_busy_gpus:
+            gpus = [g for g in gpus if g not in busy]
+            print("[train] leaving them out (--use_busy_gpus to override); using {}".format(gpus))
+    if not gpus:
+        print("[train] no free GPU among the requested ones; see nvidia-smi")
+        sys.exit(1)
     q = queue.Queue()
     failed = []
     for j in jobs:
@@ -378,8 +459,12 @@ def stage_train(cfg, args):
                 print("[train] {} finished in {:.1f} h".format(j["name"], secs / 3600.0))
             else:
                 failed.append(j["name"])
+                log_tail = tail(log)
                 print("[train] {} FAILED (rc={}) after {:.0f} s, see {}\n----- log tail -----\n{}--------------------".format(
-                    j["name"], rc, secs, log, tail(log)))
+                    j["name"], rc, secs, log, log_tail))
+                if "out of memory" in log_tail or "valid cuDNN algorithm" in log_tail:
+                    print("[train] {} ran out of GPU memory on GPU {}: check `nvidia-smi` for other processes "
+                          "on it".format(j["name"], gpu))
                 if secs < 180:  # died before training started: a setup error, not worth repeating 25 times
                     print("[train] failed within 3 minutes: aborting the remaining jobs; fix the error and relaunch "
                           "(finished runs are skipped)")
@@ -1574,6 +1659,7 @@ def main():
     ap.add_argument("--extra_flags", default="", help="appended to every training command (e.g. \"--num_epochs 1\")")
     ap.add_argument("--dry_run", action="store_true", help="train: print the commands only")
     ap.add_argument("--skip_preflight", action="store_true", help="train: launch even if the pre-flight checks fail")
+    ap.add_argument("--use_busy_gpus", action="store_true", help="train: also use GPUs that already hold memory")
     ap.add_argument("--force", action="store_true", help="redo work whose outputs exist")
     ap.add_argument("--all_seeds", action="store_true", help="illum-params: every seed of the run")
     ap.add_argument("--cpu", action="store_true")
