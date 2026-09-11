@@ -87,7 +87,7 @@ DEFAULT_CONFIG = {
     "datasets": ["scared", "hamlyn", "c3vd"],
     "save_pred": True,
     "methods": {},
-    "da3": {"models": ["depth-anything/da3mono-large", "depth-anything/da3-base"], "affine_rows": True},
+    "da3": {"models": ["da3-base", "depth-anything/da3mono-large"], "affine_rows": True},
     "illum": {"runs": ["E8"], "seed": 314, "sequences": ["sequence1", "sequence2"],
               "patch_sizes": [64, 32, 16, 8], "alpha": 0.10, "beta": 0.05, "ridge": 0.01,
               "sens_stride": 5, "gains": [0.8, 0.9, 1.0, 1.1, 1.2],
@@ -289,10 +289,12 @@ def preflight(cfg):
     return problems
 
 
-def has_da3(py):
-    """True if the training interpreter can import the depth_anything_3 package."""
-    return subprocess.call([py, "-c", "import depth_anything_3.api"], cwd=ROOT,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+DA3_URL = "https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors"
+
+
+def da3_weights_path(cfg):
+    """DA3-Base checkpoint used by the D-grid and the zero-shot rows (ported code, no package)."""
+    return os.path.join(cfg["pretrained_path"], "da3_base.safetensors")
 
 
 def tail(path, n=25):
@@ -312,15 +314,12 @@ def stage_train(cfg, args):
     if problems and not args.dry_run and not args.skip_preflight:
         print("[train] fix the above (or pass --skip_preflight) before launching")
         sys.exit(1)
-    # DA3-encoder rows need the depth_anything_3 package (Python >= 3.9, torch >= 2). If the
-    # training interpreter lacks it they are left out here, so the rest of the grid still runs;
-    # launch them later with an interpreter that has it: --python /path/to/env/bin/python
+    # DA3-encoder rows need the DA3-Base checkpoint (ported code, same Python env as the rest).
+    # Without it they are left out so the rest of the grid still runs; rerun train after the download.
     da3_runs = [r for r in selected if "--backbone_weights da3" in runs[r]["flags"]]
-    if da3_runs and not has_da3(cfg["python"]):
-        print("[train] '{}' cannot import depth_anything_3: {} need it (git clone "
-              "https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e ., Python>=3.9). "
-              "Run them with: python cviu_revision.py train --python <interpreter with DA3> --only {}".format(
-                  cfg["python"], da3_runs, " ".join(da3_runs)))
+    if da3_runs and not os.path.exists(da3_weights_path(cfg)):
+        print("[train] {} need the DA3-Base weights: wget -O {} {}".format(
+            da3_runs, da3_weights_path(cfg), DA3_URL))
         if not args.dry_run and not args.skip_preflight:
             print("[train] skipping {} for now".format(da3_runs))
             selected = [r for r in selected if r not in da3_runs]
@@ -509,8 +508,7 @@ def load_depth_model_from_run(cfg, run, seed, device):
                                 image_shape=(224, 280), pretrained_path=None,
                                 residual_block_indexes=opt["residual_block_indexes"],
                                 include_cls_token=opt.get("include_cls_token", True),
-                                backbone_weights=opt.get("backbone_weights", "da1"),
-                                da3_model_id=opt.get("da3_model_id", "depth-anything/da3-base"))
+                                backbone_weights=opt.get("backbone_weights", "da1"))
     md = model.state_dict()
     model.load_state_dict({k: v for k, v in sd.items() if k in md}, strict=False)
     return model.to(device).eval(), opt, wf
@@ -1066,12 +1064,8 @@ def stage_illum_sens(cfg, args):
 # stage: da3 (zero-shot Depth Anything 3)
 # --------------------------------------------------------------------------------------
 
-def _da3_infer(model, img_uint8):
-    """Single-view DA3 inference -> depth map (h, w) float32.
-
-    This is the only place that touches the DA3 API; adapt it if the installed
-    depth_anything_3 version differs (docs/API.md of ByteDance-Seed/Depth-Anything-3).
-    """
+def _da3_package_infer(model, img_uint8):
+    """Single-view inference through the depth_anything_3 package -> depth (h, w) float32."""
     pred = model.inference([img_uint8])
     depth = getattr(pred, "depth", None)
     if depth is None and isinstance(pred, dict):
@@ -1080,13 +1074,39 @@ def _da3_infer(model, img_uint8):
     return depth[0] if depth.ndim == 3 else depth
 
 
-def stage_da3(cfg, args):
+def _da3_predictor(cfg, variant, device):
+    """Zero-shot DA3 predictor: color (1,3,h,w) in [0,1] -> depth (h', w') numpy, or None.
+
+    "da3-base" runs the ported encoder + DualDPT main branch (models/endodac/da3_zeroshot.py,
+    verified bit-exact against the original code) from <pretrained_path>/da3_base.safetensors,
+    so it needs no extra package. Any other id goes through the depth_anything_3 package
+    (Python >= 3.9, torch >= 2) and is skipped when that is not installed.
+    """
+    if variant in ("da3-base", "depth-anything/da3-base", "depth-anything/DA3-BASE"):
+        path = da3_weights_path(cfg)
+        if not os.path.exists(path):
+            print("[da3] missing {}: wget -O {} {}".format(path, path, DA3_URL))
+            return None
+        from models.endodac.da3_zeroshot import DA3BaseMono
+        model = DA3BaseMono(weights_path=path).to(device).eval()
+
+        def predict(color):
+            with torch.no_grad():
+                return model(color.to(device))[0, 0].float().cpu().numpy()
+        return predict
     try:
         from depth_anything_3.api import DepthAnything3
     except ImportError:
-        print("[da3] depth_anything_3 is not installed: pip install the package from "
-              "https://github.com/ByteDance-Seed/Depth-Anything-3 and rerun this stage")
-        return
+        print("[da3] {} needs the depth_anything_3 package, not installed here: skipped".format(variant))
+        return None
+    model = DepthAnything3.from_pretrained(variant).to(device).eval()
+
+    def predict(color):
+        return _da3_package_infer(model, (color[0].permute(1, 2, 0).numpy() * 255).astype(np.uint8))
+    return predict
+
+
+def stage_da3(cfg, args):
     device = device_of(args)
     per_frame = out_path(cfg, "per_frame.csv")
     done = {(r["method"], r["seed"], r["dataset"]) for r in read_csv(per_frame)}
@@ -1094,18 +1114,19 @@ def stage_da3(cfg, args):
     g = git_hash()
     datasets = args.datasets or cfg["datasets"]
     for variant in cfg["da3"]["models"]:
-        method = "DA3_" + variant.split("/")[-1].replace("-", "_")
+        method = "DA3_" + variant.split("/")[-1].replace("-", "_").lower()
         todo = [d for d in datasets if (method, "0", d) not in done or args.force]
         if not todo:
             continue
         print("[da3] loading {}".format(variant))
-        model = DepthAnything3.from_pretrained(variant).to(device).eval()
+        predict = _da3_predictor(cfg, variant, device)
+        if predict is None:
+            continue
         for ds in todo:
             rows, rows_aff, preds = [], [], []
             for i, color, seq, frame, gt in iterate_dataset(cfg, ds):
-                img = (color[0].permute(1, 2, 0).numpy() * 255).astype(np.uint8)
                 t0 = time.time()
-                depth = _da3_infer(model, img)
+                depth = predict(color)
                 ms = (time.time() - t0) * 1000.0
                 preds.append(depth.astype(np.float16))
                 for align, target, name in (("median", rows, method), ("affine", rows_aff, method + "_affine")):
@@ -1548,6 +1569,7 @@ def main():
     ap.add_argument("--python", help="interpreter for the training subprocesses (overrides the config)")
     ap.add_argument("--gpus", nargs="*", help="GPU ids for train (one subprocess per GPU)")
     ap.add_argument("--only", nargs="*", help="restrict to these runs / methods")
+    ap.add_argument("--seeds", nargs="*", type=int, help="train: override the seeds of every selected run")
     ap.add_argument("--datasets", nargs="*", help="restrict predict/da3 to these datasets")
     ap.add_argument("--extra_flags", default="", help="appended to every training command (e.g. \"--num_epochs 1\")")
     ap.add_argument("--dry_run", action="store_true", help="train: print the commands only")
@@ -1559,6 +1581,8 @@ def main():
     cfg = load_config(args.config)
     if args.python:
         cfg["python"] = args.python
+    if args.seeds:
+        cfg["train"]["seeds"] = cfg["train"]["multi_seeds"] = list(args.seeds)
     ensure_dir(cfg["out_dir"])
     if args.stage == "all":
         stages = ALL_ORDER

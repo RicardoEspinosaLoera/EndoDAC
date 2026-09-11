@@ -21,8 +21,10 @@ train:
   checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
   runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
   skip_runs: []                 # grid entries not to train, e.g. [N0, D3-EndoDAC]
-  # D3 / D3-EndoDAC / N0 use --backbone_weights da3|none: the DA3 rows need the depth_anything_3
-  # package (git clone https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e .)
+  # D3 / D3-EndoDAC use --backbone_weights da3 (DA3-Base, ported code, same env as the grid) and
+  # need <pretrained_path>/da3_base.safetensors:
+  #   wget -O pretrained_model/da3_base.safetensors https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors
+  # N0 uses --backbone_weights none (random ViT-B) and needs nothing extra.
 
 proposed: E8                    # the MonoIIF row every paired test is against
 datasets: [scared, hamlyn, c3vd]
@@ -52,8 +54,10 @@ methods:
   #   align: affine
   #   files: {scared: ./disps_endovis_split_DA.npy}
 
-da3:                            # zero-shot rows (stage da3); ids as in the DA3 model cards
-  models: [depth-anything/da3mono-large, depth-anything/da3-base]
+da3:                            # zero-shot rows (stage da3)
+  # da3-base runs the ported code from pretrained_model/da3_base.safetensors (no package);
+  # other Hugging Face ids need the depth_anything_3 package and are skipped without it
+  models: [da3-base, depth-anything/da3mono-large]
   affine_rows: true             # additionally report disparity shift+scale alignment
 
 illum:

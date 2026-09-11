@@ -8,6 +8,7 @@ from models.backbones.flora import Linear as FLinear
 from models.backbones.dora import Linear as DLinear
 from .layers import HeadDepth
 from .layers import mark_only_part_as_trainable,_make_scratch, _make_fusion_block
+from .da3_vit import add_uv_pos_embed
 
 def _copy_linear(old, new):
     """Copy weight/bias of a pretrained nn.Linear into its LoRA replacement (same shapes)."""
@@ -20,11 +21,20 @@ def _copy_linear(old, new):
 
 
 class DPTHead(nn.Module):
-    def __init__(self, in_channels, features=128, use_bn=False, out_channels=[96, 192, 384, 768], use_clstoken=False):
+    """DPT neck + EndoDAC multi-scale disparity heads.
+
+    pre_norm / pos_embed reproduce DA3's DualDPT main branch (LayerNorm over the tokens before
+    the projections, uv sin-cos embedding added after them), so a DA3 encoder can use DA3's
+    trained neck unchanged. Both default to off, which is the Depth Anything v1 / EndoDAC head.
+    """
+    def __init__(self, in_channels, features=128, use_bn=False, out_channels=[96, 192, 384, 768], use_clstoken=False,
+                 pre_norm=False, pos_embed=False):
         super(DPTHead, self).__init__()
 
         self.use_clstoken = use_clstoken
-        
+        self.norm = nn.LayerNorm(in_channels) if pre_norm else None
+        self.pos_embed = pos_embed
+
         self.projects = nn.ModuleList([
             nn.Conv2d(
                 in_channels=in_channels,
@@ -85,7 +95,8 @@ class DPTHead(nn.Module):
         self.conv_depth_4 = HeadDepth(features)
         
         self.sigmoid = nn.Sigmoid()
-    def forward(self, out_features, patch_h, patch_w):
+    def fuse(self, out_features, patch_h, patch_w):
+        """Token features -> fused DPT pyramid (path_1 finest ... path_4 coarsest)."""
         out = []
         for i, x in enumerate(out_features):
             if self.use_clstoken:
@@ -94,26 +105,34 @@ class DPTHead(nn.Module):
                 x = self.readout_projects[i](torch.cat((x, readout), -1))
             else:
                 x = x[0]
-            
+            if self.norm is not None:
+                x = self.norm(x)
+
             x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
-            
+
             x = self.projects[i](x)
+            if self.pos_embed:
+                x = add_uv_pos_embed(x, patch_w, patch_h)
             x = self.resize_layers[i](x)
-            
+
             out.append(x)
-        
+
         layer_1, layer_2, layer_3, layer_4 = out
-        
+
         layer_1_rn = self.scratch.layer1_rn(layer_1)
         layer_2_rn = self.scratch.layer2_rn(layer_2)
         layer_3_rn = self.scratch.layer3_rn(layer_3)
         layer_4_rn = self.scratch.layer4_rn(layer_4)
-        
+
         path_4 = self.scratch.refinenet4(layer_4_rn, size=layer_3_rn.shape[2:])
         path_3 = self.scratch.refinenet3(path_4, layer_3_rn, size=layer_2_rn.shape[2:])
         path_2 = self.scratch.refinenet2(path_3, layer_2_rn, size=layer_1_rn.shape[2:])
         path_1 = self.scratch.refinenet1(path_2, layer_1_rn)
-        
+        return path_1, path_2, path_3, path_4
+
+    def forward(self, out_features, patch_h, patch_w):
+        path_1, path_2, path_3, path_4 = self.fuse(out_features, patch_h, patch_w)
+
         outputs = {}
         outputs[("disp", 3)] = self.sigmoid(self.conv_depth_4(path_4))
         outputs[("disp", 2)] = self.sigmoid(self.conv_depth_3(path_3))
@@ -143,8 +162,13 @@ class endodac(nn.Module):
                  use_cls_token=False,
                  use_bn=False,
                  backbone_weights="da1",
-                 da3_model_id="depth-anything/da3-base",
+                 da3_weights=None,
                  train_depth_head=False):
+        """backbone_weights: "da1" Depth Anything v1 encoder + DPT head (EndoDAC / MonoIIF);
+        "da3" DA3-Base encoder + DA3's own DPT neck (models/endodac/da3_vit.py; weights from
+        da3_weights, default <pretrained_path>/da3_base.safetensors); "none" random ViT-B with the
+        DA v1 head, whole head trained. pretrained_path=None skips every pretrained load (used
+        when a trained checkpoint is loaded afterwards)."""
         super(endodac, self).__init__()
 
         assert r > 0
@@ -180,11 +204,25 @@ class endodac(nn.Module):
         self.embedding_dim = self.embedding_dims[self.backbone_size]
         self.depth_head_feature = self.depth_head_features[self.backbone_size]
         self.depth_head_out_channel = self.depth_head_out_channels[self.backbone_size]
+        if backbone_weights not in ("da1", "da3", "none"):
+            raise ValueError("backbone_weights must be da1, da3 or none, got {}".format(backbone_weights))
+        self.backbone_weights = backbone_weights
+        head_in_channels, head_kwargs = self.embedding_dim, {}
         if backbone_weights == "da3":
-            # Depth Anything 3 encoder (its own DinoV2 with QK-norm / RoPE), weights already loaded
-            from .da3_backbone import DA3Encoder
-            encoder = DA3Encoder(da3_model_id, residual_block_indexes=residual_block_indexes,
-                                 out_layers=self.intermediate_layers[self.backbone_size])
+            # DA3-Base's DINOv2 (QK-norm, 2D RoPE, camera token from block 4), ported in da3_vit.py.
+            # Its features are 1536-d ([local | global] states) at DA3's layers 5/7/9/11, consumed by
+            # DA3's own neck (pre-norm + uv pos-embed), loaded below.
+            from .da3_vit import DA3Encoder
+            if da3_weights is None and pretrained_path is not None:
+                da3_weights = os.path.join(pretrained_path, "da3_base.safetensors")
+            if pretrained_path is not None and not os.path.exists(da3_weights):
+                raise FileNotFoundError(
+                    "DA3-Base weights not found: {} (wget -O {} "
+                    "https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors)".format(
+                        da3_weights, da3_weights))
+            encoder = DA3Encoder(residual_block_indexes=residual_block_indexes,
+                                 weights_path=da3_weights if pretrained_path is not None else None)
+            head_in_channels, head_kwargs = encoder.out_dim, {"pre_norm": True, "pos_embed": True}
         else:
             encoder = self.backbone[self.backbone_size]
 
@@ -216,15 +254,21 @@ class endodac(nn.Module):
                 _copy_linear(old_fc2, blk.mlp.fc2)
 
         self.encoder = encoder
-        self.depth_head = DPTHead(self.embedding_dim, self.depth_head_feature, use_bn, out_channels=self.depth_head_out_channel, use_clstoken=use_cls_token)
+        self.depth_head = DPTHead(head_in_channels, self.depth_head_feature, use_bn, out_channels=self.depth_head_out_channel,
+                                  use_clstoken=use_cls_token, **head_kwargs)
 
-        if pretrained_path is not None:
+        if pretrained_path is not None and backbone_weights == "da3":
+            # DA3's neck (pre-norm, projections, resize layers, fusion blocks); EndoDAC's
+            # conv_depth heads have no DA3 counterpart and start from init, as with DA v1
+            from .da3_vit import read_safetensors, load_matching, DA3_HEAD_PREFIX
+            load_matching(self.depth_head, read_safetensors(da3_weights, DA3_HEAD_PREFIX),
+                          "DA3 neck <- " + da3_weights)
+        elif pretrained_path is not None:
             pretrained_path = os.path.join(pretrained_path, "depth_anything_{}.pth".format(self.backbone_arch))
             if os.path.exists(pretrained_path):
                 pretrained_dict = torch.load(pretrained_path, map_location="cpu")
-                if backbone_weights != "da1":
-                    # only the DPT head is taken from Depth Anything v1 (as an initialisation);
-                    # the encoder is DA3's or random
+                if backbone_weights == "none":
+                    # only the DPT head is taken from Depth Anything v1; the encoder stays random
                     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k.startswith("depth_head.")}
                 self.load_state_dict(pretrained_dict, strict=False)
                 print("load pretrained weight from {} ({} keys)\n".format(pretrained_path, len(pretrained_dict)))
@@ -233,9 +277,10 @@ class endodac(nn.Module):
             else:
                 print("no {}: DPT head starts from random init".format(pretrained_path))
 
-        # A DPT head initialised from Depth Anything v1 only matches the DA v1 encoder; with any
-        # other encoder the whole head has to train (EndoDAC freezes all but its conv_depth heads).
-        self.train_depth_head = bool(train_depth_head) or backbone_weights != "da1"
+        # EndoDAC freezes the DPT neck (only the conv_depth heads train). That is right when the
+        # neck was trained on the same encoder's features (da1, and da3 with DA3's neck); with a
+        # random encoder the DA v1 neck no longer matches, so the whole head trains.
+        self.train_depth_head = bool(train_depth_head) or backbone_weights == "none"
         mark_only_part_as_trainable(self.encoder)
         mark_only_part_as_trainable(self.depth_head)
         if self.train_depth_head:

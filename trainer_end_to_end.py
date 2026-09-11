@@ -64,7 +64,7 @@ class Trainer:
                 image_shape=(224,280), pretrained_path=self.opt.pretrained_path,
                 residual_block_indexes=self.opt.residual_block_indexes,
                 include_cls_token=self.opt.include_cls_token,
-                backbone_weights=self.opt.backbone_weights, da3_model_id=self.opt.da3_model_id,
+                backbone_weights=self.opt.backbone_weights, da3_weights=self.opt.da3_weights,
                 train_depth_head=self.opt.train_depth_head)
         else:
             # CVIU ablation control: the same losses on a ResNet-18 U-Net (monodepth2 architecture)

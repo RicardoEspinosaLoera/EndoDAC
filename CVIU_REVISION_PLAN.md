@@ -9,23 +9,16 @@ Verified locally without data or GPU: config merging, every generated training c
 with `options.py`, checkpoint selection, real split pairing, the affine fit and GT warper on
 synthetic geometry, and the `stats`/`report` stages on synthetic per-frame rows. Not yet run
 anywhere: `predict`, `illum-params`, `illum-sens`, `da3` (need the server, the datasets and the
-checkpoints); `_da3_infer()` is the only function that touches the DA3 API and may need a
-one-line adjustment to the installed version. The E/R/C grid was launched on the server on
-2026-09-10. The DA3-encoder rows (D3, D3-EndoDAC; §6) need the `depth_anything_3` package, which
-requires Python 3.9-3.13 and torch 2; the server's training env is Python 3.8, so they run from
-a second conda env passed as `--python <env>/bin/python` (the default env skips them with a
-warning). Recipe:
+checkpoints). The E/R/C grid was launched on the server on 2026-09-10 and has to be relaunched
+(it stopped; unfinished runs restart from epoch 0, finished ones are skipped).
+
+The DA3 rows (D3, D3-EndoDAC, zero-shot `da3-base`; §6) use a port of DA3's code in the repo, so
+they run in the same Python 3.8 environment as everything else. They only need the checkpoint:
 
 ```
-conda create -n da3 python=3.10 -y && conda activate da3
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118   # match the driver
-git clone https://github.com/ByteDance-Seed/Depth-Anything-3 && pip install -e Depth-Anything-3
-pip install -r requirements.txt            # this repo's deps (kornia, wandb, tensorboardX, scikit-image, ...)
-python cviu_revision.py train --gpus 0 --only D3 --extra_flags "--num_epochs 1" --python $(which python)
+wget -O pretrained_model/da3_base.safetensors https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors
+python cviu_revision.py train --gpus 0 --only D3 --extra_flags "--num_epochs 1"   # dry run, then delete logs/cviu_D3_s314
 ```
-
-`predict`/`illum-*` for the D3 rows must also be run with that interpreter (they build the DA3
-encoder in-process). N0 needs nothing extra.
 
 Reviewer asks → experiments:
 
@@ -272,29 +265,36 @@ DA3-Mono-Large (relative depth), on Hugging Face under `depth-anything/`.
    the three test sets. DA3 predicts depth, not disparity, so use median scaling on depth like
    every other row; also give the affine-aligned number used for DA v1 in `mytest_da.py` for
    parity. Stage `da3` → `per_frame.csv` → `stats`.
-2. **Adapted rows (D-grid, implemented)**: DA3-Base's encoder is *not* a vanilla DINOv2 (from
-   block 4 on it uses QK-norm, RoPE and alternating attention, and its DualDPT head takes
-   1536-dim inputs), so its weights cannot be copied onto the repo's ViT. Instead
-   `models/endodac/da3_backbone.py` wraps DA3's own `DinoV2` module (loaded through the
-   `depth_anything_3` package, Apache-2.0) behind endodac's encoder interface: DV-LoRA is
-   inserted into its `mlp.fc1/fc2` with the pretrained weights kept, the Conv-neck is re-created
-   as forward hooks on blocks 2/5/8/11 (same `residual_` prefix, same trainable policy), and
-   the repo's DPT head is initialised from DA v1 but fully trained because a head trained on
-   DA v1 features does not match DA3 features (`--train_depth_head` is forced on; report the
-   larger trainable count honestly). Inputs stay in [0, 1] like the DA v1 path. Selected with
-   `--backbone_weights da3` (`--da3_model_id`, default `depth-anything/da3-base`).
+2. **Adapted rows (D-grid, implemented and verified)**: DA3-Base's encoder is *not* a vanilla
+   DINOv2: from block 4 on it uses QK-norm, 2D RoPE, a camera token and alternating
+   local/global attention, and it outputs 1536-d features (last local state | normalised
+   current state) at layers 5/7/9/11. Its weights therefore cannot be copied onto the repo's ViT.
+   `models/endodac/da3_vit.py` ports DA3's encoder (Apache-2.0, commit 3d835ec) to plain
+   Python 3.8 / torch, single view, with EndoDAC's Conv-neck inline, and reads the official
+   `model.safetensors` directly. The repo's DPT head gains DA3's pre-norm and uv pos-embed
+   options and is initialised with **DA3's own trained neck** (all projections, resize layers
+   and fusion blocks), so D3 trains exactly like E8: frozen neck, DV-LoRA in the encoder MLPs,
+   Conv-neck and conv_depth heads. Trainable parameters are identical (8,961,540 in both), so
+   D3 vs E8 isolates the foundation model. DA3's ImageNet input normalisation is kept (the DA v1
+   path feeds [0, 1], EndoDAC's convention). Selected with `--backbone_weights da3`
+   (`--da3_weights`, default `pretrained_model/da3_base.safetensors`).
+   - Verification (local, against the original DA3 code with shared random weights): encoder
+     features and camera tokens identical (max |diff| = 0) at 224x280, 406x504 and 518x518;
+     zero-shot depth of the port (encoder + DualDPT main branch, `da3_zeroshot.py`) identical
+     to the original; all 207 encoder tensors match the real DA3-BASE checkpoint header; the
+     zero-initialised Conv-neck and DV-LoRA leave DA3's features unchanged at step 0.
    - **D3** = full MonoIIF recipe on the DA3 encoder (3 seeds); **D3-EndoDAC** = E3 recipe on
      the DA3 encoder. (D3 − D3-EndoDAC) vs (E8 − E3) shows whether the method's gain transfers
      to the newer foundation model; D3 vs E8 is the backbone comparison the reviewer asked for.
    - **N0** = full recipe with a randomly initialised ViT-B (`--backbone_weights none`): the
-     "no foundation weights" control for the backbone-share question of R3.
-   - Gate: the wrapper was verified only against a stand-in ViT; the first server dry run
-     (`--only D3 --extra_flags "--num_epochs 1"`) must show the DA3 encoder printout, a sane
-     trainable-parameter count and a decreasing loss. If the installed DA3 version differs in
-     its ViT API, `DA3Encoder.get_intermediate_layers` is the place to adapt.
+     "no foundation weights" control for the backbone-share question of R3. Its DA v1 neck does
+     not match a random encoder, so its whole head trains (report its larger trainable count).
+   - The zero-shot `da3-base` row uses the same port (no package). DA3-Mono-Large (ViT-L,
+     different head) still needs the `depth_anything_3` package and is skipped without it.
 3. **Limitations text**: DA3's monocular model is Large-only (~0.3 B params), so it enters only
-   as a zero-shot row; DA3-Base is compared both zero-shot and adapted (D3); DA3's multi-view
-   depth-ray head is replaced by the repo's DPT head, so D3 measures the encoder, not DA3's head.
+   as a zero-shot row; DA3-Base is compared both zero-shot and adapted (D3). D3 keeps DA3's
+   neck but replaces its depth-ray output head with EndoDAC's multi-scale disparity heads, as
+   E8 does for Depth Anything v1, and runs single-view at the grid's 224x280 resolution.
 
 ---
 

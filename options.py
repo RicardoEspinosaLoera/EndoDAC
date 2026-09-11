@@ -304,18 +304,21 @@ class MonodepthOptions:
                                  type=str,
                                  choices=["da1", "da3", "none"],
                                  default="da1",
-                                 help="foundation weights of the ViT-B encoder: Depth Anything v1 "
+                                 help="foundation model of the ViT-B encoder: Depth Anything v1 "
                                       "(pretrained_model/depth_anything_vitb14.pth), Depth Anything 3 "
-                                      "(its own DinoV2 from the depth_anything_3 package), or random init")
-        self.parser.add_argument("--da3_model_id",
+                                      "(DA3-Base encoder + its own DPT neck, ported in models/endodac/"
+                                      "da3_vit.py), or random init")
+        self.parser.add_argument("--da3_weights",
                                  type=str,
-                                 default="depth-anything/da3-base",
-                                 help="Hugging Face id or local folder of the DA3 checkpoint")
+                                 default=None,
+                                 help="DA3-Base model.safetensors (default <pretrained_path>/da3_base.safetensors); "
+                                      "https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors")
         self.parser.add_argument("--train_depth_head",
                                  type=str2bool,
                                  default=False,
-                                 help="train the whole DPT head (always on when the head init does not "
-                                      "match the encoder, i.e. backbone_weights != da1)")
+                                 help="train the whole DPT head instead of only the conv_depth heads "
+                                      "(always on with --backbone_weights none, whose DA v1 neck does not "
+                                      "match a random encoder)")
         self.parser.add_argument("--seed",
                                  type=int,
                                  help="random seed for training",
