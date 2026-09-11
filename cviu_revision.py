@@ -13,7 +13,7 @@ Stages (each is idempotent: finished work is skipped unless --force is given):
   stats         sequence-level aggregation, bootstrap CIs, paired tests, LaTeX tables
   report        markdown report and figures
   all           predict, illum-fit, illum-params, illum-sens, da3, stats, report (not train)
-  full          train, then everything in `all`; stops if any training job failed
+  full          train, then everything in `all` on the finished runs (failed runs are listed in the report)
 
 Examples:
   python cviu_revision.py full --gpus 0 1 2 3          # the whole revision in one go (run it in tmux)
@@ -297,6 +297,64 @@ def da3_weights_path(cfg):
     return os.path.join(cfg["pretrained_path"], "da3_base.safetensors")
 
 
+def _valid_safetensors(path):
+    try:
+        import struct
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            header = json.loads(f.read(n).decode("utf-8"))
+        return any(k.startswith("model.backbone.pretrained.") for k in header)
+    except Exception:
+        return False
+
+
+def ensure_da3_weights(cfg, download=True):
+    """True if the DA3-Base checkpoint is available, downloading it (542 MB) when missing."""
+    path = da3_weights_path(cfg)
+    if os.path.exists(path):
+        if _valid_safetensors(path):
+            return True
+        print("[da3] {} is not a valid DA3 checkpoint (interrupted download?), fetching it again".format(path))
+    if not download:
+        return False
+    ensure_dir(os.path.dirname(os.path.abspath(path)))
+    part = path + ".part"
+    print("[da3] downloading the DA3-Base weights (542 MB) -> {}".format(path))
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(DA3_URL, part)
+        if not _valid_safetensors(part):
+            raise ValueError("downloaded file is not a DA3 safetensors checkpoint")
+        os.replace(part, path)
+        return True
+    except Exception as e:
+        if os.path.exists(part):
+            os.remove(part)
+        print("[da3] download failed ({}); get it by hand: wget -O {} {}".format(e, path, DA3_URL))
+        return False
+
+
+def _last_flag_value(cmd, flag):
+    vals = [cmd[i + 1] for i in range(len(cmd) - 1) if cmd[i] == flag]
+    return vals[-1] if vals else None
+
+
+def trained_epochs(cfg, name):
+    """num_epochs a run was launched with (its models/opt.json), or None."""
+    try:
+        with open(os.path.join(cfg["log_dir"], name, "models", "opt.json")) as f:
+            return int(json.load(f)["num_epochs"])
+    except Exception:
+        return None
+
+
+def clear_done_markers(cfg, name):
+    for marker in ("cviu_done.txt", "train_complete.txt"):
+        p = os.path.join(cfg["log_dir"], name, marker)
+        if os.path.exists(p):
+            os.remove(p)
+
+
 def gpu_status():
     """{gpu index: (MiB used, MiB total)} from nvidia-smi; {} when it is not available."""
     try:
@@ -379,10 +437,10 @@ def stage_train(cfg, args):
     if problems and not args.dry_run and not args.skip_preflight:
         print("[train] fix the above (or pass --skip_preflight) before launching")
         sys.exit(1)
-    # DA3-encoder rows need the DA3-Base checkpoint (ported code, same Python env as the rest).
-    # Without it they are left out so the rest of the grid still runs; rerun train after the download.
+    # DA3-encoder rows need the DA3-Base checkpoint (ported code, same Python env as the rest); it is
+    # downloaded when missing. If that fails they are left out so the rest of the grid still runs.
     da3_runs = [r for r in selected if "--backbone_weights da3" in runs[r]["flags"]]
-    if da3_runs and not os.path.exists(da3_weights_path(cfg)):
+    if da3_runs and not ensure_da3_weights(cfg, download=not args.dry_run):
         print("[train] {} need the DA3-Base weights: wget -O {} {}".format(
             da3_runs, da3_weights_path(cfg), DA3_URL))
         if not args.dry_run and not args.skip_preflight:
@@ -397,18 +455,25 @@ def stage_train(cfg, args):
             continue
         for seed in run_seeds(cfg, run):
             name = run_name(run, seed)
-            if run_is_done(cfg, name, alive) and not args.force:
-                print("[train] {} done, skipping".format(name))
-                continue
-            if name in alive:
-                print("[train] {} is still running, skipping (it would write into the same folder)".format(name))
-                continue
             cmd = [cfg["python"], os.path.join(ROOT, "train_end_to_end.py"),
                    "--data_path", cfg["data"]["scared"], "--log_dir", cfg["log_dir"],
                    "--pretrained_path", cfg["pretrained_path"],
                    "--model_name", name, "--seed", str(seed)]
             cmd += shlex.split(cfg["train"]["common_flags"]) + shlex.split(spec["flags"])
             cmd += shlex.split(args.extra_flags or "")
+            if name in alive:
+                print("[train] {} is still running, skipping (it would write into the same folder)".format(name))
+                continue
+            if run_is_done(cfg, name, alive) and not args.force:
+                planned, trained = _last_flag_value(cmd, "--num_epochs"), trained_epochs(cfg, name)
+                if planned is not None and trained is not None and trained < int(planned):
+                    # e.g. a 1-epoch smoke test: it must not stand in for the real run
+                    print("[train] {} was trained for {} epoch(s), the grid asks for {}: retraining".format(
+                        name, trained, planned))
+                    clear_done_markers(cfg, name)
+                else:
+                    print("[train] {} done, skipping".format(name))
+                    continue
             jobs.append({"run": run, "seed": seed, "name": name, "desc": spec["desc"], "cmd": cmd})
 
     manifest = {"git": git_hash(), "time": time.strftime("%Y-%m-%d %H:%M:%S"), "jobs": jobs}
@@ -465,22 +530,41 @@ def stage_train(cfg, args):
                 if "out of memory" in log_tail or "valid cuDNN algorithm" in log_tail:
                     print("[train] {} ran out of GPU memory on GPU {}: check `nvidia-smi` for other processes "
                           "on it".format(j["name"], gpu))
-                if secs < 180:  # died before training started: a setup error, not worth repeating 25 times
-                    print("[train] failed within 3 minutes: aborting the remaining jobs; fix the error and relaunch "
-                          "(finished runs are skipped)")
-                    while True:
-                        try:
-                            q.get_nowait()
-                            q.task_done()
-                        except queue.Empty:
-                            break
+                if secs < 180:
+                    # died before training started: a setup problem of this run (its other seeds would
+                    # fail the same way) or, once several runs do it, of the whole grid
+                    with lock:
+                        fast_failed_runs.add(j["run"])
+                        drain_all = len(fast_failed_runs) >= 3
+                        kept, dropped = [], []
+                        while True:
+                            try:
+                                j2 = q.get_nowait()
+                                q.task_done()
+                            except queue.Empty:
+                                break
+                            (dropped if drain_all or j2["run"] == j["run"] else kept).append(j2)
+                        for j2 in kept:
+                            q.put(j2)
+                    if drain_all:
+                        print("[train] {} different runs failed within 3 minutes {}: aborting the remaining {} "
+                              "job(s); fix the error and relaunch (finished runs are skipped)".format(
+                                  len(fast_failed_runs), sorted(fast_failed_runs), len(dropped)))
+                    elif dropped:
+                        print("[train] {} failed within 3 minutes: dropping its other seeds {}; the rest of the grid "
+                              "goes on".format(j["name"], [d["name"] for d in dropped]))
+                    failed.extend(d["name"] + " (not started)" for d in dropped)
             q.task_done()
 
+    lock = threading.Lock()
+    fast_failed_runs = set()
     threads = [threading.Thread(target=worker, args=(g,), daemon=True) for g in gpus]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
+    with open(out_path(cfg, "train_failures.json"), "w") as f:
+        json.dump({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "failed": failed}, f, indent=2)
     if failed:
         print("[train] {} job(s) failed: {}".format(len(failed), failed))
     return len(failed)
@@ -629,10 +713,16 @@ def build_predictor(cfg, name, spec, device):
 def predict_methods(cfg, args):
     """All (method name, seed, spec) triples the predict stage should cover."""
     items = []
+    alive = running_cviu_runs()
     for run in all_runs(cfg):
         for seed in run_seeds(cfg, run):
-            if weights_folder(cfg, run, seed) is not None:
-                items.append((run, seed, {"type": "run", "run": run, "seed": seed}))
+            if weights_folder(cfg, run, seed) is None:
+                continue
+            if not run_is_done(cfg, run_name(run, seed), alive):
+                # interrupted or still training: its checkpoint must not enter the tables
+                print("[predict] {} has not finished training, skipped".format(run_name(run, seed)))
+                continue
+            items.append((run, seed, {"type": "run", "run": run, "seed": seed}))
     for name, spec in (cfg.get("methods") or {}).items():
         items.append((name, 0, spec))
     if args.only:
@@ -1169,8 +1259,7 @@ def _da3_predictor(cfg, variant, device):
     """
     if variant in ("da3-base", "depth-anything/da3-base", "depth-anything/DA3-BASE"):
         path = da3_weights_path(cfg)
-        if not os.path.exists(path):
-            print("[da3] missing {}: wget -O {} {}".format(path, path, DA3_URL))
+        if not ensure_da3_weights(cfg):
             return None
         from models.endodac.da3_zeroshot import DA3BaseMono
         model = DA3BaseMono(weights_path=path).to(device).eval()
@@ -1500,6 +1589,11 @@ def stage_report(cfg, args):
         with open(manifest) as f:
             mf = json.load(f)
         md += ["Training grid launched at git `{}` ({} jobs).".format(mf["git"], len(mf["jobs"])), ""]
+    alive = running_cviu_runs()
+    missing = [run_name(r, s) for r in all_runs(cfg) for s in run_seeds(cfg, r) if not run_is_done(cfg, run_name(r, s), alive)]
+    if missing:
+        md += ["**Grid runs not finished (absent from every table): {}.** Rerun "
+               "`python cviu_revision.py full` to complete them.".format(", ".join(missing)), ""]
 
     summary = read_csv(out_path(cfg, "summary.csv"))
     paired = read_csv(out_path(cfg, "paired.csv"))
@@ -1676,22 +1770,27 @@ def main():
         stages = ["train"] if args.dry_run else ["train"] + ALL_ORDER
     else:
         stages = [args.stage]
-    failed = []
+    failed, n_train_failed = [], 0
     for s in stages:
         print("=" * 20, s, "=" * 20)
         try:
-            n_failed = STAGES[s](cfg, args)
-            if s == "train" and n_failed and len(stages) > 1:
-                print("[full] {} training job(s) failed; not continuing to the analysis stages. "
-                      "Fix the error and rerun 'full' (finished runs are skipped).".format(n_failed))
-                sys.exit(1)
+            ret = STAGES[s](cfg, args)
+            if s == "train" and ret:
+                n_train_failed = ret
+                if len(stages) > 1:
+                    print("[full] {} training job(s) failed; the analysis goes on with the finished runs "
+                          "(the report lists what is missing). Fix them and rerun 'full': finished runs "
+                          "and finished analysis are skipped.".format(n_train_failed))
         except Exception:
             traceback.print_exc()
             failed.append(s)
             if len(stages) == 1:
                 sys.exit(1)
+    if n_train_failed:
+        print("TRAINING: {} job(s) failed, see {}".format(n_train_failed, out_path(cfg, "train_failures.json")))
     if failed:
         print("FAILED stages: {}".format(failed))
+    if failed or n_train_failed:
         sys.exit(1)
 
 
