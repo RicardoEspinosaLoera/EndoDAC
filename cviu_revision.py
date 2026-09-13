@@ -594,6 +594,10 @@ def evaluate_prediction(pred, kind, align, gt, max_depth):
     pred = cv2.resize(pred.astype(np.float32), (gw, gh))
     mask = np.logical_and(gt > MIN_DEPTH, gt < max_depth)
     g = gt[mask]
+    if g.size == 0:
+        # no usable ground truth in this frame (some C3VD frames are entirely invalid):
+        # scoring it would produce NaN metrics and poison its sequence mean
+        return None, float("nan")
     if kind == "disp":
         disp = np.clip(pred, 1e-6, None)[mask]
     else:
@@ -750,7 +754,7 @@ def stage_predict(cfg, args):
             print("[predict] cannot load {}: {}".format(method, e))
             continue
         for ds in todo:
-            rows, disps = [], []
+            rows, disps, n_skipped = [], [], 0
             for i, color, seq, frame, gt in iterate_dataset(cfg, ds):
                 t0 = time.time()
                 if pred[0] == "npy":
@@ -759,13 +763,16 @@ def stage_predict(cfg, args):
                 else:
                     p = pred[1](color)
                 ms = (time.time() - t0) * 1000.0
+                if cfg["save_pred"] and pred[0] != "npy":
+                    disps.append(p.astype(np.float16))
                 m, ratio = evaluate_prediction(p, pred[2], pred[3], gt, MAX_DEPTH[ds])
+                if m is None:
+                    n_skipped += 1
+                    continue
                 row = {"method": method, "seed": seed, "dataset": ds, "sequence": seq, "frame": frame,
                        "ratio": ratio, "infer_ms": ms, "git": g}
                 row.update(m)
                 rows.append(row)
-                if cfg["save_pred"] and pred[0] != "npy":
-                    disps.append(p.astype(np.float16))
             if args.force:  # drop stale rows of this (method, seed, dataset) before appending
                 keep = [r for r in read_csv(per_frame)
                         if not (r["method"] == method and r["seed"] == str(seed) and r["dataset"] == ds)]
@@ -773,9 +780,10 @@ def stage_predict(cfg, args):
             append_rows(per_frame, rows, fields)
             if disps:
                 np.save(out_path(cfg, "pred", "{}_s{}_{}.npy".format(method, seed, ds)), np.stack(disps))
-            mean = {k: float(np.mean([r[k] for r in rows])) for k in METRICS}
-            print("[predict] {:<20} {:<7} frames={:<4} abs_rel={:.4f} rmse={:.3f} a1={:.4f}".format(
-                method, ds, len(rows), mean["abs_rel"], mean["rmse"], mean["a1"]))
+            mean = {k: float(np.mean([r[k] for r in rows])) for k in METRICS} if rows else {k: float("nan") for k in METRICS}
+            print("[predict] {:<20} {:<7} frames={:<4} abs_rel={:.4f} rmse={:.3f} a1={:.4f}{}".format(
+                method, ds, len(rows), mean["abs_rel"], mean["rmse"], mean["a1"],
+                "" if not n_skipped else "  ({} frames without ground truth skipped)".format(n_skipped)))
 
 
 # --------------------------------------------------------------------------------------
@@ -1305,6 +1313,8 @@ def stage_da3(cfg, args):
                 preds.append(depth.astype(np.float16))
                 for align, target, name in (("median", rows, method), ("affine", rows_aff, method + "_affine")):
                     m, ratio = evaluate_prediction(depth, "depth", align, gt, MAX_DEPTH[ds])
+                    if m is None:
+                        continue
                     row = {"method": name, "seed": 0, "dataset": ds, "sequence": seq, "frame": frame,
                            "ratio": ratio, "infer_ms": ms, "git": g}
                     row.update(m)
@@ -1406,6 +1416,22 @@ def stage_stats(cfg, args):
     if not rows:
         print("[stats] per_frame.csv is empty; run predict first")
         return
+    # rows written before the no-ground-truth guard can carry NaN metrics; they would turn
+    # their whole sequence mean into NaN, so drop them here as well
+    clean, dropped = [], 0
+    for r in rows:
+        try:
+            vals = [float(r[k]) for k in METRICS]
+        except (KeyError, ValueError):
+            dropped += 1
+            continue
+        if any(np.isnan(v) for v in vals):
+            dropped += 1
+            continue
+        clean.append(r)
+    if dropped:
+        print("[stats] ignoring {} frame(s) without valid ground truth".format(dropped))
+    rows = clean
     rng = np.random.default_rng(0)
     # 1) frame -> (method, seed, dataset, sequence); 2) -> (method, dataset, sequence) over seeds
     per_seed_seq = group_mean(rows, ["method", "seed", "dataset", "sequence"], METRICS)
