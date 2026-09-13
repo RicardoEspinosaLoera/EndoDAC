@@ -78,5 +78,7 @@ illum:
 stats:
   n_boot: 10000
   alpha: 0.05
+  min_sequences: 3              # below this, blocks of block_frames replace sequences as the unit
+  block_frames: 100
   paired_metrics: [abs_rel, sq_rel, rmse, a1]
   table_methods: null           # order of rows in the main tables; null = all, proposed last

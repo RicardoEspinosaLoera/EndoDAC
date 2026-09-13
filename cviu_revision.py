@@ -28,6 +28,7 @@ cviu_config.yaml (missing keys fall back to DEFAULT_CONFIG below).
 from __future__ import absolute_import, division, print_function
 
 import argparse
+import collections
 import copy
 import csv
 import glob
@@ -1545,6 +1546,42 @@ def stage_stats(cfg, args):
     if dropped:
         print("[stats] ignoring {} frame(s) without valid ground truth".format(dropped))
     rows = clean
+
+    # A dataset with fewer than min_sequences videos (e.g. a Hamlyn copy holding a single
+    # rectified sequence) cannot support sequence-level statistics. Use contiguous blocks of
+    # frames as the unit instead: temporal correlation inside a block is absorbed by averaging,
+    # and every method gets the same partition, so the paired tests stay aligned.
+    min_seq, block = sc.get("min_sequences", 3), sc.get("block_frames", 100)
+    seqs_per_ds = collections.defaultdict(set)
+    for r in rows:
+        seqs_per_ds[r["dataset"]].add(r["sequence"])
+    units = {}
+
+    def _frame_key(x):
+        try:
+            return (0, int(x), "")
+        except (TypeError, ValueError):
+            return (1, 0, str(x))
+
+    for ds, seqs in sorted(seqs_per_ds.items()):
+        if len(seqs) >= min_seq:
+            continue
+        frames = collections.defaultdict(set)
+        for r in rows:
+            if r["dataset"] == ds:
+                frames[r["sequence"]].add(r["frame"])
+        block_of = {}
+        for s, fs in frames.items():
+            for j, f in enumerate(sorted(fs, key=_frame_key)):
+                block_of[(s, f)] = "{}#{:04d}".format(s, j // block)
+        for r in rows:
+            if r["dataset"] == ds:
+                r["sequence"] = block_of[(r["sequence"], r["frame"])]
+        units[ds] = {"sequences": len(frames), "blocks": len(set(block_of.values())), "block_frames": block}
+        print("[stats] {}: only {} sequence(s) available; using {} blocks of {} frames as the unit".format(
+            ds, len(frames), units[ds]["blocks"], block))
+    with open(out_path(cfg, "stats_units.json"), "w", encoding="utf-8") as f:
+        json.dump(units, f, indent=2)
     rng = np.random.default_rng(0)
     # 1) frame -> (method, seed, dataset, sequence); 2) -> (method, dataset, sequence) over seeds
     per_seed_seq = group_mean(rows, ["method", "seed", "dataset", "sequence"], METRICS)
@@ -1738,13 +1775,23 @@ def stage_report(cfg, args):
     summary = read_csv(out_path(cfg, "summary.csv"))
     paired = read_csv(out_path(cfg, "paired.csv"))
     per_seq = read_csv(out_path(cfg, "per_sequence.csv"))
+    units = {}
+    if os.path.exists(out_path(cfg, "stats_units.json")):
+        with open(out_path(cfg, "stats_units.json"), encoding="utf-8") as f:
+            units = json.load(f)
     if summary:
         md += ["## Sequence-level results (mean ± SD over sequences; bootstrap 95% CI of the mean)", ""]
         for d in sorted({r["dataset"] for r in summary}):
             rows = [r for r in summary if r["dataset"] == d]
             order = _method_order(cfg, [r["method"] for r in rows])
             by = {r["method"]: r for r in rows}
-            md += ["### {} (n = {} sequences)".format(d, rows[0]["n_seq"]), ""]
+            u = units.get(d)
+            if u:
+                md += ["### {} (n = {} blocks of {} frames; this copy of the dataset holds only {} "
+                       "sequence(s), so blocks are the unit of analysis and the intervals are "
+                       "slightly optimistic)".format(d, rows[0]["n_seq"], u["block_frames"], u["sequences"]), ""]
+            else:
+                md += ["### {} (n = {} sequences)".format(d, rows[0]["n_seq"]), ""]
             md.append(_md_table(["method", "seeds"] + METRICS, [
                 [m, by[m]["n_seeds"]] + ["{} ± {} [{}, {}]".format(fmt(float(by[m][k])), fmt(float(by[m][k + "_sd"])), fmt(float(by[m][k + "_blo"])), fmt(float(by[m][k + "_bhi"]))) for k in METRICS]
                 for m in order]))
