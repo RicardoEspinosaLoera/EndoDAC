@@ -63,6 +63,9 @@ da3:                            # zero-shot rows (stage da3)
 illum:
   runs: [E8]                    # trained runs analysed by illum-params / illum-sens
   seed: 314
+  fit_depth_run: E3             # illum-fit: run whose depth replaces the ground truth when this
+                                # SCARED copy has no per-frame scene_points (E3 = baseline, the
+                                # least favourable choice for the proposed calibration)
   sequences: [sequence1, sequence2]
   patch_sizes: [64, 32, 16, 8]
   alpha: 0.10                   # LightingDecoder bounds

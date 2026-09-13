@@ -88,7 +88,7 @@ DEFAULT_CONFIG = {
     "save_pred": True,
     "methods": {},
     "da3": {"models": ["da3-base", "depth-anything/da3mono-large"], "affine_rows": True},
-    "illum": {"runs": ["E8"], "seed": 314, "sequences": ["sequence1", "sequence2"],
+    "illum": {"runs": ["E8"], "seed": 314, "fit_depth_run": "E3", "sequences": ["sequence1", "sequence2"],
               "patch_sizes": [64, 32, 16, 8], "alpha": 0.10, "beta": 0.05, "ridge": 0.01,
               "sens_stride": 5, "gains": [0.8, 0.9, 1.0, 1.1, 1.2],
               "biases": [-0.05, -0.025, 0.0, 0.025, 0.05]},
@@ -949,20 +949,95 @@ def sequence_pairs(cfg, seq):
     return lines, pairs, gt_T
 
 
+def scared_file(data_path, folder, *parts):
+    """Path of a SCARED file under <folder>/data/<parts>, whichever layout the copy uses.
+
+    The repo is inconsistent: the image loader expects <data>/<folder>/data/..., while the
+    depth and pose loaders expect <data>/<train|test>/<folder>/data/... . Try both.
+    """
+    split = "train" if int(folder[7]) < 8 else "test"
+    candidates = [os.path.join(data_path, split, folder, "data", *parts),
+                  os.path.join(data_path, folder, "data", *parts)]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    raise IOError("SCARED file not found, tried:\n  " + "\n  ".join(candidates))
+
+
+def scared_depth(data_path, folder, frame_index):
+    """Ground-truth depth of one SCARED frame, read as export_gt_depth.py does."""
+    import cv2
+    path = scared_file(data_path, folder, "scene_points",
+                       "scene_points{:06d}.tiff".format(frame_index - 1))
+    depth = cv2.imread(path, 3)
+    if depth is None:
+        raise IOError("cannot read {}".format(path))
+    return depth[:, :, 0][0:1024, :].astype(np.float32)
+
+
 def gt_relative_pose(data_path, folder, frame):
     """T = P(frame+1) @ pinv(P(frame)) from SCARED frame_data json (export_gt_pose.py)."""
-    sequence = folder[7]
-    split = "train" if int(sequence) < 8 else "test"
     poses = []
     for idx in (frame - 1, frame):
-        with open(os.path.join(data_path, split, folder, "data", "frame_data", "frame_data{:06d}.json".format(idx))) as f:
+        with open(scared_file(data_path, folder, "frame_data", "frame_data{:06d}.json".format(idx))) as f:
             poses.append(np.array(json.load(f)["camera-pose"]))
     return (poses[1] @ np.linalg.pinv(poses[0])).astype(np.float32)
 
 
 # --------------------------------------------------------------------------------------
-# stage: illum-fit (model free)
+# stage: illum-fit
 # --------------------------------------------------------------------------------------
+
+def gt_depth_index():
+    """(folder, frame) -> row of the exported splits/endovis/gt_depths.npz."""
+    gts = np.load(os.path.join(SPLITS, "gt_depths.npz"), fix_imports=True, encoding="latin1")["data"]
+    index = {}
+    for k, line in enumerate(readlines(os.path.join(SPLITS, "test_files.txt"))):
+        folder, frame = line.split()[:2]
+        index[(folder, int(frame))] = k
+    return gts, index
+
+
+def model_depth_source(cfg, ds, lines, device, run, seed):
+    """Depth from a trained run, rescaled to the units of the exported ground truth.
+
+    Used when this copy of SCARED ships only the images (no per-frame scene_points): the warp
+    needs depth in the same units as the ground-truth poses, so the run's scale-ambiguous depth
+    is multiplied by the median ground-truth/prediction ratio over the frames of this sequence
+    that do appear in gt_depths.npz. Returns (depth_of, scale).
+    """
+    import cv2
+    from utils.layers import disp_to_depth
+    model, _, _ = load_depth_model_from_run(cfg, run, seed, device)
+
+    def depth_of(x):
+        with torch.no_grad():
+            out = model(x.to(device))
+        disp = F.interpolate(out[("disp", 0)], size=x.shape[-2:], mode="bilinear", align_corners=True)
+        return disp_to_depth(disp, *DEPTH_RANGE)[1]
+
+    gts, index = gt_depth_index()
+    ratios = []
+    for i, line in enumerate(lines):
+        folder, frame = line.split()[:2]
+        key = (folder, int(frame))
+        if key not in index:
+            continue
+        gt = np.asarray(gts[index[key]], dtype=np.float32)
+        if gt.ndim == 3:
+            gt = gt[:, :, 0]
+        d = depth_of(ds[i][("color", 0, 0)][None])[0, 0].cpu().numpy()
+        d = cv2.resize(d, (gt.shape[1], gt.shape[0]))
+        m = np.logical_and(gt > MIN_DEPTH, gt < MAX_DEPTH["scared"])
+        if m.sum():
+            ratios.append(float(np.median(gt[m]) / np.median(d[m])))
+    if not ratios:
+        raise IOError("no frame of this sequence appears in gt_depths.npz, cannot scale the model depth")
+    scale = float(np.median(ratios))
+    print("[illum-fit] depth from run {} seed {}: scale {:.2f} estimated on {} frames with exported "
+          "ground truth (relative spread {:.1%})".format(run, seed, scale, len(ratios), float(np.std(ratios)) / scale))
+    return depth_of, scale
+
 
 def stage_illum_fit(cfg, args):
     import cv2
@@ -981,6 +1056,19 @@ def stage_illum_fit(cfg, args):
         ds = SCAREDRAWDataset(cfg["data"]["scared"], lines, H, W, [0, 1], 4, is_train=False)
         rows, convention = [], None
 
+        # per-frame ground-truth depth when this SCARED copy has it, otherwise the depth of a
+        # trained run scaled to the exported ground truth
+        folder0, frame0 = lines[0].split()[:2]
+        try:
+            scared_depth(cfg["data"]["scared"], folder0, int(frame0))
+            depth_of, depth_scale, depth_source = None, 1.0, "gt"
+        except (IOError, OSError) as e:
+            run = ic.get("fit_depth_run", "E3")
+            print("[illum-fit] {}: no per-frame ground-truth depth on disk ({})".format(
+                seq, str(e).splitlines()[0]))
+            depth_of, depth_scale = model_depth_source(cfg, ds, lines, device, run, ic["seed"])
+            depth_source = "model:{}_s{}".format(run, ic["seed"])
+
         def load_pair(i):
             folder, frame, side = lines[i].split()
             frame = int(frame)
@@ -988,11 +1076,15 @@ def stage_illum_fit(cfg, args):
             I_t = item[("color", 0, 0)][None].to(device)
             I_s = item[("color", 1, 0)][None].to(device)
             K, inv_K = item[("K", 0)][None].to(device), item[("inv_K", 0)][None].to(device)
-            d_t = cv2.resize(ds.get_depth(folder, frame, side, False).astype(np.float32), (W, H), interpolation=cv2.INTER_NEAREST)
-            d_s = cv2.resize(ds.get_depth(folder, frame + 1, side, False).astype(np.float32), (W, H), interpolation=cv2.INTER_NEAREST)
-            d_t = torch.from_numpy(d_t)[None, None].to(device)
-            d_s = torch.from_numpy(d_s)[None, None].to(device)
-            d_t = d_t * ((d_t > MIN_DEPTH) & (d_t < MAX_DEPTH["scared"])).to(d_t.dtype)
+            if depth_of is None:
+                d_t = cv2.resize(scared_depth(cfg["data"]["scared"], folder, frame), (W, H), interpolation=cv2.INTER_NEAREST)
+                d_s = cv2.resize(scared_depth(cfg["data"]["scared"], folder, frame + 1), (W, H), interpolation=cv2.INTER_NEAREST)
+                d_t = torch.from_numpy(d_t)[None, None].to(device)
+                d_s = torch.from_numpy(d_s)[None, None].to(device)
+                d_t = d_t * ((d_t > MIN_DEPTH) & (d_t < MAX_DEPTH["scared"])).to(d_t.dtype)
+            else:
+                d_t = depth_of(I_t) * depth_scale
+                d_s = depth_of(I_s) * depth_scale
             T = gt_T[i] if gt_T is not None else gt_relative_pose(cfg["data"]["scared"], folder, frame)
             T = torch.from_numpy(np.asarray(T, dtype=np.float32))[None].to(device)
             return folder, frame, I_t, I_s, K, inv_K, d_t, d_s, T
@@ -1000,8 +1092,19 @@ def stage_illum_fit(cfg, args):
         # the pose json convention is checked empirically on the first pairs: the direction
         # whose GT warp has the lower photometric residual is used for the whole sequence
         scores = {"direct": 0.0, "inverse": 0.0}
-        for i in pairs[:20]:
-            _, _, I_t, I_s, K, inv_K, d_t, d_s, T = load_pair(i)
+        probe, errors = [], []
+        for i in pairs:
+            try:
+                probe.append(load_pair(i))
+            except (IOError, OSError) as e:
+                errors.append(str(e))
+                continue
+            if len(probe) >= 20:
+                break
+        if not probe:
+            raise IOError("no usable frame of {}: ground-truth depth or pose files are missing.\n{}".format(
+                seq, errors[0] if errors else ""))
+        for _, _, I_t, I_s, K, inv_K, d_t, d_s, T in probe:
             for name, Tx in (("direct", T), ("inverse", torch.inverse(T))):
                 wpd, v, _ = warper.warp(I_s, d_t, K, inv_K, Tx, d_s)
                 scores[name] += masked_l1(wpd, I_t, v).item()
@@ -1009,21 +1112,31 @@ def stage_illum_fit(cfg, args):
         print("[illum-fit] {}: pose convention '{}' (residuals {})".format(seq, convention, scores))
 
         t0 = time.time()
+        n_missing = 0
         for n, i in enumerate(pairs):
-            folder, frame, I_t, I_s, K, inv_K, d_t, d_s, T = load_pair(i)
+            try:
+                folder, frame, I_t, I_s, K, inv_K, d_t, d_s, T = load_pair(i)
+            except (IOError, OSError):   # frame without ground-truth depth / pose on disk
+                n_missing += 1
+                continue
             if convention == "inverse":
                 T = torch.inverse(T)
             wpd, v, occl = warper.warp(I_s, d_t, K, inv_K, T, d_s)
             with torch.no_grad():
                 res = affine_residuals(wpd, I_t, v, ic["patch_sizes"], ic["alpha"], ic["beta"], ic["ridge"], ssim)
             res.update({"sequence": folder, "frame": frame, "r_identity": masked_l1(I_s, I_t, v).item(),
-                        "zbuffer_pass": float(occl), "convention": convention})
+                        "zbuffer_pass": float(occl), "convention": convention, "depth_source": depth_source})
             rows.append(res)
             if n % 100 == 0:
                 print("[illum-fit] {} {}/{}  none={:.4f} global={:.4f} local16={:.4f} bounded16={:.4f} ({:.0f}s)".format(
                     seq, n, len(pairs), res["r_none"], res["r_global"], res["r_local16"], res["r_bounded16"], time.time() - t0))
-        fields = ["sequence", "frame", "convention", "valid_frac", "zbuffer_pass", "r_identity"] + \
-                 sorted(k for k in rows[0] if k not in ("sequence", "frame", "convention", "valid_frac", "zbuffer_pass", "r_identity"))
+        if not rows:
+            raise IOError("no pair of {} could be evaluated ({} skipped for missing files)".format(seq, n_missing))
+        if n_missing:
+            print("[illum-fit] {}: {} of {} pairs skipped, their files are not on disk".format(
+                seq, n_missing, len(pairs)))
+        fixed = ("sequence", "frame", "convention", "depth_source", "valid_frac", "zbuffer_pass", "r_identity")
+        fields = list(fixed) + sorted(k for k in rows[0] if k not in fixed)
         write_csv(path, rows, fields)
         print("[illum-fit] wrote {} ({} pairs)".format(path, len(rows)))
 
@@ -1659,7 +1772,12 @@ def stage_report(cfg, args):
     fits = {seq: read_csv(out_path(cfg, "illum", "fit_{}.csv".format(seq))) for seq in ic["sequences"]}
     fits = {k: v for k, v in fits.items() if v}
     if fits:
-        md += ["## Model-free illumination test (GT geometry, cross-validated L1 residual)", "",
+        sources = sorted({r.get("depth_source", "gt") for fr in fits.values() for r in fr})
+        geometry = ("ground-truth depth and pose" if sources == ["gt"] else
+                    "ground-truth pose with depth from {} (this SCARED copy has no per-frame depth; "
+                    "depth error is therefore part of the residual and slightly favours the local model)".format(
+                        ", ".join(s.split(":")[-1] for s in sources)))
+        md += ["## Illumination model test (cross-validated L1 residual, geometry from {})".format(geometry), "",
                "Explained fraction = 1 - r_model / r_none. Bounded = clipped to the decoder's ranges and blurred.", ""]
         models = ["global"] + ["local{}".format(P) for P in ic["patch_sizes"]] + ["bounded{}".format(P) for P in ic["patch_sizes"]]
         rows = []
