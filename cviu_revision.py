@@ -9,6 +9,7 @@ Stages (each is idempotent: finished work is skipped unless --force is given):
   illum-fit     model-free test of the affine illumination model on ground-truth geometry (SCARED)
   illum-params  statistics of the learned (c, b) calibration maps of a trained run
   illum-sens    response of the calibration to synthetic gain/bias, and depth robustness to it
+  illum-grad    how much gradient each loss term gives to the illumination calibration
   da3           zero-shot Depth Anything 3 rows
   stats         sequence-level aggregation, bootstrap CIs, paired tests, LaTeX tables
   report        markdown report and figures
@@ -1294,6 +1295,128 @@ def stage_illum_params(cfg, args):
                      c_edges=c_edges, b_edges=b_edges, alpha=alpha, beta=beta)
 
 
+def illum_loss_terms(refined, target, mask, iif_mask, iif_weight, iif_eps, ssim_map_fn, alpha=0.85):
+    """The loss terms that see the illumination-calibrated warp, as scalars.
+
+    Same formulas as Trainer.compute_losses: alpha*SSIM + (1-alpha)*L1 averaged over the
+    automask-valid non-specular pixels, plus the illumination-invariant term on the eroded mask.
+    """
+    from utils.layers import get_illumination_invariant_features, get_illumination_invariant_l2
+    denom = mask.sum() + 1e-6
+    terms = {"ssim": alpha * (ssim_map_fn(refined, target) * mask).sum() / denom,
+             "l1": (1.0 - alpha) * ((refined - target).abs().mean(1, True) * mask).sum() / denom}
+    ft = get_illumination_invariant_features(target, eps=iif_eps)
+    fp = get_illumination_invariant_features(refined, eps=iif_eps)
+    d = get_illumination_invariant_l2(fp, ft)
+    terms["iif"] = iif_weight * (d * iif_mask).sum() / (iif_mask.sum() + 1e-6)
+    return terms
+
+
+def stage_illum_grad(cfg, args):
+    """How much gradient each loss term gives to the illumination calibration.
+
+    The illumination-invariant descriptors are invariant to I -> c*I + b by construction, so that
+    term cannot constrain (c, b); SSIM is largely insensitive to them as well. If almost all the
+    gradient comes from the 0.15-weighted L1 inside the highlight mask, the calibration module is
+    under-determined by the objective, which would explain why it does not track injected
+    illumination changes (stage illum-sens).
+    """
+    from torch.utils.data import DataLoader
+    from datasets.scared_dataset import SCAREDRAWDataset
+    from utils.layers import SSIM, disp_to_depth, get_feature_oclution_mask, transformation_from_parameters
+    device = device_of(args)
+    ic = cfg["illum"]
+    warper, ssim = Warper(device), SSIM().to(device)
+    try:
+        import kornia
+        def ssim_map_fn(a, b):
+            return kornia.losses.ssim_loss(a, b, window_size=7, reduction="none").mean(1, True)
+        ssim_kind = "kornia window 7 (as in training)"
+    except ImportError:
+        ssim_map_fn = lambda a, b: ssim(a, b).mean(1, True)
+        ssim_kind = "repo SSIM window 3 (kornia not installed)"
+
+    rows = []
+    for run in (args.only or ic["runs"]):
+        seed = ic["seed"]
+        models = load_run_models(cfg, run, seed, device)
+        if "lighting" not in models:
+            print("[illum-grad] {} has no illumination decoder, skipped".format(run))
+            continue
+        opt = models["_opt"]
+        params = [p for p in models["lighting"].parameters()]
+        lines = readlines(os.path.join(SPLITS, "test_files.txt"))
+        ds = SCAREDRAWDataset(cfg["data"]["scared"], lines, H, W, [0, -1, 1], 4, is_train=False)
+        loader = DataLoader(ds, 4, shuffle=False, num_workers=cfg["num_workers"], drop_last=True)
+        for bi, batch in enumerate(loader):
+            if bi >= ic.get("grad_batches", 20):
+                break
+            target = batch[("color", 0, 0)].to(device)
+            tgt_aug = batch[("color_aug", 0, 0)].to(device)
+            for f in (-1, 1):
+                source = batch[("color", f, 0)].to(device)
+                src_aug = batch[("color_aug", f, 0)].to(device)
+                with torch.no_grad():                      # geometry is fixed: only (c, b) carry grad
+                    disp = F.interpolate(models["depth"](tgt_aug)[("disp", 0)], [H, W],
+                                         mode="bilinear", align_corners=True)
+                    depth = disp_to_depth(disp, *DEPTH_RANGE)[1]
+                    feats = models["pose_encoder"](torch.cat([src_aug, tgt_aug], 1))
+                    axisangle, translation, inter = models["pose"]([feats])
+                    if "intrinsics" in models:
+                        K = models["intrinsics"](inter, W, H)
+                    else:
+                        K = batch[("K", 0)].to(device)
+                    T = transformation_from_parameters(axisangle[:, 0], translation[:, 0])
+                    warped, valid, _ = warper.warp(source, depth, K, torch.inverse(K), T)
+                    automask = (photometric_map(ssim, warped, target) <
+                                photometric_map(ssim, source, target)).to(target.dtype) * valid
+                    non_spec = 1.0 - highlight_mask(target)
+                    mask = automask * non_spec
+                    iif_mask = get_feature_oclution_mask(mask)
+                out = models["lighting"](feats)
+                c = F.interpolate(out[("contrast", 0)], [H, W], mode="bilinear", align_corners=False)
+                b = F.interpolate(out[("brightness", 0)], [H, W], mode="bilinear", align_corners=False)
+                refined = c * warped + b
+                terms = illum_loss_terms(refined, target, mask, iif_mask,
+                                         opt.get("illumination_invariant", 0.1),
+                                         opt.get("iif_eps", 1e-4), ssim_map_fn)
+                row = {"run": run, "seed": seed, "batch": bi, "source": f}
+                # is the calibration input-dependent at all? compare how much the maps change
+                # across the images of the batch with how much they vary inside one image
+                row["c_across_inputs"] = float(c.mean((1, 2, 3)).std()) if c.shape[0] > 1 else float("nan")
+                row["b_across_inputs"] = float(b.mean((1, 2, 3)).std()) if b.shape[0] > 1 else float("nan")
+                row["c_within_image"] = float(c.flatten(1).std(1).mean())
+                row["b_within_image"] = float(b.flatten(1).std(1).mean())
+                for name, term in terms.items():
+                    gc, gb = torch.autograd.grad(term, [c, b], retain_graph=True, allow_unused=True)
+                    gp = torch.autograd.grad(term, params, retain_graph=True, allow_unused=True)
+                    row[name + "_value"] = float(term)
+                    row[name + "_grad_c"] = float(gc.abs().mean()) if gc is not None else 0.0
+                    row[name + "_grad_b"] = float(gb.abs().mean()) if gb is not None else 0.0
+                    row[name + "_grad_params"] = float(torch.sqrt(sum((x ** 2).sum() for x in gp if x is not None))) \
+                        if any(x is not None for x in gp) else 0.0
+                rows.append(row)
+        del models
+    if not rows:
+        print("[illum-grad] nothing to measure")
+        return
+    fields = ["run", "seed", "batch", "source"] + sorted(k for k in rows[0] if k not in ("run", "seed", "batch", "source"))
+    write_csv(out_path(cfg, "illum", "grad.csv"), rows, fields)
+    print("[illum-grad] SSIM: {}".format(ssim_kind))
+    print("[illum-grad] mean |gradient| delivered to the calibration maps, per loss term:")
+    print("    {:<6} {:>12} {:>14} {:>14} {:>16}".format("term", "value", "d/dc", "d/db", "d/dparams"))
+    for name in ("ssim", "l1", "iif"):
+        print("    {:<6} {:>12.6f} {:>14.3e} {:>14.3e} {:>16.3e}".format(
+            name, float(np.mean([r[name + "_value"] for r in rows])),
+            float(np.mean([r[name + "_grad_c"] for r in rows])),
+            float(np.mean([r[name + "_grad_b"] for r in rows])),
+            float(np.mean([r[name + "_grad_params"] for r in rows]))))
+    tot = sum(float(np.mean([r[n + "_grad_params"] for r in rows])) for n in ("ssim", "l1", "iif")) + 1e-12
+    print("    share of the gradient reaching the decoder: " + ", ".join(
+        "{} {:.1%}".format(n, float(np.mean([r[n + "_grad_params"] for r in rows])) / tot) for n in ("ssim", "l1", "iif")))
+    print("[illum-grad] wrote {}".format(out_path(cfg, "illum", "grad.csv")))
+
+
 def stage_illum_sens(cfg, args):
     from torch.utils.data import DataLoader
     from datasets.scared_dataset import SCAREDRAWDataset
@@ -1929,7 +2052,8 @@ def stage_report(cfg, args):
 # --------------------------------------------------------------------------------------
 
 STAGES = {"train": stage_train, "predict": stage_predict, "illum-fit": stage_illum_fit,
-          "illum-params": stage_illum_params, "illum-sens": stage_illum_sens, "da3": stage_da3,
+          "illum-params": stage_illum_params, "illum-sens": stage_illum_sens,
+          "illum-grad": stage_illum_grad, "da3": stage_da3,
           "stats": stage_stats, "report": stage_report}
 ALL_ORDER = ["predict", "illum-fit", "illum-params", "illum-sens", "da3", "stats", "report"]
 
