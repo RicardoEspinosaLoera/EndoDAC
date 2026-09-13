@@ -220,7 +220,7 @@ def readlines(path):
 def read_csv(path):
     if not os.path.exists(path):
         return []
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -228,7 +228,7 @@ def append_rows(path, rows, fieldnames):
     if not rows:
         return
     new = not os.path.exists(path)
-    with open(path, "a", newline="") as f:
+    with open(path, "a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         if new:
             w.writeheader()
@@ -236,7 +236,7 @@ def append_rows(path, rows, fieldnames):
 
 
 def write_csv(path, rows, fieldnames):
-    with open(path, "w", newline="") as f:
+    with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
@@ -1647,11 +1647,12 @@ def write_tables(cfg, summary, paired, per_seq):
                 cells.append("\\textbf{" + s + "}" if best[k] == m else s)
             lines.append("{} & {} \\\\".format(m.replace("_", "\\_"), " & ".join(cells)))
         lines += ["\\bottomrule", "\\end{tabular}"]
-        with open(os.path.join(tdir, "main_{}.tex".format(d)), "w") as f:
+        with open(os.path.join(tdir, "main_{}.tex".format(d)), "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         # paired table
         pm = sc["paired_metrics"]
-        lines = ["% paired differences (method $-$ {}) over sequences; negative = proposed better; bootstrap 95\\% CI; Holm-adjusted exact Wilcoxon".format(cfg["proposed"]),
+        lines = ["% paired differences (method $-$ {0}) per sequence, signed so that positive favours {0}; "
+                 "wins = sequences where that method beats {0}; bootstrap 95\\% CI; Holm-adjusted exact Wilcoxon".format(cfg["proposed"]),
                  "\\begin{tabular}{l" + "c" * len(pm) + "}", "\\toprule",
                  "Method & " + " & ".join("$\\Delta$" + k.replace("_", "\\_") + " [CI], $p_W$" for k in pm) + " \\\\", "\\midrule"]
         for m in methods:
@@ -1667,7 +1668,7 @@ def write_tables(cfg, summary, paired, per_seq):
                                                                   fmt(r.get("p_wilcoxon_holm"), 3), r["wins"], r["n"]))
             lines.append("{} & {} \\\\".format(m.replace("_", "\\_"), " & ".join(cells)))
         lines += ["\\bottomrule", "\\end{tabular}"]
-        with open(os.path.join(tdir, "paired_{}.tex".format(d)), "w") as f:
+        with open(os.path.join(tdir, "paired_{}.tex".format(d)), "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         # supplementary per-sequence abs_rel
         seqs = sorted({r["sequence"] for r in per_seq if r["dataset"] == d})
@@ -1677,7 +1678,7 @@ def write_tables(cfg, summary, paired, per_seq):
         for m in methods:
             lines.append("{} & {} \\\\".format(m.replace("_", "\\_"), " & ".join(fmt(ps.get((m, s))) for s in seqs)))
         lines += ["\\bottomrule", "\\end{tabular}"]
-        with open(os.path.join(tdir, "per_sequence_{}.tex".format(d)), "w") as f:
+        with open(os.path.join(tdir, "per_sequence_{}.tex".format(d)), "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     # ablation and calibration tables (SCARED full metrics + Abs Rel on the other sets)
     runs = all_runs(cfg)
@@ -1694,7 +1695,7 @@ def write_tables(cfg, summary, paired, per_seq):
             cells += [fmt(by[(run, d)]["abs_rel"]) if (run, d) in by else "--" for d in others]
             lines.append("{} & {} & {} \\\\".format(run, desc, " & ".join(cells)))
         lines += ["\\bottomrule", "\\end{tabular}"]
-        with open(os.path.join(tdir, fname), "w") as f:
+        with open(os.path.join(tdir, fname), "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
 
 
@@ -1750,7 +1751,8 @@ def stage_report(cfg, args):
             md.append("")
             pr = [r for r in paired if r["dataset"] == d and r["metric"] in cfg["stats"]["paired_metrics"]]
             if pr:
-                md += ["Paired vs {} (negative = proposed better): mean diff [bootstrap CI], Wilcoxon p (Holm), wins/n".format(cfg["proposed"]), ""]
+                md += ["Paired vs {0}: difference is method $-$ {0} per sequence, signed so that **positive means "
+                       "{0} is better**, and wins counts the sequences where that method beats {0}.".format(cfg["proposed"]), ""]
                 md.append(_md_table(["method", "metric", "diff [CI]", "p_t", "p_W (Holm)", "p_sign", "wins/n", "d_z"], [
                     [r["method"], r["metric"], "{} [{}, {}]".format(fmt(float(r["mean_diff"])), fmt(float(r["diff_blo"])), fmt(float(r["diff_bhi"]))),
                      fmt(float(r["p_t"])), fmt(float(r["p_wilcoxon_holm"])), fmt(float(r["p_sign"])), "{}/{}".format(r["wins"], r["n"]), fmt(float(r["dz"]), 2)]
@@ -1870,7 +1872,7 @@ def stage_report(cfg, args):
         md.append(_md_table(["run", "slope c vs 1/gain", "slope b vs -bias", "Abs Rel clean", "Abs Rel worst perturbation"], rows))
         md += ["", "Slopes near 1 mean the calibration head tracks the injected illumination change.", ""]
 
-    with open(out_path(cfg, "report.md"), "w") as f:
+    with open(out_path(cfg, "report.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(md) + "\n")
     print("[report] wrote {}".format(out_path(cfg, "report.md")))
 
