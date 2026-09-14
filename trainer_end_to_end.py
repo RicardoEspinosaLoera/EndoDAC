@@ -690,6 +690,7 @@ class Trainer:
             loss = 0
             loss_reprojection = 0
             loss_ilumination_invariant = 0
+            loss_calib = 0
             iif_coverage = 0
 
             if self.opt.v1_multiscale:
@@ -731,10 +732,25 @@ class Trainer:
                     iif_mask = get_feature_oclution_mask(reprojection_loss_mask * highlight_mask)
                     iif_coverage += iif_mask.mean().detach()
                     loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred, features_t=features_t) * iif_mask).sum() / (iif_mask.sum() + 1e-6)
+
+                if self.opt.calib_supervision > 0 and "lighting" in self.models:
+                    # supervise the calibration with the affine pair that best explains the warp:
+                    # SSIM and L1 constrain (c, b) too weakly for it to track illumination
+                    light = self.models["lighting"]
+                    loss_calib += calibration_supervision_loss(
+                        outputs[("ch", scale, frame_id)], outputs[("bh", scale, frame_id)],
+                        outputs[("color", frame_id, scale)], target,
+                        reprojection_loss_mask * highlight_mask,
+                        patch=self.opt.calib_patch,
+                        alpha=getattr(light, "alpha", 0.10), beta=getattr(light, "beta", 0.05),
+                        blur=getattr(light, "_gaussian_blur_depthwise", None))
  
             
             loss += loss_reprojection / 2.0
             loss += self.opt.illumination_invariant * loss_ilumination_invariant / 2.0
+            if self.opt.calib_supervision > 0:
+                loss += self.opt.calib_supervision * loss_calib / 2.0
+                losses["loss_calib/{}".format(scale)] = loss_calib / 2.0
             losses["iif_mask_coverage/{}".format(scale)] = iif_coverage / (len(self.opt.frame_ids) - 1)
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)

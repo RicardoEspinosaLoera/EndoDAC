@@ -319,6 +319,16 @@ class MonodepthOptions:
                                  help="train the whole DPT head instead of only the conv_depth heads "
                                       "(always on with --backbone_weights none, whose DA v1 neck does not "
                                       "match a random encoder)")
+        self.parser.add_argument("--calib_supervision",
+                                 type=float,
+                                 default=0.0,
+                                 help="weight of the loss that pushes the predicted illumination "
+                                      "calibration towards its per-patch least-squares fit; 0 disables it "
+                                      "(the photometric terms constrain c and b only weakly)")
+        self.parser.add_argument("--calib_patch",
+                                 type=int,
+                                 default=16,
+                                 help="patch size of that least-squares fit")
         self.parser.add_argument("--seed",
                                  type=int,
                                  help="random seed for training",

@@ -607,6 +607,68 @@ def get_illumination_invariant_l2(u_p, u_t, window=3):
     return d
 
 
+def _patch_sums(x, patch):
+    """Sum over channels and over each patch x patch cell; patch=None sums the whole image."""
+    if patch is None:
+        return x.sum((1, 2, 3), keepdim=True)
+    B, C, H, W = x.shape
+    assert H % patch == 0 and W % patch == 0, \
+        "image {}x{} is not divisible by the patch size {}".format(H, W, patch)
+    return x.reshape(B, C, H // patch, patch, W // patch, patch).sum((1, 3, 5)).unsqueeze(1)
+
+
+def fit_patch_affine(warped, target, weight, patch=16, ridge=0.01):
+    """Weighted least squares target ~ c * warped + b, solved independently per patch.
+
+    The ridge term lambda = ridge * (number of weighted pixels) pulls the solution toward the
+    identity (c = 1, b = 0), so patches without texture keep the identity instead of fitting
+    noise. patch=None fits one affine pair per image.
+
+    Args:
+        warped, target : (B,3,H,W)
+        weight         : (B,1,H,W), 0 where the pixel must not influence the fit
+    Returns:
+        c, b : (B,1,H,W), constant inside each patch
+    """
+    vw = weight * warped
+    n = _patch_sums(weight.expand_as(warped), patch)
+    Sw, St = _patch_sums(vw, patch), _patch_sums(weight * target, patch)
+    Sww, Swt = _patch_sums(vw * warped, patch), _patch_sums(vw * target, patch)
+    lam = ridge * n.clamp_min(1.0)
+    a11, a12, a22 = Sww + lam, Sw, n + lam
+    r1, r2 = Swt + lam, St
+    det = (a11 * a22 - a12 * a12).clamp_min(1e-12)
+    c = (r1 * a22 - a12 * r2) / det
+    b = (a11 * r2 - a12 * r1) / det
+    if patch is None:
+        return c.expand_as(weight), b.expand_as(weight)
+    return (c.repeat_interleave(patch, 2).repeat_interleave(patch, 3),
+            b.repeat_interleave(patch, 2).repeat_interleave(patch, 3))
+
+
+def calibration_supervision_loss(c_pred, b_pred, warped, target, mask, patch=16, ridge=0.01,
+                                 alpha=0.10, beta=0.05, blur=None):
+    """Distance between the predicted illumination calibration and its least-squares fit.
+
+    The photometric terms constrain (c, b) only weakly, so the calibration decoder can drift to a
+    near-constant map that does not track illumination. This term supervises it directly with the
+    affine pair that best explains the warped frame, restricted to what the decoder can express:
+    the fit is clipped to its bounds and, when `blur` is given, smoothed with its own kernel, so
+    the target is reachable. Errors are normalised by the bounds so contrast and brightness
+    contribute comparably. The fit is a constant target, never a path for gradients.
+
+    Returns a scalar averaged over the supervised pixels.
+    """
+    with torch.no_grad():
+        c_fit, b_fit = fit_patch_affine(warped, target, mask, patch=patch, ridge=ridge)
+        c_fit = c_fit.clamp(1.0 - alpha, 1.0 + alpha)
+        b_fit = b_fit.clamp(-beta, beta)
+        if blur is not None:
+            c_fit, b_fit = blur(c_fit), blur(b_fit)
+    d = (c_pred - c_fit).abs() / alpha + (b_pred - b_fit).abs() / beta
+    return (d * mask).sum() / (mask.sum() + 1e-6)
+
+
 def get_feature_oclution_mask(mask):
     """Erode a validity mask by the 3x3 support of the Robinson descriptor.
 

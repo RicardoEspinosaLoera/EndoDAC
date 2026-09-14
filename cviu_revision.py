@@ -129,6 +129,9 @@ GRID = {
            "flags": "--depth_backbone resnet18"},
     # C-grid: illumination model
     "C1": {"group": "C", "desc": "global affine calibration", "flags": "--illum_calib global"},
+    # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
+    "C2-sup": {"group": "C", "desc": "MonoIIF with the calibration supervised by the LS fit",
+               "flags": "--calib_supervision 0.05"},
     # D-grid: Depth Anything 3 encoder (its own DinoV2 with QK-norm/RoPE) under the same recipe
     "D3": {"group": "D", "desc": "MonoIIF with DA3-Base encoder", "flags": "--backbone_weights da3"},
     "D3-EndoDAC": {"group": "D", "desc": "EndoDAC recipe with DA3-Base encoder",
@@ -806,35 +809,14 @@ def gaussian_blur(x, k=11):
     return F.conv2d(F.pad(x, (pad, pad, pad, pad), mode="reflect"), k2, groups=x.shape[1])
 
 
-def _patch_sums(x, P):
-    """(B,C,H,W) -> (B,1,H/P,W/P) summed over channels and each PxP patch; P=None: whole image."""
-    if P is None:
-        return x.sum((1, 2, 3), keepdim=True)
-    B, C, Hh, Ww = x.shape
-    return x.reshape(B, C, Hh // P, P, Ww // P, P).sum((1, 3, 5)).unsqueeze(1)
-
-
 def fit_affine(w, t, v, P, ridge):
     """Weighted least-squares affine fit t ~ c*w + b, per PxP patch (P=None: per image).
 
-    w, t: (B,3,H,W) warped source and target; v: (B,1,H,W) weights (0/1 validity).
-    The ridge lambda = ridge * n pulls (c, b) toward (1, 0), so patches without texture
-    keep the identity instead of fitting noise. Returns c, b maps at pixel resolution.
+    Thin wrapper over utils.layers.fit_patch_affine, so this analysis and the training-time
+    supervision (--calib_supervision) solve exactly the same problem.
     """
-    vw = v * w
-    n = _patch_sums(v.expand_as(w), P)
-    Sw, St = _patch_sums(vw, P), _patch_sums(v * t, P)
-    Sww, Swt = _patch_sums(vw * w, P), _patch_sums(vw * t, P)
-    lam = ridge * n.clamp_min(1.0)
-    a11, a12, a22 = Sww + lam, Sw, n + lam
-    r1, r2 = Swt + lam, St
-    det = (a11 * a22 - a12 * a12).clamp_min(1e-12)
-    c = (r1 * a22 - a12 * r2) / det
-    b = (a11 * r2 - a12 * r1) / det
-    if P is None:
-        return c.expand_as(v), b.expand_as(v)
-    return (c.repeat_interleave(P, 2).repeat_interleave(P, 3),
-            b.repeat_interleave(P, 2).repeat_interleave(P, 3))
+    from utils.layers import fit_patch_affine
+    return fit_patch_affine(w, t, v, patch=P, ridge=ridge)
 
 
 def masked_l1(x, t, e):
