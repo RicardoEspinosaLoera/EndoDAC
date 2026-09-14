@@ -92,8 +92,11 @@ DEFAULT_CONFIG = {
     "da3": {"models": ["da3-base", "depth-anything/da3mono-large"], "affine_rows": True},
     "illum": {"runs": ["E8"], "seed": 314, "fit_depth_run": "E3", "sequences": ["sequence1", "sequence2"],
               "patch_sizes": [64, 32, 16, 8], "alpha": 0.10, "beta": 0.05, "ridge": 0.01,
-              "sens_stride": 5, "gains": [0.8, 0.9, 1.0, 1.1, 1.2],
-              "biases": [-0.05, -0.025, 0.0, 0.025, 0.05]},
+              # the perturbations must stay inside what the decoder can express (c in 1+-alpha,
+              # b in +-beta), otherwise the ideal response is unreachable and the fitted slope
+              # is flattened by clipping rather than by the module ignoring illumination
+              "sens_stride": 5, "gains": [0.95, 0.975, 1.0, 1.025, 1.05],
+              "biases": [-0.03, -0.015, 0.0, 0.015, 0.03]},
     "stats": {"n_boot": 10000, "alpha": 0.05, "paired_metrics": ["abs_rel", "sq_rel", "rmse", "a1"],
               "table_methods": None},
 }
@@ -1452,8 +1455,11 @@ def stage_illum_sens(cfg, args):
                         continue  # one factor at a time
                     o = run_pair(models, warper, ssim, target, (g * source + bias).clamp(0, 1), K_in, inv_K_in)
                     am = o["automask"]
+                    lt = models.get("lighting")
+                    alpha, beta = getattr(lt, "alpha", ic["alpha"]), getattr(lt, "beta", ic["beta"])
                     for j in range(target.shape[0]):
                         rows.append({"run": run, "seed": seed, "kind": "calib", "gain": g, "bias": bias,
+                                     "alpha": alpha, "beta": beta,
                                      "frame": int(data["frame_id"][j]),
                                      "c_mean": o["c"][j].mean().item(), "b_mean": o["b"][j].mean().item(),
                                      "res_before": ((o["warped"][j] - target[j]).abs().mean(0, True) * am[j]).sum().item() / (am[j].sum().item() + 1e-6),
@@ -1475,7 +1481,8 @@ def stage_illum_sens(cfg, args):
                        "sequence": tlines[i].split()[0], "frame": int(tlines[i].split()[1])}
                 row.update(m)
                 rows.append(row)
-        fields = ["run", "seed", "kind", "gain", "bias", "sequence", "frame", "c_mean", "b_mean", "res_before", "res_after"] + METRICS
+        fields = ["run", "seed", "kind", "gain", "bias", "alpha", "beta", "sequence", "frame",
+                  "c_mean", "b_mean", "res_before", "res_after"] + METRICS
         write_csv(path, rows, fields)
         print("[illum-sens] wrote {} ({} rows)".format(path, len(rows)))
 
@@ -2029,18 +2036,29 @@ def stage_report(cfg, args):
             fr = read_csv(p)
             name = os.path.basename(p)[5:-4]
             cal = [r for r in fr if r["kind"] == "calib"]
-            g_rows = [(float(r["gain"]), float(r["c_mean"])) for r in cal if float(r["bias"]) == 0.0]
-            b_rows = [(float(r["bias"]), float(r["b_mean"])) for r in cal if float(r["gain"]) == 1.0]
-            # the warp is c * (g * I + bias) + b: the calibration should respond with c ~ 1/g, b ~ -bias
+            # the warp is c * (g * I + bias) + b, so the ideal response is c = 1/g and b = -bias.
+            # Only perturbations the decoder can express (c in 1+-alpha, b in +-beta) are fitted:
+            # outside that range clipping flattens the slope whatever the module does.
+            alpha = float(cal[0].get("alpha", 0.10)) if cal else 0.10
+            beta = float(cal[0].get("beta", 0.05)) if cal else 0.05
+            g_all = [(float(r["gain"]), float(r["c_mean"])) for r in cal if float(r["bias"]) == 0.0]
+            b_all = [(float(r["bias"]), float(r["b_mean"])) for r in cal if float(r["gain"]) == 1.0]
+            g_rows = [(g, c) for g, c in g_all if abs(1.0 / g - 1.0) <= alpha + 1e-9]
+            b_rows = [(bb, bm) for bb, bm in b_all if abs(bb) <= beta + 1e-9]
+            dropped = "{}/{} gain and {}/{} bias settings outside the decoder's range".format(
+                len(g_all) - len(g_rows), len(g_all), len(b_all) - len(b_rows), len(b_all))
             sg = np.polyfit([1 / g for g, _ in g_rows], [c for _, c in g_rows], 1)[0] if len(set(g for g, _ in g_rows)) > 1 else float("nan")
             sb = np.polyfit([-b for b, _ in b_rows], [bm for _, bm in b_rows], 1)[0] if len(set(b for b, _ in b_rows)) > 1 else float("nan")
             dep = [r for r in fr if r["kind"] == "depth"]
             base = np.mean([float(r["abs_rel"]) for r in dep if float(r["gain"]) == 1.0 and float(r["bias"]) == 0.0]) if dep else float("nan")
             worst = max([np.mean([float(r["abs_rel"]) for r in dep if float(r["gain"]) == g and float(r["bias"]) == b])
                          for g, b in {(float(r["gain"]), float(r["bias"])) for r in dep}]) if dep else float("nan")
-            rows.append([name, fmt(sg, 3), fmt(sb, 3), fmt(base, 4), fmt(worst, 4)])
-        md.append(_md_table(["run", "slope c vs 1/gain", "slope b vs -bias", "Abs Rel clean", "Abs Rel worst perturbation"], rows))
-        md += ["", "Slopes near 1 mean the calibration head tracks the injected illumination change.", ""]
+            rows.append([name, fmt(sg, 3), fmt(sb, 3), fmt(base, 4), fmt(worst, 4), dropped])
+        md.append(_md_table(["run", "slope c vs 1/gain", "slope b vs -bias", "Abs Rel clean",
+                             "Abs Rel worst perturbation", "excluded"], rows))
+        md += ["", "Slopes near 1 mean the calibration head tracks the injected illumination change. "
+                   "Settings whose ideal response falls outside the decoder's bounds are excluded from "
+                   "the fit, since clipping would flatten the slope regardless of the module's behaviour.", ""]
 
     with open(out_path(cfg, "report.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(md) + "\n")
