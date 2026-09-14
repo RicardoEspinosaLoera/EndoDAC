@@ -1765,13 +1765,20 @@ def _groupby(rows, keys):
 
 
 def _method_order(cfg, methods):
+    """Row order of the tables: external methods, the ablation chain, then anything else.
+
+    Every method with results must appear: grid runs outside ABLATION_ORDER (C1, C2-sup, entries
+    added through the config) used to be dropped silently.
+    """
     order = cfg["stats"].get("table_methods")
     prop = cfg["proposed"]
     if order:
         return [m for m in order if m in methods]
-    runs = [m for m in ABLATION_ORDER if m in methods and m != prop]
-    ext = sorted(m for m in methods if m not in GRID and m != prop)
-    return ext + runs + ([prop] if prop in methods else [])
+    grid = set(all_runs(cfg))
+    known = [m for m in ABLATION_ORDER if m in methods and m != prop]
+    rest = sorted(m for m in methods if m in grid and m not in known and m != prop)
+    ext = sorted(m for m in methods if m not in grid and m != prop)
+    return ext + known + rest + ([prop] if prop in methods else [])
 
 
 def write_tables(cfg, summary, paired, per_seq):
