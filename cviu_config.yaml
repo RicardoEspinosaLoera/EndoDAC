@@ -17,7 +17,8 @@ train:
   common_flags: "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline"
   seeds: [314]                  # single-seed runs
   multi_seeds: [314, 1, 2]      # runs listed below get all three
-  multi_seed_runs: [E3, E8, C0, C1, R1, R2, D3]
+  # runs that carry a claim need three seeds; the launcher only trains the missing ones
+  multi_seed_runs: [E3, E8, C0, C1, R1, R2, D3, E8-DVLoRA, E8-IIF, C2-sup, C1-lora]
   checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
   runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
   skip_runs: []                 # grid entries not to train, e.g. [N0, D3-EndoDAC]

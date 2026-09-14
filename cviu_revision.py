@@ -80,7 +80,8 @@ DEFAULT_CONFIG = {
         "common_flags": "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline",
         "seeds": [314],
         "multi_seeds": [314, 1, 2],
-        "multi_seed_runs": ["E3", "E8", "C0", "C1", "R1", "R2", "D3"],
+        "multi_seed_runs": ["E3", "E8", "C0", "C1", "R1", "R2", "D3",
+                            "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -132,6 +133,9 @@ GRID = {
     # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
     "C2-sup": {"group": "C", "desc": "MonoIIF with the calibration supervised by the LS fit",
                "flags": "--calib_supervision 0.05"},
+    # the two settings that won their own comparison, combined
+    "C1-lora": {"group": "C", "desc": "global calibration + plain LoRA",
+                "flags": "--illum_calib global --lora_type lora"},
     # D-grid: Depth Anything 3 encoder (its own DinoV2 with QK-norm/RoPE) under the same recipe
     "D3": {"group": "D", "desc": "MonoIIF with DA3-Base encoder", "flags": "--backbone_weights da3"},
     "D3-EndoDAC": {"group": "D", "desc": "EndoDAC recipe with DA3-Base encoder",
@@ -139,8 +143,8 @@ GRID = {
     "N0": {"group": "D", "desc": "MonoIIF with a randomly initialised encoder (no foundation weights)",
            "flags": "--backbone_weights none"},
 }
-ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "E8-DVLoRA", "R1", "R2",
-                  "N0", "D3-EndoDAC", "D3"]
+ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
+                  "E8-DVLoRA", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3"]
 CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)")]
 
 
