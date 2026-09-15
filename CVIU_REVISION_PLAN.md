@@ -639,3 +639,49 @@ sensitivity slope moves from −0.006 towards 1, the module was starved of signa
 rewritten — the paper's claim would become "local calibration works once it is trained on
 coherent data", and the local-vs-global comparison would have to be re-run at 3 seeds. If the
 slope stays flat, §8e stands and is now defended against exactly this objection from a reviewer.
+
+---
+
+## 10. Paper vs code: discrepancies found on reading the submission (2026-09-15)
+
+The submitted PDF was read after the grid finished. Three of its settings do not match the code
+the grid was trained with, and one promised experiment does not exist.
+
+| Paper | Code / grid | Consequence |
+|---|---|---|
+| λ₁ = **0.5** for the II loss (§3.3, Table 2 sweeps {0.25…10}) | `--illumination_invariant` default **0.1** (options.py:266), used by every E/C/D/R run | **0.1 is below the whole range the paper tested.** No run of the 41 is the published method. §8d ("the IIF loss does not help") is measured at one fifth of the published weight and is **retracted**. |
+| Depth Anything **V2** encoder (abstract, §2.2.4, §3.3, §5, conclusion) | loads `depth_anything_vitb14.pth` (endodac.py:267), i.e. Depth Anything **v1** | Either the paper names the wrong backbone or the file on the server is a renamed V2 checkpoint. Must be checked: a reviewer verifies this against the released code. |
+| batch size **12**, encoder frozen the first **5 epochs** then DVLoRA + calibration fine-tuned 15 (§3.3) | `--batch_size 8`; freezing is governed by `--warm_up_step 20000`, which at batch 8 over 15 351 images is ≈10.4 epochs (≈15.6 at batch 12) | Neither matches 5 epochs. Check what `warm_up_step` actually does before quoting §3.3. |
+| §2.1.3: "a quantitative comparison under an identical training framework is given in Section 3.4" for Robinson-8 **vs Sobel, Scharr and Census** | no such experiment exists, and the three descriptors are not implemented | A promised comparison with no data behind it. Either implement the three descriptors (≈1 day of work plus 3-4 runs) or remove the sentence. |
+
+### 10a. M-grid: the published method
+
+| Run | Flags | What it is |
+|---|---|---|
+| M-local | `--photometric standard --illumination_invariant 0.5` | **MonoIIF as published**: local calibration + II at λ₁ = 0.5 |
+| M-none | `--illum_calib none --photometric standard --illumination_invariant 0.5` | II only, no calibration |
+| M-global | `--illum_calib global --photometric standard --illumination_invariant 0.5` | global calibration + II, to re-test §8a at the published λ₁ |
+
+Three seeds each; `E3` (PML only) and `E4` (calibration only, λ₁ = 0) are the remaining arms of the
+Table-3 ablation the paper asks for and already have, or will have, three seeds. `E5` and `E7` stay
+single-seed: at λ₁ = 0.1 they are λ-sensitivity points, not the method. `C1-std` was dropped in
+favour of `M-global`.
+
+Everything measured at λ₁ = 0.1 remains valid **as a comparison between its own arms** (both sides
+share λ₁), so §8a's calibration result, §8c's backbone attribution and §8g's cross-dataset table
+still stand as statements about that configuration. What none of them can be called is "the
+method".
+
+### 10b. Paper TODOs the existing results already answer
+
+- §3.1 test counts: SCARED 551 frames / **7** keyframe sequences; Hamlyn 5 737 usable frames /
+  **1** sequence (analysed as 58 blocks of 100 frames); C3VD 1 757 frames / **7** scenes.
+- §3.3 seed policy: 3 seeds (314, 1, 2) for every claim-bearing run, seed SD reported separately
+  from the sequence-level CI (0.0008-0.0029 Abs Rel on SCARED).
+- §2.2.4 / §3.3 parameter counts: ViT-B/14 encoder, **8 961 540** trainable parameters.
+- Table 4 / §4.1.1 / §4.1.2 per-sequence statistics, bootstrap CIs and paired tests: `paired.csv`,
+  `per_sequence.csv`, `tables/paired_*.tex`. Still missing the external checkpoints (HADepth,
+  EndoDAC, MonoPCC) — see the Status block.
+- §5 / §22 Depth Anything 3: zero-shot DA3-Base (0.0718 median / 0.0692 affine on SCARED) and
+  adapted D3 (0.0545) are measured; §6 of this plan has the text.
+- Discussion item (iv), the statistical caveat on few test sequences: §8b.

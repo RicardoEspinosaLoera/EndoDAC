@@ -80,9 +80,11 @@ DEFAULT_CONFIG = {
         "common_flags": "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline",
         "seeds": [314],
         "multi_seeds": [314, 1, 2],
-        # E4/E5/E7 describe the method itself (no HADepth highlight term) and carry its claim,
-        # so they need the three seeds too; they were single-seed until 2026-09-15
-        "multi_seed_runs": ["E3", "E4", "E5", "E7", "E8", "C0", "C1", "C1-std", "R1", "R2", "D3",
+        # The M-grid is the published method and carries its claim. E4 (calibration only, lambda1=0)
+        # is its ablation arm. E5/E7 stay single-seed: at lambda1=0.1 they are sensitivity points,
+        # not the method.
+        "multi_seed_runs": ["E3", "E4", "E8", "C0", "C1", "R1", "R2", "D3",
+                            "M-local", "M-none", "M-global",
                             "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora"],
         "checkpoint": "best",
         "runs": {},
@@ -135,11 +137,18 @@ GRID = {
     # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
     "C2-sup": {"group": "C", "desc": "MonoIIF with the calibration supervised by the LS fit",
                "flags": "--calib_supervision 0.05"},
-    # MonoIIF as defined by the authors is E7 (EndoDAC + IIF loss + local affine calibration, with
-    # monodepth2's photometric loss): the highlight-aware term of E8/C0/C1 is HADepth's, not part of
-    # the method. C1-std re-tests "global beats local" inside that definition.
-    "C1-std": {"group": "C", "desc": "global affine calibration, monodepth2 photometric loss",
-               "flags": "--illum_calib global --photometric standard"},
+    # M-grid: MonoIIF EXACTLY as published (CVIU submission, sections 2.2.5 and 3.3): EndoDAC's
+    # adapted backbone + the per-pixel affine calibration + the II loss at lambda1 = 0.5, with
+    # monodepth2's photometric loss. The highlight-aware term of E8/C0/C1 is HADepth's and is not
+    # part of the method, and every E/C/D/R run above used the repo default lambda1 = 0.1, which is
+    # BELOW the whole range the paper's Table 2 sweeps ({0.25 ... 10}, optimum 0.5). No run of that
+    # grid is therefore the published method; these are.
+    "M-local": {"group": "M", "desc": "MonoIIF as published: local calibration + II (lambda1=0.5)",
+                "flags": "--photometric standard --illumination_invariant 0.5"},
+    "M-none": {"group": "M", "desc": "II (lambda1=0.5) only, no calibration",
+               "flags": "--illum_calib none --photometric standard --illumination_invariant 0.5"},
+    "M-global": {"group": "M", "desc": "global calibration + II (lambda1=0.5)",
+                 "flags": "--illum_calib global --photometric standard --illumination_invariant 0.5"},
     # the two settings that won their own comparison, combined
     "C1-lora": {"group": "C", "desc": "global calibration + plain LoRA",
                 "flags": "--illum_calib global --lora_type lora"},
@@ -162,7 +171,8 @@ GRID = {
            "flags": "--backbone_weights none"},
 }
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
-                  "E8-DVLoRA", "C1-std", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3",
+                  "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
+                  "R1", "R2", "N0", "D3-EndoDAC", "D3",
                   "A-C0", "A-C1", "A-E8"]
 CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)"),
                ("A-C0", "none, consistent jitter"), ("A-C1", "global affine, consistent jitter"),
