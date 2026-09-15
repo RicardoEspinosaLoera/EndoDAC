@@ -4,13 +4,25 @@ One script, `cviu_revision.py`, runs every new experiment the reviewers asked fo
 existing trainer, model factory and datasets; the only repo edits are flag-gated switches whose
 defaults reproduce the current behaviour.
 
-**Status (2026-09-10).** Script, `cviu_config.yaml` and all §2 repo edits are implemented.
-Verified locally without data or GPU: config merging, every generated training command parses
-with `options.py`, checkpoint selection, real split pairing, the affine fit and GT warper on
-synthetic geometry, and the `stats`/`report` stages on synthetic per-frame rows. Not yet run
-anywhere: `predict`, `illum-params`, `illum-sens`, `da3` (need the server, the datasets and the
-checkpoints). The E/R/C grid was launched on the server on 2026-09-10 and has to be relaunched
-(it stopped; unfinished runs restart from epoch 0, finished ones are skipped).
+**Status (2026-09-15). The grid is finished.** 41 training jobs (the §3 grid plus the extra
+seeds and the later additions `E8-IIF`, `E8-DVLoRA`, `C2-sup`, `C1-lora` at 3 seeds each), all
+evaluated on SCARED, Hamlyn and C3VD. Every stage has run: `predict`, `illum-fit`,
+`illum-params`, `illum-sens`, `illum-grad`, `da3`, `stats`, `report`. Outputs in
+`results/cviu/`: `per_frame.csv`, `summary.csv`, `per_sequence.csv`, `paired.csv`, `report.md`,
+`tables/*.tex`. Findings in §8; response-letter drafts in `CVIU_RESPONSE_LETTER.md`.
+
+Still open:
+
+- **External baselines are absent from Tables 4-6.** `EndoDAC_MICCAI` and `AF_SfMLearner`
+  failed to load: the paths in `cviu_config.yaml` (`logs/endodac_fullmodel/models/weights_19`,
+  `logs/Model_MIA`) do not exist on the server. HADepth, MonoViT, Endo-SfMLearner and
+  Monodepth2 were never configured. Until these are pointed at real checkpoints, the tables
+  compare only this grid's runs.
+- DA3-Mono-Large zero-shot: skipped, needs the `depth_anything_3` package (DA3-Base zero-shot
+  did run, through the in-repo port).
+- Pose evaluation: never measured.
+- `save_pred` was turned off and `results/cviu/pred/` deleted when the shared 7 TB overlay hit
+  100%; re-run `predict --force --only <method>` to regenerate disparities for figures.
 
 The DA3 rows (D3, D3-EndoDAC, zero-shot `da3-base`; §6) use a port of DA3's code in the repo, so
 they run in the same Python 3.8 environment as everything else. They only need the checkpoint:
@@ -311,3 +323,177 @@ Risks to watch: E3 not reproducing EndoDAC (then the whole grid is uninterpretab
 debug before launching the rest); the `none` calibration run changing the automask balance; the
 `global` head collapsing to c=1, b=0 (check its statistics before interpreting C1); Hamlyn
 sequence count small enough that only bootstrap CIs are meaningful.
+
+---
+
+## 8. Results (2026-09-15)
+
+All numbers are SCARED Abs Rel, **sequence-level** (n = 7 keyframe videos), from
+`results/cviu/summary.csv` and `results/cviu/paired.csv`. "vs C1" is the paired difference
+`method − C1` per sequence with a 10 000-draw cluster bootstrap CI, signed so that **positive
+means C1 is better**; `wins` counts the sequences where the method beats C1.
+
+### 8a. The best configuration is C1 (global affine calibration)
+
+| Run | seeds | Abs Rel | seed SD | vs C1 | CI | wins | p (Wilcoxon) |
+|---|---|---|---|---|---|---|---|
+| **C1** global affine | 3 | **0.04968** | 0.0021 | — | — | — | — |
+| C1-lora global + plain LoRA | 3 | 0.04987 | 0.0012 | +0.00019 | [−0.00127, +0.00155] | 4/7 | 0.94 |
+| E8-DVLoRA local + plain LoRA | 3 | 0.05031 | 0.0008 | +0.00063 | [−0.00089, +0.00238] | 3/7 | 0.81 |
+| E8−IIF local, no IIF loss | 3 | 0.05052 | 0.0009 | +0.00084 | [−0.00073, +0.00236] | 2/7 | 0.38 |
+| C2-sup local, LS-supervised | 3 | 0.05114 | 0.0014 | +0.00146 | [+0.00047, +0.00257] | 1/7 | 0.031 |
+| E8 MonoIIF (local affine) | 3 | 0.05116 | 0.0014 | +0.00148 | [+0.00050, +0.00319] | **0/7** | 0.016 |
+| E3 EndoDAC baseline | 3 | 0.05166 | 0.0009 | +0.00198 | [+0.00043, +0.00416] | 2/7 | 0.078 |
+| C0 no calibration | 3 | 0.05184 | 0.0029 | +0.00216 | [+0.00064, +0.00397] | 1/7 | 0.047 |
+| D3 MonoIIF on DA3-Base | 3 | 0.05448 | 0.0002 | +0.00480 | [+0.00157, +0.00840] | 1/7 | 0.031 |
+| R2 ResNet-18 + full method | 3 | 0.05926 | 0.0015 | +0.00958 | [+0.00453, +0.01534] | 0/7 | 0.016 |
+| R1 ResNet-18 + standard loss | 3 | 0.05929 | 0.0015 | +0.00961 | [+0.00561, +0.01357] | 0/7 | 0.016 |
+| N0 random-init ViT-B | 1 | 0.10606 | — | +0.05638 | [+0.04329, +0.07027] | 0/7 | 0.016 |
+
+Single-seed rows, for the build-up only (their differences are of the same size as the seed SD
+of ~0.001-0.002, so they do not support claims): E1 0.08693, E2 0.06056, E4 0.05284,
+E5 0.05201, E6 0.05135, E7 0.05350, D3-EndoDAC 0.05272.
+
+**C1 beats C0 (calibration helps) and beats E8 (global beats local, in 7 of 7 sequences)**, both
+with CIs excluding zero. `C1-lora`, added to test whether the two winning settings compose, is a
+dead tie with C1 (d_z = 0.09): the gain comes from the calibration, not from the adapter type.
+
+### 8b. Multiplicity: Holm over 20 comparisons is powerless by construction
+
+With n = 7 the smallest attainable two-sided exact Wilcoxon p is 2/2⁷ = 0.0156, so Holm over the
+20 rows of the table cannot go below 0.31 — and indeed no `p_wilcoxon_holm` in `paired.csv` does.
+The fix is to pre-specify the two primary comparisons and declare the rest exploratory:
+
+| Primary comparison | question | p | Holm (family = 2) |
+|---|---|---|---|
+| C1 vs E8 | global or local affine? | 0.0156 | **0.031** |
+| C1 vs C0 | does calibration help at all? | 0.0469 | **0.047** |
+
+Both below 0.05. Everything else is reported with bootstrap CIs and no correction, stated as
+such.
+
+### 8c. Most of the performance is the foundation model, not the method
+
+| Step | Abs Rel | Δ | share of N0 → C1 |
+|---|---|---|---|
+| N0 random-init ViT-B | 0.10606 | — | — |
+| E1 + DA v1 frozen weights, DPT heads trained | 0.08693 | 0.01913 | 34% |
+| E2 + Conv-neck | 0.06056 | 0.02637 | 47% |
+| E3 + DV-LoRA (= EndoDAC) | 0.05166 | 0.00890 | 16% |
+| C1 + our calibration | 0.04968 | 0.00198 | **3.5%** |
+
+The pretrained weights and EndoDAC's adaptation machinery (Conv-neck + DV-LoRA) account for
+~96% of the span; our contribution on top of a faithfully reproduced EndoDAC is a 3.8% relative
+reduction in Abs Rel whose CI excludes zero. E3 = 0.0517 reproduces the published EndoDAC
+number (0.052), so the anchor holds.
+
+The R-grid is a negative result worth stating: on a ResNet-18 backbone the full method is
+**R2 − R1 = −0.00003**, i.e. nothing. The benefit of the photometric machinery appears only on
+top of a strong foundation backbone.
+
+### 8d. The IIF loss does not help on SCARED
+
+`E8-IIF` is E8 with `--illumination_invariant 0`. With 3 seeds it is **better** than E8:
+0.05052 vs 0.05116. Against C1, E8's difference is +0.00148 with a CI excluding zero while
+E8-IIF's is +0.00084 with a CI covering zero. The single-seed rows point the same way
+(E5, +IIF only, 0.05201 vs E3 0.05166; E7, calib+IIF, 0.05350 vs E4, calib only, 0.05284).
+`illum-grad` independently measured the IIF term as contributing 2.1% of the gradient reaching
+the calibration decoder (SSIM 44.4%, L1 53.5%).
+
+Consequence for the paper: the IIF term cannot be presented as a source of accuracy. Either it
+is reframed (e.g. as robustness under illumination change, which `illum-sens` can support) or
+dropped from the claims. This is a framing decision, not a bug.
+
+### 8e. Illumination model (R2)
+
+- `illum-fit`, model-free least squares on GT geometry: local affine explains ~10× more
+  photometric residual than global (0.040 vs 0.004 of the residual), so the local model is the
+  better *photometric* model — and yet it gives worse depth (E8 loses to C1 in 7/7 sequences).
+- `illum-params`: the learned local maps do not track illumination (slope −0.006 against
+  injected gain). They are not collapsed either (c SD across inputs 0.0136 vs 0.0287 within an
+  image), so the module is active but fitting something other than illumination.
+- `C2-sup`, supervising the local maps towards their per-patch least-squares fit
+  (`calib_supervision`, `utils/layers.py:calibration_supervision_loss`), collapses them to the
+  identity (c mean 0.9995, SD 0.0026) and does not recover C1's accuracy (0.05114 vs 0.04968).
+
+Reading: the extra degrees of freedom of the dense maps absorb photometric residual that is not
+illumination — most plausibly geometric error — and so weaken the depth gradient. The bounded
+global head, with 2 parameters per pair, cannot do that. This is consistent with every
+measurement above, but it is an interpretation; the falsifying experiment would be a local head
+constrained to a low-order spatial basis, which was not run.
+
+**This reading is confounded — see §9.** Every run above was trained with a colour jitter that
+is re-sampled per frame, so on half the training items the illumination relation the lighting
+head observes is dominated by augmentation noise. Nothing in §8a-§8c depends on it (all runs
+share it), but §8e's claim that the module "does not track illumination" cannot be separated
+from the possibility that it was never shown a usable signal. The A-grid of §9 settles it.
+
+### 8f. Illumination calibration: code review (2026-09-15)
+
+Checked and clean, so these are not alternative explanations:
+
+- The automask is computed from the **uncalibrated** warp and the raw source frame
+  (`trainer_end_to_end.py:709-714`), so the calibration cannot widen the mask it is scored on.
+- The highlight mask is computed from the **target** (`trainer_end_to_end.py:448`), so the
+  calibration cannot dodge specular pixels by darkening its own output.
+- `("ch"/"bh", scale, f_i)` are interpolated to full resolution and `("color", f_i, scale)` is
+  full resolution too (`source_scale = 0` with `v1_multiscale` off), so the broadcast is right.
+- `GlobalLightingHead`'s zero-initialised head starts exactly at c=1, b=0 with live gradients.
+
+One structural point that does bear on local vs global: the photometric loss is
+0.85·SSIM(window 7) + 0.15·L1, and SSIM factors into luminance × contrast × structure, both
+normalised inside the window. A **local** affine map, bounded and Gaussian-blurred at a scale
+comparable to that window, can drive the luminance and contrast factors towards 1 patch by patch
+**whether or not the geometry is right**, leaving only the structure term to carry depth
+information; two global scalars cannot. This matches `illum-grad`, where L1 supplies 53.5% of the
+gradient reaching the calibration while weighing 0.15.
+
+---
+
+## 9. The colour-augmentation defect and the A-grid (found 2026-09-15)
+
+`datasets/mono_dataset.py` built the jitter as `transforms.ColorJitter(...)` and called it **once
+per frame** (`preprocess`, one call per image of the item). A constructed `ColorJitter`
+re-samples its factors inside every call, so each frame of an item received a *different*
+jitter. Verified on a constant grey image: five calls of one object give means
+109 / 120 / 143 / 123 / 150. The docstring promised the opposite ("apply the same augmentation
+to all images in this item … so that all images input to the pose network receive the same
+augmentation"); monodepth2 achieved that with the *static* `ColorJitter.get_params`, which
+returns fixed factors. The line comes from this repo's `Initial` commit, i.e. it is inherited
+from EndoDAC, not introduced by the revision.
+
+Why it matters here specifically: the lighting head reads `color_aug`
+(`trainer_end_to_end.py:606`) while the (c, b) it predicts is applied to the **un-augmented**
+warp (`trainer_end_to_end.py:909`). With `do_color_aug` true for half the items and brightness
+and contrast drawn independently from [0.8, 1.2] per frame, the apparent gain between the two
+frames the head observes carries random noise of up to 1.2/0.8 = 1.5, while the head can only
+express c ∈ [0.9, 1.1] — and that noise is independent of the relation it must correct. The
+optimal predictor under such an input shrinks to a constant.
+
+That single defect predicts four measurements we had been treating as separate findings:
+
+| Measurement | What the defect predicts |
+|---|---|
+| c ≈ 1.043, b ≈ −0.018 nearly constant; temporal corr. 0.92-0.94 | shrinkage to the prior mean |
+| sensitivity slope −0.006 instead of ≈ 1 | the input does not inform the target |
+| local (E8) worse than global (C1), 0/7 sequences | the dense map has the capacity to fit the noise; two scalars degrade gracefully |
+| C2-sup collapses to the identity (c 0.9995 ± 0.0026) | its LS target is computed un-augmented, so it is unpredictable from an augmented input, and the L1 minimiser is the median |
+
+**Fix and test.** `--color_aug_consistent` (default `False`, so the 41 runs above stay
+reproducible and E3 still reproduces EndoDAC) makes `MonoDataset._sample_color_aug` draw the
+factors once and apply them to every frame. Verified locally: five frames of an item get an
+identical, non-identity jitter; different items still differ; the legacy path is unchanged.
+
+A-grid, one seed each, ~11 h on three GPUs:
+
+| Run | Flags |
+|---|---|
+| A-C0 | `--illum_calib none --color_aug_consistent True` |
+| A-C1 | `--illum_calib global --color_aug_consistent True` |
+| A-E8 | `--color_aug_consistent True` |
+
+Then `illum-params` and `illum-sens` on `A-E8`. **Decision rule fixed in advance:** if the
+sensitivity slope moves from −0.006 towards 1, the module was starved of signal and §8e must be
+rewritten — the paper's claim would become "local calibration works once it is trained on
+coherent data", and the local-vs-global comparison would have to be re-run at 3 seeds. If the
+slope stays flat, §8e stands and is now defended against exactly this objection from a reviewer.

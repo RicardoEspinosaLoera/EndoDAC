@@ -136,6 +136,17 @@ GRID = {
     # the two settings that won their own comparison, combined
     "C1-lora": {"group": "C", "desc": "global calibration + plain LoRA",
                 "flags": "--illum_calib global --lora_type lora"},
+    # A-grid: the whole grid above was trained with a colour jitter re-sampled per frame, so the
+    # frames of one item carry different illumination and the pose/lighting heads read noise
+    # (datasets/mono_dataset.py::_sample_color_aug). These three repeat the calibration
+    # comparison with the same jitter for every frame: if the learned maps start tracking
+    # illumination (illum-sens slope -> 1) the module was starved of signal, not ill-posed.
+    "A-C0": {"group": "A", "desc": "no calibration, consistent colour jitter",
+             "flags": "--illum_calib none --color_aug_consistent True"},
+    "A-C1": {"group": "A", "desc": "global calibration, consistent colour jitter",
+             "flags": "--illum_calib global --color_aug_consistent True"},
+    "A-E8": {"group": "A", "desc": "MonoIIF (local calibration), consistent colour jitter",
+             "flags": "--color_aug_consistent True"},
     # D-grid: Depth Anything 3 encoder (its own DinoV2 with QK-norm/RoPE) under the same recipe
     "D3": {"group": "D", "desc": "MonoIIF with DA3-Base encoder", "flags": "--backbone_weights da3"},
     "D3-EndoDAC": {"group": "D", "desc": "EndoDAC recipe with DA3-Base encoder",
@@ -144,8 +155,11 @@ GRID = {
            "flags": "--backbone_weights none"},
 }
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
-                  "E8-DVLoRA", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3"]
-CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)")]
+                  "E8-DVLoRA", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3",
+                  "A-C0", "A-C1", "A-E8"]
+CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)"),
+               ("A-C0", "none, consistent jitter"), ("A-C1", "global affine, consistent jitter"),
+               ("A-E8", "local affine, consistent jitter")]
 
 
 def deep_update(base, upd):
@@ -523,6 +537,17 @@ def stage_train(cfg, args):
             except queue.Empty:
                 return
             log = os.path.join(log_dir, j["name"] + ".log")
+            # The job list was built when this launcher started; another launcher (or a longer
+            # queue of our own) may have begun this run since. Two processes with the same
+            # --model_name write into the same models/ folder and ruin each other's checkpoints.
+            now_alive = running_cviu_runs()
+            if j["name"] in now_alive:
+                print("[train] gpu {} -> {} started elsewhere since the job list was built, "
+                      "skipping (it would write into the same folder)".format(gpu, j["name"]))
+                continue
+            if run_is_done(cfg, j["name"], now_alive) and not args.force:
+                print("[train] gpu {} -> {} finished elsewhere, skipping".format(gpu, j["name"]))
+                continue
             print("[train] gpu {} -> {} (log: {})".format(gpu, j["name"], log))
             t0 = time.time()
             with open(log, "a") as lf:

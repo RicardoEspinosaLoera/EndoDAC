@@ -1,0 +1,173 @@
+# Response to reviewers — CVIU
+
+Drafts for the four experimental asks. Every number is SCARED Abs Rel at the **sequence level**
+(n = 7 keyframe videos, 3 training seeds where stated), from `results/cviu/summary.csv` and
+`results/cviu/paired.csv`; the derivation is in `CVIU_REVISION_PLAN.md` §8. Paired differences
+are `method − ours` per sequence with a 10 000-draw cluster bootstrap CI.
+
+**Placeholders marked `[HAMLYN]` / `[C3VD]` still need the corresponding rows of
+`results/cviu/report.md`.**
+
+---
+
+## Reviewer 2 — the illumination calibration module is not fully validated
+
+> Second, the effectiveness of the illumination calibration module is not yet fully validated…
+
+We agree, and the new experiments changed our own conclusion. We now report three trained
+variants at three seeds each, plus a model-free analysis of the affine assumption and statistics
+of the learned parameters.
+
+**Draft text.**
+
+We evaluate three photometric calibration models under an otherwise identical recipe: no
+calibration (C0), one affine pair (c, b) per image predicted by a global head (C1), and the
+spatially varying maps of the original submission (C2 = E8). At the sequence level on SCARED,
+Abs Rel is 0.0518 ± 0.0029 for no calibration, **0.0497 ± 0.0021 for the global model** and
+0.0512 ± 0.0014 for the local model. The paired differences against the global model are
++0.00216, CI [+0.00064, +0.00397], for no calibration and +0.00148, CI [+0.00050, +0.00319],
+for the local model, the latter with the global model better in **all seven sequences**. Both
+CIs exclude zero. Calibration therefore helps, but the *global* model is the one that helps:
+the spatially varying variant of the original submission is worse than a two-parameter affine
+correction.
+
+To understand why, we fitted the affine model in closed form on ground-truth geometry, with no
+network involved: per-patch least squares explains about ten times more photometric residual
+than a single global fit (0.040 vs 0.004 of the residual). The dense model is thus the better
+*photometric* model and the worse *depth* model. Inspecting the learned maps, their mean gain
+does not track an injected illumination gain (regression slope −0.006, where a head reading
+illumination would give ≈ 1), while the maps are demonstrably active (gain SD 0.0136 across
+inputs vs 0.0287 within an image). Supervising them towards their own least-squares fit
+collapses them to the identity (mean gain 0.9995, SD 0.0026) without recovering the global
+model's accuracy (0.0511). We conclude that the extra degrees of freedom absorb photometric
+residual that is not illumination — most plausibly geometric error — and thereby weaken the
+gradient that should reach the depth network, whereas a two-parameter bounded correction cannot.
+We have replaced the local module with the global one throughout and report the local variant as
+an ablation.
+
+**What is honest to claim and what is not.** The mechanism above is an interpretation consistent
+with every measurement we made; the falsifying experiment — a local head restricted to a
+low-order spatial basis — was not run, and we say so in the paper.
+
+---
+
+## Reviewer 3 — separate the pretrained backbone's contribution from the method's
+
+> …a component-wise ablation that separates what the pretrained backbone contributes from what
+> the method contributes…
+
+**Draft text.**
+
+We built the model up from a randomly initialised ViT-B, adding one component at a time, all at
+the same recipe and resolution:
+
+| Configuration | SCARED Abs Rel | Δ | share |
+|---|---|---|---|
+| Random-init ViT-B, full method | 0.1061 | — | — |
+| + Depth Anything v1 weights (frozen), DPT heads trained | 0.0869 | 0.0191 | 34% |
+| + Conv-neck residual blocks | 0.0606 | 0.0264 | 47% |
+| + DV-LoRA adapters (= EndoDAC) | 0.0517 | 0.0089 | 16% |
+| + our photometric calibration (full model) | 0.0497 | 0.0020 | **3.5%** |
+
+The foundation weights and the adaptation machinery introduced by EndoDAC account for
+approximately 96% of the improvement over a randomly initialised encoder. Our contribution, on
+top of an EndoDAC reproduction that matches the published number (0.0517 here vs 0.052 as
+published), is a 3.8% relative reduction in Abs Rel whose bootstrap CI excludes zero
+(+0.00198, CI [+0.00043, +0.00416], better in 5 of 7 sequences). We state this proportion
+explicitly in the revised paper rather than reporting only the final number.
+
+We also repeated the same losses on a ResNet-18 U-Net backbone. There the method changes
+nothing: 0.0593 with the standard photometric loss against 0.0593 with the full method, a
+difference of 0.00003. The benefit of photometric calibration appears only on top of a strong
+foundation backbone, and we now say so as a limitation instead of presenting the losses as
+backbone-agnostic.
+
+Finally, with three seeds per configuration we report the training-seed SD (0.0008-0.0029 in
+Abs Rel) separately from the sequence-level CI, so that readers can see which ablation gaps are
+smaller than run-to-run variation. Several are, and we no longer draw conclusions from them.
+
+---
+
+## Question 2 — why was Depth Anything 3 not considered?
+
+**Draft text.**
+
+It now is, both zero-shot and adapted. DA3-Base's encoder is not a vanilla DINOv2 — from block 4
+it uses QK-norm, 2D RoPE, a camera token and alternating local/global attention, and it emits
+1536-d features at layers 5/7/9/11 — so its weights cannot be copied onto the encoder used in
+the submission. We ported DA3's encoder and the main branch of its DualDPT head into our
+codebase and verified the port against the reference implementation: encoder features and camera
+tokens are bit-identical at three resolutions, all 207 encoder tensors match the released
+DA3-BASE checkpoint, and the zero-initialised adapters leave DA3's features unchanged at step 0.
+
+Zero-shot, DA3-Base reaches Abs Rel 0.0718 with median scaling and 0.0692 with affine disparity
+alignment on SCARED, against 0.0497 for our adapted model. Adapted with exactly our recipe and
+an identical trainable-parameter count (8,961,540 in both), the DA3 encoder reaches 0.0545,
+i.e. worse than the same recipe on Depth Anything v1 (+0.00480 against our model, CI [+0.00157,
++0.00840]). Under the EndoDAC recipe the ordering is the same (0.0527 on DA3 vs 0.0517 on
+DA v1). We therefore keep Depth Anything v1 as the backbone and report DA3 as an evaluated
+alternative rather than an improvement, noting the two constraints we could not remove: DA3's
+monocular model is released at Large size only, so it enters only as a zero-shot row, and our
+adaptation replaces DA3's depth-ray output head with multi-scale disparity heads, which may not
+be the best way to use that model.
+
+---
+
+## Question 6 — uncertainty and paired tests at the video-sequence level
+
+**Draft text.**
+
+Tables 4-6 are recomputed with the video sequence as the unit of analysis. Frame metrics are
+averaged within a sequence and then across seeds, giving one value per (method, sequence); we
+report mean ± SD over sequences with a 95% cluster-bootstrap CI (10 000 draws, resampling
+sequences), and, for every competing method, the paired difference against ours with its
+bootstrap CI, a paired t-test, the exact Wilcoxon signed-rank test, a sign test, and Cohen's
+d_z. Per-sequence numbers are in the supplement. The frame-level t-intervals of the original
+submission were anti-conservative, because frames within a video are strongly correlated, and we
+say so.
+
+Two consequences we report openly:
+
+1. **Multiplicity.** With n = 7 sequences the smallest attainable two-sided exact Wilcoxon
+   p-value is 2/2⁷ = 0.0156, so a family-wise correction across the ~20 rows of a table cannot
+   yield a significant result no matter how large the effect. We therefore pre-specify two
+   primary comparisons — ours vs no calibration, and global vs local calibration — and apply
+   Holm within that family of two: adjusted p = 0.047 and 0.031 respectively. All remaining
+   comparisons are reported as exploratory, with CIs and uncorrected p-values, and labelled as
+   such.
+2. **Differences of ~0.001 Abs Rel are not resolvable.** Several method pairs that the original
+   tables separated are statistically indistinguishable at the sequence level; we now mark them
+   as ties rather than ranking them. Concretely, our model and the same model with plain LoRA
+   adapters differ by 0.00019, CI [−0.00127, +0.00155], d_z = 0.09.
+
+On Hamlyn our copy of the dataset holds a single rectified sequence, so we use contiguous blocks
+of 100 frames as the unit (n = 58) and state that these intervals are slightly optimistic,
+because blocks within one video remain correlated. `[HAMLYN]` `[C3VD]`
+
+---
+
+## Open items before submission
+
+0. **HOLD the R2 answer until the A-grid lands.** A defect found on 2026-09-15
+   (`CVIU_REVISION_PLAN.md` §9) means every run of the grid was trained with a colour jitter
+   re-sampled per frame, so on half the training items the illumination relation the lighting
+   head reads is augmentation noise. It does not affect the accuracy comparisons — all runs share
+   it — but it is a plausible single cause of all four measurements the R2 answer above leans on
+   (near-constant c and b, zero sensitivity slope, local worse than global, C2-sup collapsing to
+   the identity). `A-C0` / `A-C1` / `A-E8` retrain the calibration comparison with the jitter
+   fixed (~11 h). If the sensitivity slope moves towards 1, the paragraph "we conclude that the
+   extra degrees of freedom absorb photometric residual that is not illumination" must be
+   rewritten and the local-vs-global comparison re-run at 3 seeds.
+
+1. **Tables 4-6 have no external baselines.** `EndoDAC_MICCAI` and `AF_SfMLearner` failed to
+   load (the checkpoint paths in `cviu_config.yaml` do not exist on the server); HADepth,
+   MonoViT, Endo-SfMLearner and Monodepth2 were never configured. Fix the paths and re-run
+   `predict` + `stats`.
+2. **Decide the method's identity.** With the local module replaced by the global one and the
+   IIF term shown not to improve accuracy (§8d of the plan: 0.05052 without it vs 0.05116 with
+   it, 3 seeds), the contribution as written no longer matches the results. Either the IIF term
+   is reframed as robustness under illumination change — `illum-sens` can support that, and the
+   sensitivity sweep is already computed — or it is dropped from the claims. The paper's title
+   and framing depend on this choice.
+3. Hamlyn and C3VD paragraphs above need their numbers.
+4. Pose evaluation was never run; `evaluate_pose.py` exists if a reviewer asks.

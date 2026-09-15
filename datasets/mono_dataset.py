@@ -10,6 +10,7 @@ from PIL import ImageFile
 import torch
 import torch.utils.data as data
 from torchvision import transforms
+import torchvision.transforms.functional as TF
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
@@ -59,7 +60,13 @@ class MonoDataset(data.Dataset):
 
         self.loader = pil_loader
         self.to_tensor = transforms.ToTensor()
-        
+
+        # When False (the default, and what every run of the CVIU grid was trained with) the
+        # colour jitter is re-sampled per frame, so the frames of one item get *different*
+        # augmentations -- see _sample_color_aug. The trainer sets this from
+        # --color_aug_consistent.
+        self.consistent_color_aug = False
+
 
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
@@ -82,12 +89,45 @@ class MonoDataset(data.Dataset):
                                                interpolation=self.interp)
         self.load_depth = self.check_depth()
 
+    def _sample_color_aug(self):
+        """A colour jitter whose factors are sampled ONCE and reused for every frame.
+
+        `transforms.ColorJitter(...)` re-samples its factors inside every call, so calling the
+        object once per frame (as `preprocess` does) gives each frame of an item a different
+        jitter: brightness and contrast drawn independently from [0.8, 1.2] per frame turn the
+        apparent photometric relation between the frames into noise with a gain of up to
+        1.2/0.8. The pose and lighting heads read those augmented frames while the photometric
+        loss is computed on the un-augmented ones, so the illumination calibration is asked to
+        predict a target its input no longer carries. monodepth2 avoided this with the *static*
+        `ColorJitter.get_params`, which returns fixed factors; torchvision >= 0.9 returns them
+        as a tuple instead of a ready-made transform.
+        """
+        params = transforms.ColorJitter.get_params(
+            self.brightness, self.contrast, self.saturation, self.hue)
+        if not isinstance(params, tuple):
+            return params                       # torchvision <= 0.8: already a Compose
+        fn_idx, bf, cf, sf, hf = params
+
+        def apply(img):
+            for i in fn_idx:
+                if i == 0 and bf is not None:
+                    img = TF.adjust_brightness(img, bf)
+                elif i == 1 and cf is not None:
+                    img = TF.adjust_contrast(img, cf)
+                elif i == 2 and sf is not None:
+                    img = TF.adjust_saturation(img, sf)
+                elif i == 3 and hf is not None:
+                    img = TF.adjust_hue(img, hf)
+            return img
+
+        return apply
+
     def preprocess(self, inputs, color_aug):
         """Resize colour images to the required scales and augment if required
 
-        We create the color_aug object in advance and apply the same augmentation to all
-        images in this item. This ensures that all images input to the pose network receive the
-        same augmentation.
+        `color_aug` is applied to every image of this item. Whether that means the *same*
+        augmentation for all of them depends on what the caller passed: see
+        `_sample_color_aug` and `self.consistent_color_aug`.
         """
         for k in list(inputs):
             frame = inputs[k]
@@ -176,7 +216,15 @@ class MonoDataset(data.Dataset):
             inputs[("inv_K", scale)] = torch.from_numpy(inv_K)
 
         if do_color_aug:
-            color_aug = transforms.ColorJitter(self.brightness,self.contrast,self.saturation,self.hue)
+            if self.consistent_color_aug:
+                try:
+                    color_aug = self._sample_color_aug()
+                except Exception:
+                    # never fail training over an augmentation: fall back to the legacy path
+                    color_aug = transforms.ColorJitter(
+                        self.brightness, self.contrast, self.saturation, self.hue)
+            else:
+                color_aug = transforms.ColorJitter(self.brightness,self.contrast,self.saturation,self.hue)
         else:
             color_aug = (lambda x: x)
 

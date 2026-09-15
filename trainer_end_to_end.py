@@ -184,6 +184,8 @@ class Trainer:
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+        # only the training split augments, so this is the only loader it matters for
+        train_dataset.consistent_color_aug = self.opt.color_aug_consistent
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
