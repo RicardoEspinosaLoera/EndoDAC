@@ -685,3 +685,67 @@ method".
 - §5 / §22 Depth Anything 3: zero-shot DA3-Base (0.0718 median / 0.0692 affine on SCARED) and
   adapted D3 (0.0545) are measured; §6 of this plan has the text.
 - Discussion item (iv), the statistical caveat on few test sequences: §8b.
+
+---
+
+## 11. λ₁ sweep for the II loss (L-grid), and the checkpoint-selection bias
+
+### 11a. Why the paper's Table 2 is not the answer
+
+Table 2 of the submission sweeps λ₁ ∈ {0.25, 0.5, 1, 2, 3, 4, 5, 10} and picks 0.5, but it does
+so **on the ResNet variant** (lines 2-10 have no transformer blocks), with one seed, on frame-level
+means. MonoIIF, the paper's primary contribution, has no sweep at all: its λ₁ = 0.5 is inherited
+from a different backbone. The differences between adjacent λ₁ in that table (0.058 / 0.060 /
+0.063) are the size of the seed SD we measure here (0.0008-0.0029), so with one seed the optimum
+is not resolvable.
+
+### 11b. The design
+
+Six points, all with the method's structure (local calibration, monodepth2 photometric loss),
+differing only in λ₁, **three seeds each**:
+
+| λ₁ | Run | Status |
+|---|---|---|
+| 0 | E4 | exists (1 seed), +2 queued |
+| 0.1 | E7 | exists (1 seed), +2 to train — the repo default the whole grid used |
+| 0.25 | **L025** | new |
+| 0.5 | M-local | queued — the published value |
+| 1.0 | **L100** | new |
+| 2.0 | **L200** | new |
+
+Three seeds, not one, because a λ curve drawn through single runs cannot separate the optimum from
+seed noise — which is exactly the weakness of the paper's Table 2. Analysis uses the existing
+sequence-level machinery: the six points share the same test sequences, so λ values are compared
+**paired across sequences**, far more powerful than comparing means. `stats` writes
+`tables/lambda_sweep.tex` (SCARED metrics plus Hamlyn and C3VD Abs Rel per λ).
+
+Cost: 11 new jobs (L025, L100, L200 × 3 seeds, plus E7 seeds 1 and 2) at ~10.5 h. Two rounds on
+7 GPUs, ≈ 22 h.
+
+### 11c. The selection problem, which the sweep must not compound
+
+`run_epoch_eval()` iterates **`self.test_loader`** (trainer_end_to_end.py:534) and `train()` keeps
+the checkpoint only when that RMSE improves. **The best-epoch checkpoint of every run in this
+project — and of every number in the submitted paper — is selected on the SCARED test set.** It is
+inherited from EndoDAC's training loop and is common in this literature, but it biases every
+reported figure optimistically, and a reviewer who asked for proper uncertainty quantification
+(Q6) may well notice it.
+
+Choosing λ₁ by test Abs Rel on top of that would be selecting a hyperparameter on the test set and
+then reporting test numbers from it. Two defensible ways out, in order of preference:
+
+1. **Select λ₁ on SCARED, report the held-out evidence on Hamlyn and C3VD.** No extra compute, and
+   it is the structure the paper already has: SCARED is the development set, the other two are
+   generalization tests. State in the text that λ₁ was chosen on SCARED.
+2. **Split the SCARED sequences**: choose λ₁ on a fixed subset (e.g. datasets 1-3) and report on
+   the remaining four. Honest and free, but it halves an already small n = 7.
+
+The validation split (1 705 images) cannot be used for this as things stand: this SCARED copy has
+no per-frame ground-truth depth outside the test split (§4a), and the self-supervised loss is not
+comparable across λ₁ because λ₁ multiplies one of its terms — using the photometric term alone as
+the criterion would mechanically favour λ₁ = 0.
+
+Recommendation: option 1, plus one sentence of limitation in the paper about checkpoint selection.
+Fixing the selection properly (a `--checkpoint_split val` flag and ground truth for the validation
+frames) would invalidate the comparability of all 41 existing runs and is not worth it for this
+revision.
