@@ -384,7 +384,19 @@ such.
 | E1 + DA v1 frozen weights, DPT heads trained | 0.08693 | 0.01913 | 34% |
 | E2 + Conv-neck | 0.06056 | 0.02637 | 47% |
 | E3 + DV-LoRA (= EndoDAC) | 0.05166 | 0.00890 | 16% |
-| C1 + our calibration | 0.04968 | 0.00198 | **3.5%** |
+| C0 + HADepth's highlight loss + our IIF loss | 0.05184 | -0.00018 | **-0.3%** |
+| C1 + our global affine calibration | 0.04968 | 0.00216 | **3.8%** |
+
+**Corrected 2026-09-15.** This table previously ended with a single row "+ our calibration,
+0.00198", which was wrong: `C1` is `--illum_calib global` alone, so it inherits the defaults
+`--illumination_invariant 0.1` and `--photometric highlight` and that 0.00198 bundled three
+components, one of them prior work. `C0` (`--illum_calib none`, IIF and highlight on) is the run
+that isolates them: E3 -> C0 is the highlight term (HADepth Eq. 6-11, implemented in
+`trainer_end_to_end.py::get_highlight_mask` / `compute_highlight_aware_loss`) plus our IIF loss,
+together worth **nothing** (-0.00018), and C0 -> C1 is our calibration alone, +0.00216 with the
+CI excluding zero (§8a). Attribution of the whole N0 -> C1 span: 34% the foundation weights,
+63% EndoDAC's adaptation machinery, -0.3% HADepth's highlight term plus our IIF loss, **3.8% our
+calibration**.
 
 The pretrained weights and EndoDAC's adaptation machinery (Conv-neck + DV-LoRA) account for
 ~96% of the span; our contribution on top of a faithfully reproduced EndoDAC is a 3.8% relative
@@ -480,17 +492,17 @@ Consequences for the paper:
 4. Reporting only SCARED would be the reviewer's worst suspicion confirmed. All three datasets
    go in the paper with this table.
 
-### 8h. Leave-one-out of the method's own components (all three datasets)
+### 8h. Leave-one-out of every component of the pipeline (all three datasets)
 
 `diff = variant - E8` per sequence, so **negative means removing the component improved
 accuracy**. Bootstrap CI, 10 000 draws, from `results/cviu/per_sequence.csv`.
 
 | Removed | run | SCARED (n=7) | Hamlyn (n=58) | C3VD (n=7) | seeds |
 |---|---|---|---|---|---|
-| affine calibration | C0 | +0.0007 [-0.0010,+0.0028] | **-0.0015 [-0.0028,-0.0003]** | -0.0020 [-0.0111,+0.0087] | 3 |
-| IIF loss | E8-IIF | -0.0006 [-0.0021,+0.0008] | +0.0015 [-0.0001,+0.0030] | **-0.0170 [-0.0270,-0.0073]** | 3 |
-| highlight loss | E7 | +0.0023 [-0.0017,+0.0082] | **-0.0048 [-0.0071,-0.0025]** | **+0.0342 [+0.0257,+0.0422]** | 1 |
-| DV-LoRA -> LoRA | E8-DVLoRA | -0.0008 [-0.0017,+0.0001] | **+0.0030 [+0.0016,+0.0044]** | **+0.0219 [+0.0149,+0.0295]** | 3 |
+| affine calibration *(ours)* | C0 | +0.0007 [-0.0010,+0.0028] | **-0.0015 [-0.0028,-0.0003]** | -0.0020 [-0.0111,+0.0087] | 3 |
+| IIF loss *(ours)* | E8-IIF | -0.0006 [-0.0021,+0.0008] | +0.0015 [-0.0001,+0.0030] | **-0.0170 [-0.0270,-0.0073]** | 3 |
+| highlight loss *(HADepth)* | E7 | +0.0023 [-0.0017,+0.0082] | **-0.0048 [-0.0071,-0.0025]** | **+0.0342 [+0.0257,+0.0422]** | 1 |
+| DV-LoRA -> LoRA *(EndoDAC)* | E8-DVLoRA | -0.0008 [-0.0017,+0.0001] | **+0.0030 [+0.0016,+0.0044]** | **+0.0219 [+0.0149,+0.0295]** | 3 |
 
 Build-up one component at a time on top of E3 (delta Abs Rel, negative = better):
 
@@ -508,9 +520,11 @@ Readings:
    individual additions help: only the three together beat E3, by 0.0005.
 2. The **highlight-aware loss is the only component with a large effect anywhere**: +0.0342 on
    C3VD (0/7 scenes for the variant without it), which is essentially the whole -0.0250 that E8
-   gains over E3 there. It is negative on Hamlyn and it has **one seed**, so it cannot carry a
-   claim yet. Two more seeds of E7 (~21 h on two GPUs) is the cheapest open experiment and the
-   one most likely to yield a defensible contribution.
+   gains over E3 there. **It is HADepth's, not ours** -- `trainer_end_to_end.py::get_highlight_mask`
+   implements HADepth Eq. 6-8 and `compute_highlight_aware_loss` its Eq. 9-11, and it is the
+   default (`--photometric highlight`) in every run of the C-, D- and R-grids. It is negative on
+   Hamlyn and has **one seed**, so two more seeds of E7 (~21 h on two GPUs) are needed to close
+   the attribution between HADepth's term and ours, not to build a claim of our own.
 3. **Retract the earlier "plain LoRA beats DV-LoRA" note** (memory and the 2026-09-13 results):
    it held on SCARED alone with the interval touching zero, and out of domain DV-LoRA wins on
    both datasets with intervals excluding zero. DV-LoRA is EndoDAC's component, not ours, and it

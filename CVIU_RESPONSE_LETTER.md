@@ -84,32 +84,40 @@ the same recipe and resolution:
 | + Depth Anything v1 weights (frozen), DPT heads trained | 0.0869 | 0.0191 | 34% |
 | + Conv-neck residual blocks | 0.0606 | 0.0264 | 47% |
 | + DV-LoRA adapters (= EndoDAC) | 0.0517 | 0.0089 | 16% |
-| + our photometric calibration (full model) | 0.0497 | 0.0020 | **3.5%** |
+| + the highlight-aware loss of HADepth + our illumination-invariant loss | 0.0518 | -0.0002 | **-0.3%** |
+| + our global affine calibration (full model) | 0.0497 | 0.0022 | **3.8%** |
 
 The foundation weights and the adaptation machinery introduced by EndoDAC account for
-approximately 96% of the improvement over a randomly initialised encoder. Our contribution, on
-top of an EndoDAC reproduction that matches the published number (0.0517 here vs 0.052 as
-published), is a 3.8% relative reduction in Abs Rel whose bootstrap CI excludes zero
-(+0.00198, CI [+0.00043, +0.00416], better in 5 of 7 sequences). We state this proportion
-explicitly in the revised paper rather than reporting only the final number.
+approximately 96% of the improvement over a randomly initialised encoder, on top of an EndoDAC
+reproduction that matches the published number (0.0517 here vs 0.052 as published). The two
+photometric terms we adopted or proposed before the calibration -- the highlight-aware loss of
+HADepth and our illumination-invariant loss -- are together worth nothing (-0.0002). The one
+component of ours that earns its place is the global affine calibration, isolated by comparing
+against the run that keeps both of those terms and drops only the calibration: +0.00216, CI
+[+0.00064, +0.00397], better in 6 of 7 sequences, a 3.8% relative reduction in Abs Rel. We state
+this proportion explicitly in the revised paper rather than reporting only the final number, and
+we attribute each component to whoever introduced it.
 
-**Leave-one-out of each of our own components.** The table above isolates the backbone; this one
-isolates the method. Each row removes one component from the full model and reports the paired
+**Leave-one-out of every component of the pipeline.** The table above isolates the backbone; this
+one isolates each loss and adapter, credited to whoever introduced it -- our pipeline builds on
+EndoDAC's adapters and adopts HADepth's highlight-aware loss. Each row removes one component from the full model and reports the paired
 difference `variant − full` per sequence, so a **negative** number means the component was
 costing accuracy. Sequence-level, 10 000-draw bootstrap CI.
 
-| Component removed | SCARED (n=7) | Hamlyn (n=58) | C3VD (n=7) | seeds |
-|---|---|---|---|---|
-| affine calibration | +0.0007 [−0.0010, +0.0028] | **−0.0015 [−0.0028, −0.0003]** | −0.0020 [−0.0111, +0.0087] | 3 |
-| illumination-invariant loss | −0.0006 [−0.0021, +0.0008] | +0.0015 [−0.0001, +0.0030] | **−0.0170 [−0.0270, −0.0073]** | 3 |
-| highlight-aware loss | +0.0023 [−0.0017, +0.0082] | **−0.0048 [−0.0071, −0.0025]** | **+0.0342 [+0.0257, +0.0422]** | 1 |
-| DV-LoRA → plain LoRA | −0.0008 [−0.0017, +0.0001] | **+0.0030 [+0.0016, +0.0044]** | **+0.0219 [+0.0149, +0.0295]** | 3 |
+| Component removed | whose | SCARED (n=7) | Hamlyn (n=58) | C3VD (n=7) | seeds |
+|---|---|---|---|---|---|
+| affine calibration | ours | +0.0007 [−0.0010, +0.0028] | **−0.0015 [−0.0028, −0.0003]** | −0.0020 [−0.0111, +0.0087] | 3 |
+| illumination-invariant loss | ours | −0.0006 [−0.0021, +0.0008] | +0.0015 [−0.0001, +0.0030] | **−0.0170 [−0.0270, −0.0073]** | 3 |
+| highlight-aware loss | HADepth | +0.0023 [−0.0017, +0.0082] | **−0.0048 [−0.0071, −0.0025]** | **+0.0342 [+0.0257, +0.0422]** | 1 |
+| DV-LoRA → plain LoRA | EndoDAC | −0.0008 [−0.0017, +0.0001] | **+0.0030 [+0.0016, +0.0044]** | **+0.0219 [+0.0149, +0.0295]** | 3 |
 
-No component of ours improves accuracy on more than one dataset. The illumination-invariant loss
-is neutral in-domain, worth 0.0015 on Hamlyn and **costs 0.0170 on C3VD**. The highlight-aware
-term is the only one with a large effect anywhere (+0.0342 on C3VD) and it is negative on Hamlyn;
-it currently has a single training seed, so we do not draw a conclusion from it. DV-LoRA, which
-is EndoDAC's contribution and not ours, is the component whose removal costs most out of domain.
+Of the two losses, our illumination-invariant term is neutral in-domain, worth 0.0015 on Hamlyn
+and **costs 0.0170 on C3VD**; it does not survive as an accuracy contribution. The two components
+with a large effect out of domain are **both adopted, not ours**: HADepth's highlight-aware loss
+(+0.0342 on C3VD, though negative on Hamlyn and on a single training seed) and EndoDAC's DV-LoRA
+(+0.0030 and +0.0219, both intervals excluding zero). Our own calibration is the component with
+the clearest in-domain effect and no measurable effect outside it. We report the attribution this
+way rather than presenting the pipeline as one undifferentiated method.
 
 Adding the components to the baseline one at a time tells the same story on the training domain:
 +calibration +0.0012, +invariant loss +0.0004, +highlight −0.0003, +calibration+invariant
@@ -222,10 +230,12 @@ single pooled frame-level average.
    depth, with a small in-domain gain from global photometric calibration" than to a new method
    claim. That is a strong CVIU contribution — the reviewers asked exactly these questions — but
    it is a different paper from the one submitted.
-4. **`E7` needs two more seeds.** It is the leave-one-out arm of the highlight-aware loss, and
-   that term is now the only component of ours with a large effect anywhere (+0.0342 Abs Rel on
-   C3VD, 0/7 scenes for the variant without it). With one seed it cannot carry that claim, and
-   it is the cheapest experiment left: `train --only E7 --seeds 1 2`, two GPUs, ~21 h.
+4. **`E7` needs two more seeds** -- not to build a claim of ours, but to close the attribution.
+   It is the leave-one-out arm of **HADepth's** highlight-aware loss, which is the largest single
+   component effect measured anywhere (+0.0342 Abs Rel on C3VD, 0/7 scenes without it) and is
+   enabled by default in every run of the C-, D- and R-grids. With one seed the split between
+   "HADepth's term" and "ours" rests on a single training run, which a reviewer asking exactly
+   this question will notice. `train --only E7 --seeds 1 2`, two GPUs, ~21 h.
 5. **Retract the "plain LoRA beats DV-LoRA" note.** That held on SCARED only, with the interval
    touching zero (−0.0008 [−0.0017, +0.0001]); out of domain DV-LoRA wins on both datasets with
    intervals excluding zero.
