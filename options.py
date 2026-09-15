@@ -296,10 +296,25 @@ class MonodepthOptions:
                                       "monodepth2 SSIM+L1, both averaged over automask-valid pixels")
         self.parser.add_argument("--depth_backbone",
                                  type=str,
-                                 choices=["endodac", "resnet18"],
+                                 choices=["endodac", "resnet18", "monovit"],
                                  default="endodac",
-                                 help="depth network: Depth Anything + DV-LoRA (endodac) or the "
-                                      "ResNet-18 U-Net control")
+                                 help="depth network: Depth Anything + DV-LoRA (endodac), the "
+                                      "ResNet-18 U-Net of monodepth2, or MonoViT's MPViT-small "
+                                      "encoder with its HR decoder")
+        self.parser.add_argument("--depth_lr",
+                                 type=float,
+                                 default=None,
+                                 help="learning rate of the depth network only; default (None) puts "
+                                      "it in the single --learning_rate group with the pose and "
+                                      "lighting heads. MonoViT's published recipe halves it for the "
+                                      "MPViT encoder (5e-5 against 1e-4)")
+        self.parser.add_argument("--mpvit_weights",
+                                 type=str,
+                                 default=None,
+                                 help="ImageNet MPViT-small checkpoint for --depth_backbone monovit "
+                                      "(default <pretrained_path>/mpvit_small.pth); without it the "
+                                      "encoder starts from random weights, which is NOT MonoViT as "
+                                      "published")
         self.parser.add_argument("--backbone_weights",
                                  type=str,
                                  choices=["da1", "da3", "none"],

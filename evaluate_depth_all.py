@@ -370,15 +370,27 @@ class DepthModelFactory:
         
         encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
         decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
+
+        if not os.path.exists(encoder_path):
+            # a MonoViT trained in this repo (--depth_backbone monovit) saves one depth_model.pth
+            from models.monovit_depth import MonoViTDepth
+            sd = torch.load(os.path.join(opt.load_weights_folder, "depth_model.pth"))
+            model = MonoViTDepth(pretrained_weights=None)
+            md = model.state_dict()
+            model.load_state_dict({k: v for k, v in sd.items() if k in md}, strict=False)
+            model.cuda()
+            model.eval()
+            return model, 'monovit'
+
         encoder_dict = torch.load(encoder_path)
-    
+
         # Create encoder
         encoder = monovit.mpvit_small()
         encoder.num_ch_enc = [64, 128, 216, 288, 288]
-        
+
         # Create decoder for transformer-based model
         depth_decoder = monovit.DepthDecoderT()
-        
+
         # Load weights
         model_dict = encoder.state_dict()
         encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})

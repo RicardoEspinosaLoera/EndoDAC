@@ -15,18 +15,97 @@
 import numpy as np
 import math
 import logging
+import os
 import torch
 
-from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.layers import DropPath, trunc_normal_
-
-from einops import rearrange
 from functools import partial
 from torch import nn, einsum
 from torch.nn.modules.batchnorm import _BatchNorm
-#from mmcv.utils import load_checkpoint,load_state_dict
-from mmengine.runner.checkpoint import load_checkpoint,load_state_dict
-from mmcv.cnn import build_norm_layer
+
+# Self-contained: the original file needed timm, einops, mmcv and mmengine, none of which are in
+# requirements.txt, so `import models.monovit` failed in the training environment. The four
+# helpers below are the only things it used from them.
+
+IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)
+
+trunc_normal_ = nn.init.trunc_normal_
+
+
+def build_norm_layer(norm_cfg, num_features):
+    """mmcv.cnn.build_norm_layer, for the two types MPViT asks for."""
+    t = (norm_cfg or {}).get("type", "BN")
+    if t in ("BN", "BN2d"):
+        return "bn", nn.BatchNorm2d(num_features)
+    if t == "SyncBN":
+        return "bn", nn.SyncBatchNorm(num_features)
+    raise ValueError("unsupported norm type: {}".format(t))
+
+
+class DropPath(nn.Module):
+    """Stochastic depth per sample (timm.models.layers.DropPath)."""
+
+    def __init__(self, drop_prob=0.0):
+        super().__init__()
+        self.drop_prob = drop_prob
+
+    def forward(self, x):
+        if self.drop_prob == 0.0 or not self.training:
+            return x
+        keep = 1.0 - self.drop_prob
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+        mask = x.new_empty(shape).bernoulli_(keep)
+        return x * mask / keep
+
+    def extra_repr(self):
+        return "drop_prob={}".format(self.drop_prob)
+
+
+def load_state_dict(model, state_dict, strict=False, logger=None):
+    """mmengine.runner.checkpoint.load_state_dict, reduced to what MPViT needs."""
+    missing, unexpected = model.load_state_dict(state_dict, strict=strict)
+    msg = "[mpvit] loaded pretrained weights: {} missing, {} unexpected keys".format(
+        len(missing), len(unexpected))
+    (logger.info if logger is not None else print)(msg)
+    return missing, unexpected
+
+
+def load_checkpoint(model, filename, strict=False, logger=None):
+    ckpt = torch.load(filename, map_location="cpu")
+    if isinstance(ckpt, dict):
+        ckpt = ckpt.get("model", ckpt.get("state_dict", ckpt))
+    return load_state_dict(model, ckpt, strict=strict, logger=logger)
+
+
+def _load_pretrained(model, pretrained, name):
+    """ImageNet initialisation of an MPViT backbone.
+
+    `pretrained` is the path of the official `<name>.pth` (MPViT release, a dict with a "model"
+    key). Missing or None leaves the random initialisation and says so: MonoViT is published with
+    the ImageNet weights, so a run without them is a different experiment and must be labelled
+    as one.
+    """
+    if not pretrained:
+        print("[mpvit] {}: no pretrained weights given, random initialisation".format(name))
+        return False
+    if not os.path.exists(pretrained):
+        print("[mpvit] {}: {} not found, random initialisation".format(name, pretrained))
+        return False
+    load_checkpoint(model, pretrained, strict=False, logger=None)
+    print("[mpvit] {}: initialised from {}".format(name, pretrained))
+    return True
+
+
+def rearrange_to_map(v, H, W):
+    """einops: 'B h (H W) Ch -> B (h Ch) H W'."""
+    B, h, _, Ch = v.shape
+    return v.reshape(B, h, H, W, Ch).permute(0, 1, 4, 2, 3).reshape(B, h * Ch, H, W)
+
+
+def rearrange_to_tokens(v, h):
+    """einops: 'B (h Ch) H W -> B h (H W) Ch'."""
+    B, C, H, W = v.shape
+    return v.reshape(B, h, C // h, H, W).permute(0, 1, 3, 4, 2).reshape(B, h, H * W, C // h)
 
 #from mmseg.utils import get_root_logger
 #from mmseg.utils import get_root_logger
@@ -323,7 +402,7 @@ class ConvRelPosEnc(nn.Module):
         v_img = v
 
         # Shape: [B, h, H*W, Ch] -> [B, h*Ch, H, W].
-        v_img = rearrange(v_img, "B h (H W) Ch -> B (h Ch) H W", H=H, W=W)
+        v_img = rearrange_to_map(v_img, H, W)
         # Split according to channels.
         v_img_list = torch.split(v_img, self.channel_splits, dim=1)
         conv_v_img_list = [
@@ -331,7 +410,7 @@ class ConvRelPosEnc(nn.Module):
         ]
         conv_v_img = torch.cat(conv_v_img_list, dim=1)
         # Shape: [B, h*Ch, H, W] -> [B, h, H*W, Ch].
-        conv_v_img = rearrange(conv_v_img, "B (h Ch) H W -> B h (H W) Ch", h=h)
+        conv_v_img = rearrange_to_tokens(conv_v_img, h)
 
         EV_hat_img = q_img * conv_v_img
         EV_hat = EV_hat_img
@@ -747,7 +826,7 @@ class MPViT(nn.Module):
                     m.eval()
 
 
-def mpvit_tiny(**kwargs):
+def mpvit_tiny(pretrained=None, **kwargs):
     """mpvit_tiny :
 
     - #paths : [2, 3, 3, 3]
@@ -768,11 +847,12 @@ def mpvit_tiny(**kwargs):
         num_heads=[8, 8, 8, 8],
         **kwargs,
     )
+    _load_pretrained(model, pretrained, "mpvit_tiny")
     model.default_cfg = _cfg_mpvit()
     return model
 
 
-def mpvit_xsmall(**kwargs):
+def mpvit_xsmall(pretrained=None, **kwargs):
     """mpvit_xsmall :
 
     - #paths : [2, 3, 3, 3]
@@ -793,15 +873,12 @@ def mpvit_xsmall(**kwargs):
         num_heads=[8, 8, 8, 8],
         **kwargs,
     )
-    checkpoint = torch.load('/workspace/endo-manydepth/manydepth/mpvit/mpvit_xsmall.pth', map_location=lambda storage, loc: storage)['model']
-    load_state_dict(model, checkpoint, strict=False, logger=logger)
-    del checkpoint
-    del logger
+    _load_pretrained(model, pretrained, "mpvit_xsmall")
     model.default_cfg = _cfg_mpvit()
     return model
 
 
-def mpvit_small(**kwargs):
+def mpvit_small(pretrained=None, **kwargs):
     """mpvit_small :
 
     - #paths : [2, 3, 3, 3]
@@ -822,18 +899,12 @@ def mpvit_small(**kwargs):
         num_heads=[8, 8, 8, 8],
         **kwargs,
     )
-    checkpoint = torch.load('/workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth', map_location=lambda storage, loc: storage)['model']
-    logger = logging.getLogger()
-    
-    
-    load_state_dict(model, checkpoint, strict=False, logger=logger)
-    del checkpoint
-    del logger
+    _load_pretrained(model, pretrained, "mpvit_small")
     model.default_cfg = _cfg_mpvit()
     return model
 
 
-def mpvit_base(**kwargs):
+def mpvit_base(pretrained=None, **kwargs):
     """mpvit_base :
 
     - #paths : [2, 3, 3, 3]
@@ -854,5 +925,6 @@ def mpvit_base(**kwargs):
         num_heads=[8, 8, 8, 8],
         **kwargs,
     )
+    _load_pretrained(model, pretrained, "mpvit_base")
     model.default_cfg = _cfg_mpvit()
     return model

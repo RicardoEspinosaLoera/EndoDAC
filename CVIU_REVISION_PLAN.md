@@ -888,3 +888,41 @@ protocol we control. It does **not** replace HADepth, AF-SfMLearner and Endo-SfM
 are method-level baselines whose losses are not implemented here, and they still need their
 published checkpoints (`cviu_config.yaml::methods`, currently pointing at paths that do not exist
 on the server).
+
+## 13. R2 as a factorial on MonoII: calibration x colour augmentation (AM-grid, 2026-09-15)
+
+Reviewer 2 asks whether the local affine calibration is validated. The cleanest way to answer is a
+**full factorial on the cheapest backbone**: the ResNet-18 of MonoII trains in ~4-6 h against
+~10.5 h for the adapted foundation encoder, so eighteen runs here cost about what six cost there.
+
+| | jitter as shipped | consistent jitter |
+|---|---|---|
+| no calibration | `MonoII-none` | `A-MonoII-none` |
+| **global** affine | `MonoII-glob` | `A-MonoII-glob` |
+| **local** affine (the proposal) | `MonoII` | `A-MonoII` |
+
+Three seeds per cell. Everything else is the published recipe: II loss at λ₁ = 0.5, monodepth2
+photometric loss, no HADepth term, batch 8, 20 epochs. `stats` writes `tables/monoii_calib.tex`.
+
+**Why the two factors together.** Reading **down a column** gives the none/global/local comparison
+the reviewer asked for, on a backbone where the paper claims the mechanism works. Reading **across
+a row** gives the effect of the colour-augmentation defect of §9 on that calibration model, which
+is the open hypothesis for why the module looked inert: its input was noise on half the training
+items. Run either factor alone and the other confounds it.
+
+**Pre-registered reading**, fixed before any of these runs exists:
+
+- *Calibration main effect.* Paired per sequence against the no-calibration cell of the same
+  column, SCARED as the selection set, Hamlyn and C3VD held out, Abs Rel primary. Two primary
+  comparisons per column (global vs none, local vs none), Holm over that family of two — the same
+  rule as §8b, which is the only way to escape the n=7 Wilcoxon floor of 0.0156.
+- *Augmentation main effect.* Each cell against its row partner.
+- *Interaction.* If the calibration helps only in the right-hand column, the defect was starving
+  the module and §8e must be rewritten. If it helps in both, the defect was never the issue and
+  §8e stands. If it helps in neither, the mechanism does not work on this backbone either, and
+  that is the answer to R2 whether we like it or not.
+
+**What it cannot settle.** It is one architecture. A positive result here plus the B-grid of §12
+would support "backbone-agnostic"; a positive result here alone supports "it works on ResNet-18",
+which is still more than the submission evidences, since the paper's Table 2 has no row isolating
+the calibration on that backbone at all.

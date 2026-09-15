@@ -129,3 +129,25 @@ CUDA_VISIBLE_DEVICES=3 python visualize_reconstruction.py --data_path '/mnt/data
 
 CUDA_VISIBLE_DEVICES=3 python visualize_reconstruction.py --data_path '/mnt/data-hdd2/Beilei/Dataset/SCARED' \
 --load_weights_folder './logs/Model_MIA' --eval_mono --model_type afsfm
+------------------------------------------------------------ B-grid: MonoII / MonoViT from scratch ------------------------------------------------------
+# MonoII = monodepth2's ResNet-18 + local affine calibration + II loss at the published lambda1 = 0.5
+CUDA_VISIBLE_DEVICES=0 python train_end_to_end.py --data_path '/workspace/ENDOVIS' --log_dir './logs' \
+--num_epochs 20 --batch_size 8 --learn_intrinsics True --model_name monoii \
+--depth_backbone resnet18 --photometric standard --illumination_invariant 0.5
+
+# MonoViT = MPViT-small + HR decoder, monodepth2 photometric loss. Needs the ImageNet MPViT-small
+# weights in pretrained_model/mpvit_small.pth; the official dropbox link is dead, so copy the one
+# already on the server:  cp /workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth pretrained_model/
+# (or pass --mpvit_weights /path/to/mpvit_small.pth)
+CUDA_VISIBLE_DEVICES=1 python train_end_to_end.py --data_path '/workspace/ENDOVIS' --log_dir './logs' \
+--num_epochs 20 --batch_size 8 --learn_intrinsics True --model_name monovit \
+--depth_backbone monovit --illum_calib none --illumination_invariant 0 --photometric standard
+
+# MonoViT + the two components; --depth_lr 5e-5 reproduces MonoViT's published split learning rate
+CUDA_VISIBLE_DEVICES=2 python train_end_to_end.py --data_path '/workspace/ENDOVIS' --log_dir './logs' \
+--num_epochs 20 --batch_size 8 --learn_intrinsics True --model_name monovit_ii \
+--depth_backbone monovit --photometric standard --illumination_invariant 0.5
+
+# the whole B-grid at 3 seeds, through the revision script (9 jobs)
+python cviu_revision.py train --gpus 0 1 2 --only MonoII MonoViT MonoViT-II
+python cviu_revision.py predict && python cviu_revision.py stats && python cviu_revision.py report

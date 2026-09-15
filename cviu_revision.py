@@ -74,6 +74,9 @@ DEFAULT_CONFIG = {
     "log_dir": "./logs",
     "out_dir": "./results/cviu",
     "pretrained_path": "./pretrained_model",
+    # ImageNet MPViT-small checkpoint for the MonoViT rows, if it is not already in
+    # <pretrained_path>/mpvit_small.pth (the official download link is dead, see MPVIT_URL)
+    "mpvit_weights": None,
     "python": sys.executable,
     "num_workers": 4,
     "train": {
@@ -85,7 +88,10 @@ DEFAULT_CONFIG = {
         # not the method.
         "multi_seed_runs": ["E3", "E4", "E7", "E8", "C0", "C1", "R1", "R2", "D3",
                             "M-local", "M-none", "M-global", "L025", "L100", "L200",
-                            "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora"],
+                            "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora",
+                            "MonoII", "MonoViT", "MonoViT-II",
+                            "MonoII-none", "MonoII-glob",
+                            "A-MonoII-none", "A-MonoII-glob", "A-MonoII"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -128,10 +134,43 @@ GRID = {
     "C0": {"group": "EC", "desc": "full minus calibration (no lighting model)", "flags": "--illum_calib none"},
     "E8-DVLoRA": {"group": "E", "desc": "full with plain LoRA", "flags": "--lora_type lora"},
     # R-grid: same losses on a weak backbone
-    "R1": {"group": "R", "desc": "ResNet-18 + standard loss",
+    "R1": {"group": "R", "desc": "ResNet-18 + standard loss (= Monodepth2 under this recipe)",
            "flags": "--depth_backbone resnet18 --illum_calib none --illumination_invariant 0 --photometric standard"},
     "R2": {"group": "R", "desc": "ResNet-18 + calibration + IIF + highlight",
            "flags": "--depth_backbone resnet18"},
+    # B-grid: the competing architectures, trained here from scratch under the SHARED recipe
+    # (plan section 12) -- same pose net, same splits, same 20 epochs, same learned intrinsics,
+    # each method's own published loss. Their difference against E3/M-local is then the depth
+    # network, not the training protocol. MonoII and MonoViT-II carry the method's two components
+    # (local affine calibration + II loss at the published lambda1 = 0.5, monodepth2 photometric
+    # loss); R2 is NOT MonoII: it uses lambda1 = 0.1 and HADepth's highlight term.
+    "MonoII": {"group": "B", "desc": "MonoII: ResNet-18 + local calibration + II (lambda1=0.5)",
+               "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0.5"},
+    # AM-grid: the R2 question (none / global / local affine calibration) as a full factorial with
+    # the colour-augmentation defect of section 9, on the cheapest backbone. ResNet-18 trains in
+    # ~4-6 h instead of ~10.5, so 3 calibrations x 2 augmentations x 3 seeds costs about what six
+    # foundation-backbone runs cost. Everything else is the published recipe: II at lambda1 = 0.5,
+    # monodepth2 photometric loss. MonoII is the {local, broken} cell.
+    "MonoII-none": {"group": "AM", "desc": "ResNet-18, no calibration, II (0.5)",
+                    "flags": "--depth_backbone resnet18 --illum_calib none --photometric standard "
+                             "--illumination_invariant 0.5"},
+    "MonoII-glob": {"group": "AM", "desc": "ResNet-18, global affine calibration, II (0.5)",
+                    "flags": "--depth_backbone resnet18 --illum_calib global --photometric standard "
+                             "--illumination_invariant 0.5"},
+    "A-MonoII-none": {"group": "AM", "desc": "ResNet-18, no calibration, II (0.5), consistent jitter",
+                      "flags": "--depth_backbone resnet18 --illum_calib none --photometric standard "
+                               "--illumination_invariant 0.5 --color_aug_consistent True"},
+    "A-MonoII-glob": {"group": "AM", "desc": "ResNet-18, global calibration, II (0.5), consistent jitter",
+                      "flags": "--depth_backbone resnet18 --illum_calib global --photometric standard "
+                               "--illumination_invariant 0.5 --color_aug_consistent True"},
+    "A-MonoII": {"group": "AM", "desc": "MonoII (local calibration), consistent jitter",
+                 "flags": "--depth_backbone resnet18 --photometric standard "
+                          "--illumination_invariant 0.5 --color_aug_consistent True"},
+    "MonoViT": {"group": "B", "desc": "MonoViT: MPViT-small + HR decoder, standard loss",
+                "flags": "--depth_backbone monovit --illum_calib none --illumination_invariant 0 "
+                         "--photometric standard"},
+    "MonoViT-II": {"group": "B", "desc": "MonoViT + local calibration + II (lambda1=0.5)",
+                   "flags": "--depth_backbone monovit --photometric standard --illumination_invariant 0.5"},
     # C-grid: illumination model
     "C1": {"group": "C", "desc": "global affine calibration", "flags": "--illum_calib global"},
     # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
@@ -182,8 +221,29 @@ GRID = {
 }
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
                   "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
-                  "L025", "L100", "L200", "R1", "R2", "N0", "D3-EndoDAC", "D3",
-                  "A-C0", "A-C1", "A-E8"]
+                  "L025", "L100", "L200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
+                  "MonoII-none", "MonoII-glob", "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
+                  "N0", "D3-EndoDAC", "D3", "A-C0", "A-C1", "A-E8"]
+# R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
+# down a column gives the calibration comparison the reviewer asked for; reading across a row
+# gives the effect of the augmentation defect on that calibration model.
+MONOII_CALIB_ORDER = [("MonoII-none", "none, jitter as shipped"),
+                      ("MonoII-glob", "global affine, jitter as shipped"),
+                      ("MonoII", "local affine (MonoII), jitter as shipped"),
+                      ("A-MonoII-none", "none, consistent jitter"),
+                      ("A-MonoII-glob", "global affine, consistent jitter"),
+                      ("A-MonoII", "local affine (MonoII), consistent jitter")]
+# R3, the reviewer's question about what the backbone contributes: the same two components
+# (local affine calibration + II loss at lambda1 = 0.5, monodepth2 photometric loss) on three
+# depth networks of very different capacity, each also trained plain. Every row is 3 seeds and
+# the shared recipe, so a row pair differs only in the components and a column pair only in the
+# architecture.
+BACKBONE_ORDER = [("R1", "ResNet-18 (Monodepth2), plain"),
+                  ("MonoII", "ResNet-18 + calibration + II (MonoII)"),
+                  ("MonoViT", "MPViT-small + HR decoder (MonoViT), plain"),
+                  ("MonoViT-II", "MPViT-small + calibration + II"),
+                  ("E3", "Depth Anything v1 + DV-LoRA (EndoDAC), plain"),
+                  ("M-local", "Depth Anything v1 + calibration + II (MonoIIF)")]
 # lambda1 sweep of the II loss, in increasing order: the table the paper's Table 2 lacks for the
 # foundation backbone. Every point has the method's structure and differs only in lambda1.
 LAMBDA_ORDER = [("E4", "$\lambda_1 = 0$"), ("E7", "$\lambda_1 = 0.1$"),
@@ -392,6 +452,74 @@ def ensure_da3_weights(cfg, download=True):
         return False
 
 
+# The link the MPViT and MonoViT READMEs both give. Checked 2026-09-15: Dropbox retired the
+# /s/<id>/ links and it now answers with an HTML page, so the download below will normally fail
+# and the file has to come from a copy that already exists somewhere.
+MPVIT_URL = "https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth"
+MPVIT_FALLBACKS = [
+    "/workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth",  # hard-coded in models/monovit/mpvit.py before this change
+    "./ckpt/mpvit_small.pth",                                     # where MonoViT's README puts it
+    "~/mpvit_small.pth",
+]
+
+
+def mpvit_weights_path(cfg):
+    """ImageNet MPViT-small checkpoint, the initialisation MonoViT is published with."""
+    return os.path.join(cfg["pretrained_path"], "mpvit_small.pth")
+
+
+def ensure_mpvit_weights(cfg, download=True):
+    """True if the MPViT-small checkpoint is available, fetching it when missing.
+
+    Looked for in <pretrained_path>, then in cfg["mpvit_weights"] and the known local copies, then
+    downloaded. Without it the MonoViT rows would train from random weights, which is a different
+    experiment and would understate the baseline, so the B-grid runs are skipped rather than
+    mislabelled.
+    """
+    path = mpvit_weights_path(cfg)
+
+    def valid(p):
+        if torch is None:  # stats/report environments have no torch; size is the only check left
+            return os.path.getsize(p) > (10 << 20)
+        try:
+            ck = torch.load(p, map_location="cpu")
+            return isinstance(ck, dict) and ("model" in ck or "state_dict" in ck)
+        except Exception:
+            return False
+
+    if os.path.exists(path):
+        if valid(path):
+            return True
+        print("[mpvit] {} is not a valid MPViT checkpoint (interrupted download?), fetching it again".format(path))
+    ensure_dir(os.path.dirname(os.path.abspath(path)))
+    for cand in ([cfg.get("mpvit_weights")] if cfg.get("mpvit_weights") else []) + MPVIT_FALLBACKS:
+        cand = os.path.expanduser(cand)
+        if os.path.exists(cand) and valid(cand):
+            print("[mpvit] using the copy already on this machine: {}".format(cand))
+            shutil.copy2(cand, path)
+            return True
+    if not download:
+        return False
+    part = path + ".part"
+    print("[mpvit] downloading the ImageNet MPViT-small weights -> {}".format(path))
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(MPVIT_URL, part)
+        if not valid(part):
+            raise ValueError("downloaded file is not an MPViT checkpoint")
+        os.replace(part, path)
+        return True
+    except Exception as e:
+        if os.path.exists(part):
+            os.remove(part)
+        print("[mpvit] download failed ({}).\n"
+              "        The official link ({}) is dead: Dropbox retired the /s/ links, so it answers\n"
+              "        with an HTML page. Copy an existing mpvit_small.pth to {} (look for one in\n"
+              "        {}), or set mpvit_weights: <path> in the config."
+              .format(e, MPVIT_URL, path, ", ".join(MPVIT_FALLBACKS)))
+        return False
+
+
 def _last_flag_value(cmd, flag):
     vals = [cmd[i + 1] for i in range(len(cmd) - 1) if cmd[i] == flag]
     return vals[-1] if vals else None
@@ -504,6 +632,15 @@ def stage_train(cfg, args):
         if not args.dry_run and not args.skip_preflight:
             print("[train] skipping {} for now".format(da3_runs))
             selected = [r for r in selected if r not in da3_runs]
+    # MonoViT rows need the ImageNet MPViT-small weights; without them the encoder would start
+    # from random init and the baseline would be understated.
+    mv_runs = [r for r in selected if "--depth_backbone monovit" in runs[r]["flags"]]
+    if mv_runs and not ensure_mpvit_weights(cfg, download=not args.dry_run):
+        print("[train] {} need the ImageNet MPViT-small weights at {} (see the message above)".format(
+            mv_runs, mpvit_weights_path(cfg)))
+        if not args.dry_run and not args.skip_preflight:
+            print("[train] skipping {} for now".format(mv_runs))
+            selected = [r for r in selected if r not in mv_runs]
     alive = running_cviu_runs()   # e.g. jobs left running after their launcher died
     if alive:
         print("[train] still training from an earlier launch: {}".format(sorted(alive)))
@@ -740,9 +877,14 @@ def load_depth_model_from_run(cfg, run, seed, device):
     with open(os.path.join(os.path.dirname(wf), "opt.json")) as f:
         opt = json.load(f)
     sd = torch.load(os.path.join(wf, "depth_model.pth"), map_location="cpu")
-    if opt.get("depth_backbone", "endodac") == "resnet18":
+    backbone = opt.get("depth_backbone", "endodac")
+    if backbone == "resnet18":
         from models.resnet_depth import ResnetDepth
         model = ResnetDepth(opt["num_layers"], False, opt["scales"])
+    elif backbone == "monovit":
+        from models.monovit_depth import MonoViTDepth
+        # pretrained_weights=None: the checkpoint holds every weight, no need to reload MPViT
+        model = MonoViTDepth(scales=opt["scales"], pretrained_weights=None)
     else:
         import models.endodac as endodac
         # pretrained_path=None: the checkpoint holds every weight, no need to reload DA v1
@@ -1902,7 +2044,9 @@ def write_tables(cfg, summary, paired, per_seq):
     others = [d for d in cfg["datasets"] if d != "scared"]
     for fname, order in (("ablation.tex", [(r, runs[r]["desc"]) for r in ABLATION_ORDER if r in runs]),
                          ("calibration.tex", CALIB_ORDER),
-                         ("lambda_sweep.tex", LAMBDA_ORDER)):
+                         ("backbones.tex", BACKBONE_ORDER),
+                         ("lambda_sweep.tex", LAMBDA_ORDER),
+                         ("monoii_calib.tex", MONOII_CALIB_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:
@@ -1997,6 +2141,36 @@ def stage_report(cfg, args):
                 fig.savefig(os.path.join(fdir, "per_sequence_{}.pdf".format(d)))
                 plt.close(fig)
                 md += ["![per-sequence {}](figures/per_sequence_{}.pdf)".format(d, d), ""]
+
+    # backbone x components (R3): is the gain the architecture or the two components?
+    bb_pairs = [("R1", "MonoII", "ResNet-18 (Monodepth2 / MonoII)"),
+                ("MonoViT", "MonoViT-II", "MPViT-small + HR decoder (MonoViT)"),
+                ("E3", "M-local", "Depth Anything v1 + DV-LoRA (EndoDAC / MonoIIF)")]
+    have = {r["method"] for r in per_seq}
+    if any(b in have and f in have for b, f, _ in bb_pairs):
+        md += ["## Backbone × components (R3): local calibration + II loss (λ₁ = 0.5) on three depth networks", "",
+               "Every row is the same pair of components on a different architecture, with everything "
+               "else equal (shared recipe: same pose net, same splits, 20 epochs, learned intrinsics). "
+               "The difference is (with components) − (plain) per sequence, so **negative means the "
+               "components help**.", ""]
+        rows = []
+        for d in sorted({r["dataset"] for r in per_seq}):
+            ps = {(r["method"], r["sequence"]): float(r["abs_rel"]) for r in per_seq if r["dataset"] == d}
+            for base, full, label in bb_pairs:
+                seqs = sorted({s for (m, s) in ps if m == base} & {s for (m, s) in ps if m == full})
+                if not seqs:
+                    continue
+                diff = np.array([ps[(full, s)] - ps[(base, s)] for s in seqs])
+                t = paired_tests(diff)
+                lo, hi = bootstrap_ci(diff, cfg["stats"]["n_boot"], cfg["stats"]["alpha"], np.random.default_rng(0))
+                rows.append([d, label,
+                             fmt(float(np.mean([ps[(base, s)] for s in seqs])), 4),
+                             fmt(float(np.mean([ps[(full, s)] for s in seqs])), 4),
+                             "{} [{}, {}]".format(fmt(t["mean_diff"], 4), fmt(lo, 4), fmt(hi, 4)),
+                             "{}/{}".format(int((diff < 0).sum()), len(seqs)),
+                             fmt(t.get("p_wilcoxon", float("nan")))])
+        md.append(_md_table(["dataset", "backbone", "plain", "+ components", "diff [CI]", "helped/n", "p_W"], rows))
+        md.append("")
 
     # illum-fit
     fits = {seq: read_csv(out_path(cfg, "illum", "fit_{}.csv".format(seq))) for seq in ic["sequences"]}

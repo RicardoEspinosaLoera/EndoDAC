@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 import wandb
 from models.resnet_depth import ResnetDepth
+from models.monovit_depth import MonoViTDepth
 
 _DEPTH_COLORMAP = plt.get_cmap('plasma', 256)  # for plotting
 
@@ -66,6 +67,14 @@ class Trainer:
                 include_cls_token=self.opt.include_cls_token,
                 backbone_weights=self.opt.backbone_weights, da3_weights=self.opt.da3_weights,
                 train_depth_head=self.opt.train_depth_head)
+        elif self.opt.depth_backbone == "monovit":
+            # MonoViT (Zhao et al., 3DV'22): MPViT-small + the HR nested decoder, trained here
+            # from scratch under the same recipe as every other backbone.
+            mpvit_weights = self.opt.mpvit_weights
+            if mpvit_weights is None:
+                mpvit_weights = os.path.join(self.opt.pretrained_path, "mpvit_small.pth")
+            self.models["depth_model"] = MonoViTDepth(
+                scales=self.opt.scales, pretrained_weights=mpvit_weights)
         else:
             # CVIU ablation control: the same losses on a ResNet-18 U-Net (monodepth2 architecture)
             self.models["depth_model"] = ResnetDepth(
@@ -154,7 +163,18 @@ class Trainer:
             self.models["predictive_mask"].to(self.device)
             self.parameters_to_train += list(self.models["predictive_mask"].parameters())
 
-        self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.learning_rate)
+        if self.opt.depth_lr is not None:
+            # two groups: the depth network at --depth_lr, everything else at --learning_rate
+            depth_ids = {id(p) for p in self.models["depth_model"].parameters()}
+            groups = [{"params": [p for p in self.parameters_to_train if id(p) in depth_ids],
+                       "lr": self.opt.depth_lr},
+                      {"params": [p for p in self.parameters_to_train if id(p) not in depth_ids],
+                       "lr": self.opt.learning_rate}]
+            print("Depth network trains at lr {}, the pose/lighting heads at {}".format(
+                self.opt.depth_lr, self.opt.learning_rate))
+        else:
+            groups = self.parameters_to_train
+        self.model_optimizer = optim.Adam(groups, self.opt.learning_rate)
         self.model_lr_scheduler = optim.lr_scheduler.StepLR(
             self.model_optimizer, self.opt.scheduler_step_size, 0.1)
         """self.model_optimizer_0 = optim.Adam(self.parameters_to_train_0, 1e-4)

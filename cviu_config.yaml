@@ -6,6 +6,9 @@ data:
   hamlyn: /workspace/HAMLYN
   c3vd:   /workspace/C3VD
 
+mpvit_weights:                  # ImageNet MPViT-small .pth for the MonoViT rows, if it is not
+                                # already in <pretrained_path>/mpvit_small.pth (see the note in
+                                # train: below -- the official download link is dead)
 log_dir: ./logs                 # where train_end_to_end.py writes <model_name>/models/weights_*
 out_dir: ./results/cviu         # everything this script produces
 pretrained_path: ./pretrained_model
@@ -21,7 +24,9 @@ train:
   # M-local/M-none/M-global are MonoIIF as published (lambda1 = 0.5, no HADepth term); every
   # E/C/D/R run used the repo default lambda1 = 0.1, below the paper's tested range
   multi_seed_runs: [E3, E4, E7, E8, C0, C1, R1, R2, D3, M-local, M-none, M-global,
-                    L025, L100, L200, E8-DVLoRA, E8-IIF, C2-sup, C1-lora]
+                    L025, L100, L200, E8-DVLoRA, E8-IIF, C2-sup, C1-lora,
+                    MonoII, MonoViT, MonoViT-II, MonoII-none, MonoII-glob,
+                    A-MonoII-none, A-MonoII-glob, A-MonoII]
   checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
   runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
   skip_runs: []                 # grid entries not to train, e.g. [N0, D3-EndoDAC]
@@ -29,6 +34,14 @@ train:
   # need <pretrained_path>/da3_base.safetensors:
   #   wget -O pretrained_model/da3_base.safetensors https://huggingface.co/depth-anything/DA3-BASE/resolve/main/model.safetensors
   # N0 uses --backbone_weights none (random ViT-B) and needs nothing extra.
+  # B-grid (MonoII, MonoViT, MonoViT-II): the competing architectures trained here from scratch
+  # under the shared recipe. The MonoViT rows need the ImageNet MPViT-small checkpoint at
+  # <pretrained_path>/mpvit_small.pth. The link both the MPViT and MonoViT READMEs give
+  # (https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth) is DEAD since Dropbox retired the
+  # /s/ links, so the train stage looks for a copy already on the machine first -- including
+  # /workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth, the path models/monovit/mpvit.py
+  # used to hard-code -- and copies it into pretrained_model/. Point `mpvit_weights` below at it
+  # if it lives somewhere else. MonoII needs nothing extra (torchvision's ImageNet ResNet-18).
 
 proposed: E8                    # the MonoIIF row every paired test is against
 datasets: [scared, hamlyn, c3vd]
