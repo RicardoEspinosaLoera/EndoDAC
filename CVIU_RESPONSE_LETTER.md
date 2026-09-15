@@ -5,8 +5,9 @@ Drafts for the four experimental asks. Every number is SCARED Abs Rel at the **s
 `results/cviu/paired.csv`; the derivation is in `CVIU_REVISION_PLAN.md` §8. Paired differences
 are `method − ours` per sequence with a 10 000-draw cluster bootstrap CI.
 
-**Placeholders marked `[HAMLYN]` / `[C3VD]` still need the corresponding rows of
-`results/cviu/report.md`.**
+Hamlyn and C3VD numbers are filled in (from the results pulled to the laptop on 2026-09-15).
+**The cross-dataset picture is in `CVIU_REVISION_PLAN.md` §8g and it narrows the R2 claim
+considerably: nothing about the calibration replicates outside SCARED.**
 
 ---
 
@@ -45,9 +46,25 @@ gradient that should reach the depth network, whereas a two-parameter bounded co
 We have replaced the local module with the global one throughout and report the local variant as
 an ablation.
 
+**Out of domain the comparison is a tie, and we say so.** On Hamlyn (n = 58 blocks from its
+single sequence) and C3VD (n = 7 scenes) neither claim replicates: against the global model, no
+calibration gives −0.0002, CI [−0.0023, +0.0020] on Hamlyn and −0.0059, CI [−0.0147, +0.0028] on
+C3VD, and the local model gives +0.0013, CI [−0.0004, +0.0030] and −0.0038, CI [−0.0138,
++0.0094]. Every interval covers zero. Two results even run the other way: on Hamlyn the plain
+EndoDAC baseline is the best of the seven configurations (−0.0031, CI [−0.0048, −0.0013], better
+in 37 of 58 blocks), and on C3VD the best is our model *without* the illumination-invariant loss
+(−0.0208, CI [−0.0322, −0.0103], better in 6 of 7 scenes). We therefore claim that affine
+photometric calibration helps **in the training domain** and is neutral outside it, and that the
+global form is the one to use because it is clearly better in-domain and never worse than the
+local one by more than noise. We do not claim a general improvement, and all three datasets are
+reported with this table rather than SCARED alone.
+
 **What is honest to claim and what is not.** The mechanism above is an interpretation consistent
 with every measurement we made; the falsifying experiment — a local head restricted to a
-low-order spatial basis — was not run, and we say so in the paper.
+low-order spatial basis — was not run, and we say so in the paper. Only the backbone-level
+effects (the ResNet-18 control, the DA3 encoder, the random-init encoder) survive a change of
+domain with intervals excluding zero; every photometric-component effect is within noise of zero
+on at least one dataset.
 
 ---
 
@@ -142,7 +159,13 @@ Two consequences we report openly:
 
 On Hamlyn our copy of the dataset holds a single rectified sequence, so we use contiguous blocks
 of 100 frames as the unit (n = 58) and state that these intervals are slightly optimistic,
-because blocks within one video remain correlated. `[HAMLYN]` `[C3VD]`
+because blocks within one video remain correlated; the partition is identical for every method,
+so the paired tests stay aligned. C3VD keeps its 7 scenes as units. The recomputation changes
+what the tables say: on SCARED (n = 7) the differences among our photometric variants span
+0.0021 Abs Rel, on C3VD (n = 7) they span 0.042, and on Hamlyn 0.006, so the same method pair
+can be significant on one dataset and a tie on another. We now report all three and mark per
+dataset which differences their intervals actually resolve, instead of ranking methods on a
+single pooled frame-level average.
 
 ---
 
@@ -163,11 +186,16 @@ because blocks within one video remain correlated. `[HAMLYN]` `[C3VD]`
    load (the checkpoint paths in `cviu_config.yaml` do not exist on the server); HADepth,
    MonoViT, Endo-SfMLearner and Monodepth2 were never configured. Fix the paths and re-run
    `predict` + `stats`.
-2. **Decide the method's identity.** With the local module replaced by the global one and the
-   IIF term shown not to improve accuracy (§8d of the plan: 0.05052 without it vs 0.05116 with
-   it, 3 seeds), the contribution as written no longer matches the results. Either the IIF term
-   is reframed as robustness under illumination change — `illum-sens` can support that, and the
-   sensitivity sweep is already computed — or it is dropped from the claims. The paper's title
-   and framing depend on this choice.
-3. Hamlyn and C3VD paragraphs above need their numbers.
+2. **Decide the method's identity.** The IIF term does not improve accuracy: removing it is
+   neutral on SCARED (0.05052 vs 0.05116, 3 seeds), costs 0.0015 on Hamlyn, and **gains 0.0208
+   on C3VD with the interval excluding zero** — the largest single component effect measured on
+   that dataset, in the wrong direction for the component the method is named after. Either it
+   is reframed as robustness under illumination change (`illum-sens` is already computed) or it
+   is dropped from the claims. The paper's title depends on this choice.
+3. **Consider whether the headline claim should be the calibration at all.** Per §8g only the
+   backbone-level effects replicate across the three datasets. An honest paper built on these
+   results is closer to "a careful ablation of what actually drives self-supervised endoscopic
+   depth, with a small in-domain gain from global photometric calibration" than to a new method
+   claim. That is a strong CVIU contribution — the reviewers asked exactly these questions — but
+   it is a different paper from the one submitted.
 4. Pose evaluation was never run; `evaluate_pose.py` exists if a reviewer asks.

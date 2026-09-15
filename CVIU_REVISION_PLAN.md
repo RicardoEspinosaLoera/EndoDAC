@@ -333,7 +333,11 @@ All numbers are SCARED Abs Rel, **sequence-level** (n = 7 keyframe videos), from
 `method − C1` per sequence with a 10 000-draw cluster bootstrap CI, signed so that **positive
 means C1 is better**; `wins` counts the sequences where the method beats C1.
 
-### 8a. The best configuration is C1 (global affine calibration)
+### 8a. On SCARED the best configuration is C1 (global affine calibration)
+
+**Read §8g before quoting anything from this subsection.** C1 is the best configuration *on
+SCARED, the training domain*. Out of domain the ranking changes completely and neither of the
+two claims below replicates.
 
 | Run | seeds | Abs Rel | seed SD | vs C1 | CI | wins | p (Wilcoxon) |
 |---|---|---|---|---|---|---|---|
@@ -427,6 +431,54 @@ is re-sampled per frame, so on half the training items the illumination relation
 head observes is dominated by augmentation noise. Nothing in §8a-§8c depends on it (all runs
 share it), but §8e's claim that the module "does not track illumination" cannot be separated
 from the possibility that it was never shown a usable signal. The A-grid of §9 settles it.
+
+### 8g. Cross-dataset: the calibration result does not replicate
+
+Abs Rel per dataset, the seven 3-seed configurations that differ only in the photometric
+machinery (SCARED n=7 sequences; Hamlyn n=58 blocks of 100 frames from its single sequence, so
+its intervals are optimistic; C3VD n=7 scenes). Best per column in bold.
+
+| Run | what it is | SCARED | Hamlyn | C3VD | rank sum |
+|---|---|---|---|---|---|
+| E3 | EndoDAC baseline, no calibration / IIF / highlight | 0.0517 | **0.1565** | 0.2929 | 6+1+7 |
+| C0 | E8 without calibration | 0.0518 | 0.1593 | 0.2658 | 7+2+3 |
+| C1 | global affine calibration | **0.0497** | 0.1595 | 0.2717 | 1+3+5 |
+| C1-lora | global affine + plain LoRA | 0.0499 | 0.1598 | 0.2751 | 2+4+6 |
+| C2-sup | local affine supervised by the LS fit | 0.0511 | 0.1599 | 0.2611 | 5+5+2 |
+| E8 | local affine (the submitted MonoIIF) | 0.0512 | 0.1608 | 0.2679 | 4+6+4 |
+| E8-IIF | E8 without the IIF loss | 0.0505 | 0.1623 | **0.2509** | 3+7+1 |
+
+Paired against C1, the two claims of §8a **fail to replicate**:
+
+| Claim | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| calibration helps (C1 vs C0) | +0.00216 [+0.00064,+0.00397] | -0.0002 [-0.0023,+0.0020] tie | -0.0059 [-0.0147,+0.0028] tie |
+| global beats local (C1 vs E8) | +0.00148 [+0.00050,+0.00319] 7/7 | +0.0013 [-0.0004,+0.0030] tie | -0.0038 [-0.0138,+0.0094] tie |
+
+And two results run the other way out of domain:
+
+- **Hamlyn: the plain EndoDAC baseline E3 wins**, -0.0031 [-0.0048,-0.0013] against C1, 37/58
+  blocks, p = 0.002. None of the photometric machinery earns its place there.
+- **C3VD: E8-IIF wins**, -0.0208 [-0.0322,-0.0103] against C1, 6/7 scenes, p = 0.031. Removing
+  the IIF loss buys 0.017 Abs Rel, ~6% relative — the largest single effect any component has on
+  that dataset, and it is negative for the component the method is named after.
+
+What does replicate on all three datasets, with CIs excluding zero: the ResNet-18 control loses
+(R1, R2), the DA3 backbone loses (D3), and the random-init encoder loses by a wide margin. In
+other words **only the large, backbone-level effects survive a change of domain; every
+photometric-component effect is within noise of zero somewhere.**
+
+Consequences for the paper:
+
+1. §8a must be quoted as "on SCARED", never as "the best configuration".
+2. The R2 answer cannot claim that calibration helps in general. What the data supports is: it
+   helps in-domain, it is neutral out of domain, and the *global* form is never worse than the
+   local one by more than noise while being clearly better in-domain. That is a defensible but
+   much narrower claim.
+3. §8d (the IIF loss does not help) gets stronger, not weaker: removing it is neutral on SCARED,
+   costs 0.0015 on Hamlyn and gains 0.017 on C3VD.
+4. Reporting only SCARED would be the reviewer's worst suspicion confirmed. All three datasets
+   go in the paper with this table.
 
 ### 8f. Illumination calibration: code review (2026-09-15)
 
