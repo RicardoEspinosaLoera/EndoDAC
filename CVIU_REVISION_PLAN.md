@@ -650,9 +650,45 @@ the grid was trained with, and one promised experiment does not exist.
 | Paper | Code / grid | Consequence |
 |---|---|---|
 | λ₁ = **0.5** for the II loss (§3.3, Table 2 sweeps {0.25…10}) | `--illumination_invariant` default **0.1** (options.py:266), used by every E/C/D/R run | **0.1 is below the whole range the paper tested.** No run of the 41 is the published method. §8d ("the IIF loss does not help") is measured at one fifth of the published weight and is **retracted**. |
-| Depth Anything **V2** encoder (abstract, §2.2.4, §3.3, §5, conclusion) | loads `depth_anything_vitb14.pth` (endodac.py:267), i.e. Depth Anything **v1** | Either the paper names the wrong backbone or the file on the server is a renamed V2 checkpoint. Must be checked: a reviewer verifies this against the released code. |
+| Depth Anything **V2** encoder (abstract, §2.2.4, §3.3, §5, conclusion) | loads `depth_anything_vitb14.pth` (endodac.py:267), i.e. Depth Anything **v1** | **Resolved by the authors 2026-09-15: the code is right, the paper is wrong.** The backbone is Depth Anything **v1** (ViT-B/14). Every "V2" claim about the *proposed* model must be corrected — see §10c. Internal evidence agrees: the paper itself says MonoIIF "shares its adapted backbone with EndoDAC", and EndoDAC uses v1. |
 | batch size **12**, encoder frozen the first **5 epochs** then DVLoRA + calibration fine-tuned 15 (§3.3) | `--batch_size 8`; freezing is governed by `--warm_up_step 20000`, which at batch 8 over 15 351 images is ≈10.4 epochs (≈15.6 at batch 12) | Neither matches 5 epochs. Check what `warm_up_step` actually does before quoting §3.3. |
 | §2.1.3: "a quantitative comparison under an identical training framework is given in Section 3.4" for Robinson-8 **vs Sobel, Scharr and Census** | no such experiment exists, and the three descriptors are not implemented | A promised comparison with no data behind it. Either implement the three descriptors (≈1 day of work plus 3-4 runs) or remove the sentence. |
+
+### 10c. "Depth Anything V2" must be corrected to v1 throughout the paper
+
+The proposed model uses **Depth Anything v1, ViT-B/14** (`pretrained_model/depth_anything_vitb14.pth`).
+Places where the submission claims V2 *for the proposed model* and must be changed:
+
+- **Abstract**: "a Depth Anything V2 foundation model encoder adapted via domain-specific low-rank
+  adaptation (MonoIIF)".
+- **§2.2.4, "Foundation model backbone (MonoIIF)"**: "builds upon the Depth Anything V2 foundation
+  model (Yang et al., 2024b)".
+- **§3.3**: "For MonoIIF, the Depth Anything V2 encoder …" (the same sentence carries the TODO on
+  encoder size: it is ViT-B/14, 8 961 540 trainable parameters under DV-LoRA).
+- **§3.4, "Foundation model backbone"**: "the pretrained geometric priors of the Depth Anything V2
+  backbone", and the Table 3 TODO's "zero-shot DA-V2" row.
+- **§3.5, "MonoIIF model"**: "leverages the Depth Anything encoder (Yang et al., 2024b)" — the text
+  is fine, the citation points at v2.
+- **§5**: "The experiments of this work rely on the Depth Anything V2 encoder."
+- **§6 Conclusion**: "within a Depth Anything V2 encoder adapted with low-rank updates (MonoIIF)".
+- **References**: `Yang et al. 2024a` and `2024b` are two entries for the same v2 paper. One of
+  them must become the v1 reference (Yang, Kang, Huang, Xu, Feng, Zhao, *Depth Anything:
+  Unleashing the Power of Large-Scale Unlabeled Data*, CVPR 2024).
+
+The mentions of Depth Anything V2 in §1.2 and §1.3, which describe **related work**, stay as they
+are.
+
+One consequence worth weighing: with the text corrected, a reviewer who already asks "why not
+Depth Anything 3" will equally ask "why not v2". Two ways to answer, in increasing cost:
+
+1. State it in the limitations: v1 was chosen to share EndoDAC's backbone exactly, so that the
+   comparison isolates the losses rather than the foundation model. That is true and is the reason
+   the whole E-grid is interpretable.
+2. Run it: DA v2 ViT-B is the same DINOv2-based architecture as v1, so a `--backbone_weights da2`
+   option is a few lines pointing at `depth_anything_v2_vitb.pth`, plus one zero-shot row and one
+   adapted run at 3 seeds (~32 h). This would give the paper v1 / v2 / v3 on the same recipe with
+   identical trainable-parameter counts, which is a strong answer to Q2 and cheap relative to what
+   has already been spent.
 
 ### 10a. M-grid: the published method
 

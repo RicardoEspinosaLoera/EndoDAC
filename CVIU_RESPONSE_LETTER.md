@@ -201,6 +201,20 @@ single pooled frame-level average.
 
 ---
 
+## Corrections to the manuscript itself (independent of any experiment)
+
+- **The backbone is Depth Anything v1, not V2.** Confirmed against the code by the authors on
+  2026-09-15. Every claim of "V2" about the proposed model is wrong: abstract, §2.2.4, §3.3, §3.4,
+  §3.5, §5, §6 and one of the two duplicated `Yang et al. 2024` references. The V2 mentions in the
+  related-work sections §1.2 and §1.3 stay. `CVIU_REVISION_PLAN.md` §10c lists every sentence.
+- **λ₁ = 0.5 was never swept on the foundation backbone.** Table 2 sweeps it on the ResNet variant,
+  one seed, frame-level; MonoIIF inherits the value. The L-grid (plan §11) measures it properly.
+- **Checkpoint selection is on the test set** (`run_epoch_eval` iterates the test loader). This
+  needs a sentence of limitation in §3.3.
+- **§2.1.3 promises an experiment that does not exist**: "a quantitative comparison under an
+  identical training framework is given in Section 3.4" for Robinson-8 vs Sobel, Scharr and
+  Census. Either implement the three descriptors or remove the sentence.
+
 ## Open items before submission
 
 0. **HOLD the R2 answer until the A-grid lands.** A defect found on 2026-09-15
