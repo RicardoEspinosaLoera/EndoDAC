@@ -480,6 +480,42 @@ Consequences for the paper:
 4. Reporting only SCARED would be the reviewer's worst suspicion confirmed. All three datasets
    go in the paper with this table.
 
+### 8h. Leave-one-out of the method's own components (all three datasets)
+
+`diff = variant - E8` per sequence, so **negative means removing the component improved
+accuracy**. Bootstrap CI, 10 000 draws, from `results/cviu/per_sequence.csv`.
+
+| Removed | run | SCARED (n=7) | Hamlyn (n=58) | C3VD (n=7) | seeds |
+|---|---|---|---|---|---|
+| affine calibration | C0 | +0.0007 [-0.0010,+0.0028] | **-0.0015 [-0.0028,-0.0003]** | -0.0020 [-0.0111,+0.0087] | 3 |
+| IIF loss | E8-IIF | -0.0006 [-0.0021,+0.0008] | +0.0015 [-0.0001,+0.0030] | **-0.0170 [-0.0270,-0.0073]** | 3 |
+| highlight loss | E7 | +0.0023 [-0.0017,+0.0082] | **-0.0048 [-0.0071,-0.0025]** | **+0.0342 [+0.0257,+0.0422]** | 1 |
+| DV-LoRA -> LoRA | E8-DVLoRA | -0.0008 [-0.0017,+0.0001] | **+0.0030 [+0.0016,+0.0044]** | **+0.0219 [+0.0149,+0.0295]** | 3 |
+
+Build-up one component at a time on top of E3 (delta Abs Rel, negative = better):
+
+| Variant | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| E4 = E3 + calibration | +0.0012 | -0.0014 | -0.0057 |
+| E5 = E3 + IIF | +0.0004 | +0.0015 | +0.0056 |
+| E6 = E3 + highlight | -0.0003 | +0.0036 | -0.0003 |
+| E7 = E3 + calibration + IIF | +0.0018 | -0.0005 | +0.0091 |
+| E8 = E3 + all three | -0.0005 | +0.0043 | **-0.0250** |
+
+Readings:
+
+1. **No component of ours improves accuracy on more than one dataset.** In-domain not even the
+   individual additions help: only the three together beat E3, by 0.0005.
+2. The **highlight-aware loss is the only component with a large effect anywhere**: +0.0342 on
+   C3VD (0/7 scenes for the variant without it), which is essentially the whole -0.0250 that E8
+   gains over E3 there. It is negative on Hamlyn and it has **one seed**, so it cannot carry a
+   claim yet. Two more seeds of E7 (~21 h on two GPUs) is the cheapest open experiment and the
+   one most likely to yield a defensible contribution.
+3. **Retract the earlier "plain LoRA beats DV-LoRA" note** (memory and the 2026-09-13 results):
+   it held on SCARED alone with the interval touching zero, and out of domain DV-LoRA wins on
+   both datasets with intervals excluding zero. DV-LoRA is EndoDAC's component, not ours, and it
+   is the one whose removal costs most.
+
 ### 8f. Illumination calibration: code review (2026-09-15)
 
 Checked and clean, so these are not alternative explanations:

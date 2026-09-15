@@ -93,6 +93,30 @@ published), is a 3.8% relative reduction in Abs Rel whose bootstrap CI excludes 
 (+0.00198, CI [+0.00043, +0.00416], better in 5 of 7 sequences). We state this proportion
 explicitly in the revised paper rather than reporting only the final number.
 
+**Leave-one-out of each of our own components.** The table above isolates the backbone; this one
+isolates the method. Each row removes one component from the full model and reports the paired
+difference `variant − full` per sequence, so a **negative** number means the component was
+costing accuracy. Sequence-level, 10 000-draw bootstrap CI.
+
+| Component removed | SCARED (n=7) | Hamlyn (n=58) | C3VD (n=7) | seeds |
+|---|---|---|---|---|
+| affine calibration | +0.0007 [−0.0010, +0.0028] | **−0.0015 [−0.0028, −0.0003]** | −0.0020 [−0.0111, +0.0087] | 3 |
+| illumination-invariant loss | −0.0006 [−0.0021, +0.0008] | +0.0015 [−0.0001, +0.0030] | **−0.0170 [−0.0270, −0.0073]** | 3 |
+| highlight-aware loss | +0.0023 [−0.0017, +0.0082] | **−0.0048 [−0.0071, −0.0025]** | **+0.0342 [+0.0257, +0.0422]** | 1 |
+| DV-LoRA → plain LoRA | −0.0008 [−0.0017, +0.0001] | **+0.0030 [+0.0016, +0.0044]** | **+0.0219 [+0.0149, +0.0295]** | 3 |
+
+No component of ours improves accuracy on more than one dataset. The illumination-invariant loss
+is neutral in-domain, worth 0.0015 on Hamlyn and **costs 0.0170 on C3VD**. The highlight-aware
+term is the only one with a large effect anywhere (+0.0342 on C3VD) and it is negative on Hamlyn;
+it currently has a single training seed, so we do not draw a conclusion from it. DV-LoRA, which
+is EndoDAC's contribution and not ours, is the component whose removal costs most out of domain.
+
+Adding the components to the baseline one at a time tells the same story on the training domain:
++calibration +0.0012, +invariant loss +0.0004, +highlight −0.0003, +calibration+invariant
++0.0018, all three together −0.0005 Abs Rel. Only the combination is (marginally) better than
+the baseline, and only in-domain. On C3VD the combination is worth −0.0250 and essentially all
+of it comes from the highlight-aware term.
+
 We also repeated the same losses on a ResNet-18 U-Net backbone. There the method changes
 nothing: 0.0593 with the standard photometric loss against 0.0593 with the full method, a
 difference of 0.00003. The benefit of photometric calibration appears only on top of a strong
@@ -198,4 +222,11 @@ single pooled frame-level average.
    depth, with a small in-domain gain from global photometric calibration" than to a new method
    claim. That is a strong CVIU contribution — the reviewers asked exactly these questions — but
    it is a different paper from the one submitted.
-4. Pose evaluation was never run; `evaluate_pose.py` exists if a reviewer asks.
+4. **`E7` needs two more seeds.** It is the leave-one-out arm of the highlight-aware loss, and
+   that term is now the only component of ours with a large effect anywhere (+0.0342 Abs Rel on
+   C3VD, 0/7 scenes for the variant without it). With one seed it cannot carry that claim, and
+   it is the cheapest experiment left: `train --only E7 --seeds 1 2`, two GPUs, ~21 h.
+5. **Retract the "plain LoRA beats DV-LoRA" note.** That held on SCARED only, with the interval
+   touching zero (−0.0008 [−0.0017, +0.0001]); out of domain DV-LoRA wins on both datasets with
+   intervals excluding zero.
+6. Pose evaluation was never run; `evaluate_pose.py` exists if a reviewer asks.
