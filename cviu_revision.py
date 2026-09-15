@@ -80,7 +80,9 @@ DEFAULT_CONFIG = {
         "common_flags": "--num_epochs 20 --batch_size 8 --learn_intrinsics True --wandb_mode offline",
         "seeds": [314],
         "multi_seeds": [314, 1, 2],
-        "multi_seed_runs": ["E3", "E8", "C0", "C1", "R1", "R2", "D3",
+        # E4/E5/E7 describe the method itself (no HADepth highlight term) and carry its claim,
+        # so they need the three seeds too; they were single-seed until 2026-09-15
+        "multi_seed_runs": ["E3", "E4", "E5", "E7", "E8", "C0", "C1", "C1-std", "R1", "R2", "D3",
                             "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora"],
         "checkpoint": "best",
         "runs": {},
@@ -133,6 +135,11 @@ GRID = {
     # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
     "C2-sup": {"group": "C", "desc": "MonoIIF with the calibration supervised by the LS fit",
                "flags": "--calib_supervision 0.05"},
+    # MonoIIF as defined by the authors is E7 (EndoDAC + IIF loss + local affine calibration, with
+    # monodepth2's photometric loss): the highlight-aware term of E8/C0/C1 is HADepth's, not part of
+    # the method. C1-std re-tests "global beats local" inside that definition.
+    "C1-std": {"group": "C", "desc": "global affine calibration, monodepth2 photometric loss",
+               "flags": "--illum_calib global --photometric standard"},
     # the two settings that won their own comparison, combined
     "C1-lora": {"group": "C", "desc": "global calibration + plain LoRA",
                 "flags": "--illum_calib global --lora_type lora"},
@@ -155,7 +162,7 @@ GRID = {
            "flags": "--backbone_weights none"},
 }
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
-                  "E8-DVLoRA", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3",
+                  "E8-DVLoRA", "C1-std", "C1-lora", "R1", "R2", "N0", "D3-EndoDAC", "D3",
                   "A-C0", "A-C1", "A-E8"]
 CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)"),
                ("A-C0", "none, consistent jitter"), ("A-C1", "global affine, consistent jitter"),

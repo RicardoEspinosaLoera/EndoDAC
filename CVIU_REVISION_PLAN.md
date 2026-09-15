@@ -530,6 +530,46 @@ Readings:
    both datasets with intervals excluding zero. DV-LoRA is EndoDAC's component, not ours, and it
    is the one whose removal costs most.
 
+### 8i. The method as the authors define it is E7, and it is a tie with EndoDAC (2026-09-15)
+
+MonoIIF is EndoDAC's components plus **two** things: the illumination-invariant (ILL) loss and the
+local affine calibration. The highlight-aware term is HADepth's and is not part of the method.
+The grid run that matches that definition is therefore **E7** (`--photometric standard`, with the
+default local calibration and IIF weight), *not* E8, and not C1.
+
+| Dataset | E3 (EndoDAC) | E7 (the method) | E7 - E3 | wins | p |
+|---|---|---|---|---|---|
+| SCARED | 0.0517 | 0.0535 | +0.0018 [-0.0022,+0.0077] | 3/7 | 0.94 |
+| Hamlyn | 0.1565 | 0.1559 | -0.0005 [-0.0022,+0.0012] | 36/58 | 0.21 |
+| C3VD | 0.2929 | 0.3020 | +0.0091 [-0.0008,+0.0205] | 2/7 | 0.30 |
+
+**All three intervals cover zero: the method is statistically indistinguishable from the EndoDAC
+baseline on all three datasets.** Its two components separately, on top of E3: local calibration
+alone (E4) +0.0012 / -0.0014 / -0.0057, IIF alone (E5) +0.0004 / +0.0015 / +0.0056.
+
+**Design error in this grid, to fix before anything else.** The three runs that describe the
+method (E4, E5, E7) each have **one seed**, while all eleven three-seed runs (E8, C0, C1,
+E8-IIF, E8-DVLoRA, C2-sup, C1-lora, D3, R1, R2, E3) include HADepth's highlight term. E3's
+seed SD on SCARED is 0.0009, so a single-seed difference of 0.0018 carries no information. The
+seed budget went to the wrong runs.
+
+Runs added 2026-09-15: E4, E5, E7 join `multi_seed_runs` (seeds 1 and 2 to train), and **C1-std**
+(`--illum_calib global --photometric standard`, 3 seeds) re-tests "global beats local" inside the
+method's own definition, since the C1-vs-E8 result of §8a was measured with HADepth's term
+present in both arms.
+
+**Question of fact for the authors.** The trainer applied the highlight-aware loss
+unconditionally from commit `e65b446` ("ill + hlam", 2026-03-06) until `--photometric` was added
+during this revision, with `highlight` as its default. Any model trained after that date includes
+it. If the submitted paper's numbers came from such a run, the paper's model is E8, not E7, and
+includes a component of HADepth's without crediting it. Check the checkpoint that produced the
+submitted tables:
+
+```
+python -c "import json;print(json.load(open('logs/<paper_model>/models/opt.json')))"
+ls -l --time-style=long-iso logs/<paper_model>/models/
+```
+
 ### 8f. Illumination calibration: code review (2026-09-15)
 
 Checked and clean, so these are not alternative explanations:
