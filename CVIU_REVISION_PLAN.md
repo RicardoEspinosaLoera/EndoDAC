@@ -15,9 +15,11 @@ Still open:
 
 - **External baselines are absent from Tables 4-6.** `EndoDAC_MICCAI` and `AF_SfMLearner`
   failed to load: the paths in `cviu_config.yaml` (`logs/endodac_fullmodel/models/weights_19`,
-  `logs/Model_MIA`) do not exist on the server. HADepth, MonoViT, Endo-SfMLearner and
-  Monodepth2 were never configured. Until these are pointed at real checkpoints, the tables
-  compare only this grid's runs.
+  `logs/Model_MIA`) do not exist on the server. HADepth and Endo-SfMLearner were never
+  configured. Until these are pointed at real checkpoints, the tables compare only this grid's
+  runs. **Partly addressed 2026-09-15 (§12):** Monodepth2 (`R1`), MonoII and MonoViT are now
+  trained here from scratch under the shared recipe, so they enter the tables as grid runs
+  instead of as foreign checkpoints — 9 jobs still to run.
 - DA3-Mono-Large zero-shot: skipped, needs the `depth_anything_3` package (DA3-Base zero-shot
   did run, through the in-repo port).
 - Pose evaluation: never measured.
@@ -37,7 +39,7 @@ Reviewer asks → experiments:
 | Reviewer ask | Experiment | Script stage |
 |---|---|---|
 | R2: validate the local-affine illumination model (none vs global vs local), analyse the estimated parameters | C-grid (3 trained calibration variants), model-free affine fit on GT geometry, learned-parameter statistics, perturbation sensitivity | `train`, `illum-fit`, `illum-params`, `illum-sens` |
-| R3: isolate each component (Depth Anything backbone, DV-LoRA, calibration, IIF loss) | E-grid (build-up + leave-one-out) and R-grid (same losses on a ResNet-18 backbone) | `train`, `predict`, `stats` |
+| R3: isolate each component (Depth Anything backbone, DV-LoRA, calibration, IIF loss) | E-grid (build-up + leave-one-out), R-grid (same losses on a ResNet-18 backbone) and B-grid (§12: the same two components on ResNet-18 / MPViT / Depth Anything, each also trained plain) | `train`, `predict`, `stats` |
 | Q2: why not Depth Anything 3 | DA3 zero-shot rows on all test sets; optional DA3-Base backbone inside MonoIIF; limitations paragraph | `da3`, `predict`, `stats` |
 | Q6: uncertainty + paired tests at the video-sequence level | Per-frame → per-sequence aggregation, bootstrap CIs, paired tests for Tables 4-6 | `predict`, `stats`, `report` |
 
@@ -403,9 +405,22 @@ The pretrained weights and EndoDAC's adaptation machinery (Conv-neck + DV-LoRA) 
 reduction in Abs Rel whose CI excludes zero. E3 = 0.0517 reproduces the published EndoDAC
 number (0.052), so the anchor holds.
 
-The R-grid is a negative result worth stating: on a ResNet-18 backbone the full method is
-**R2 − R1 = −0.00003**, i.e. nothing. The benefit of the photometric machinery appears only on
-top of a strong foundation backbone.
+**RETRACTED 2026-09-15.** This paragraph read: "the R-grid is a negative result worth stating: on
+a ResNet-18 backbone the full method is R2 − R1 = −0.00003, i.e. nothing; the benefit of the
+photometric machinery appears only on top of a strong foundation backbone." **That is not a test
+of MonoII.** `R2` is ResNet-18 with λ₁ = **0.1** *and* HADepth's highlight term; MonoII is
+ResNet-18 with the calibration and the II loss at λ₁ = **0.5** and monodepth2's photometric loss.
+Two different configurations.
+
+The paper's own Table 2 points the other way on the transformer backbone: line 14 (no calibration,
+II at 0.5) gives 0.057 and line 11 (calibration, II at 0.5) gives 0.055 — the same order as the
++0.0022 we measure for the calibration on the foundation backbone. And Table 2 contains no row at
+all that isolates the calibration on ResNet, so the paper does not evidence it there either.
+
+Whether the two components help independently of the architecture is therefore an **open
+question**, and the B-grid of §12 is the design that answers it: R1/MonoII, MonoViT/MonoViT-II and
+E3/M-local, three seeds each, every pair differing only in the calibration and the II loss at the
+published λ₁.
 
 ### 8d. The IIF loss does not help on SCARED
 
@@ -785,3 +800,91 @@ Recommendation: option 1, plus one sentence of limitation in the paper about che
 Fixing the selection properly (a `--checkpoint_split val` flag and ground truth for the validation
 frames) would invalidate the comparability of all 41 existing runs and is not worth it for this
 revision.
+
+---
+
+## 12. Competing architectures trained here from scratch: MonoII and MonoViT (B-grid, added 2026-09-15)
+
+The open item at the top of this plan — Tables 4-6 have no external baselines — had two causes:
+the checkpoints of the published methods are not on the server, and the ones that are would have
+been trained by somebody else, on another split, with another protocol. Both go away if the
+competing architectures are trained **in this repo, from scratch, under the shared recipe**.
+
+**Shared recipe** (the user's decision, 2026-09-15): same pose network, same splits, same 20
+epochs, same batch size, same optimizer and learning rate, same learned intrinsics, same data
+augmentation, same checkpoint selection. Only two things change per row: the depth network, and
+whether the two components of the method (local affine calibration + II loss at the published
+λ₁ = 0.5, on monodepth2's photometric loss — no HADepth highlight term) are switched on. A row
+pair therefore isolates the components and a column pair isolates the architecture. The price is
+that these are not the published numbers of MonoViT or Monodepth2; say so in the caption.
+
+| Run | Depth network | Components | Flags on top of `common_flags` |
+|---|---|---|---|
+| `R1` | ResNet-18 U-Net (= **Monodepth2**) | none | `--depth_backbone resnet18 --illum_calib none --illumination_invariant 0 --photometric standard` |
+| `MonoII` | ResNet-18 U-Net | local affine + II (λ₁ = 0.5) | `--depth_backbone resnet18 --photometric standard --illumination_invariant 0.5` |
+| `MonoViT` | MPViT-small + HR decoder | none | `--depth_backbone monovit --illum_calib none --illumination_invariant 0 --photometric standard` |
+| `MonoViT-II` | MPViT-small + HR decoder | local affine + II (λ₁ = 0.5) | `--depth_backbone monovit --photometric standard --illumination_invariant 0.5` |
+| `E3` | Depth Anything v1 + DV-LoRA (= **EndoDAC**) | none | `--illum_calib none --illumination_invariant 0 --photometric standard` |
+| `M-local` | Depth Anything v1 + DV-LoRA | local affine + II (λ₁ = 0.5) | `--photometric standard --illumination_invariant 0.5` |
+
+`R1`, `E3` and `M-local` are already trained at 3 seeds, so the new compute is 9 jobs:
+`MonoII`, `MonoViT`, `MonoViT-II` × 3 seeds.
+
+**`MonoII` is not `R2`.** `R2` is `--depth_backbone resnet18` with the repo defaults, i.e.
+λ₁ = 0.1 *and* HADepth's highlight-aware term. MonoII, like `M-local`, is the method as published:
+λ₁ = 0.5, monodepth2 photometric loss, nothing of HADepth's.
+
+### Repo edits (2026-09-15)
+
+- `models/monovit/mpvit.py` was unusable: it imported `timm`, `einops`, `mmcv` and `mmengine`
+  (none in `requirements.txt`, so `import models.monovit` raised ImportError, which is why the
+  `monovit` entry of `DepthModelFactory` had never run), and `mpvit_small()` loaded a checkpoint
+  from a hard-coded `/workspace/endo-manydepth/...` path. It is now self-contained (local
+  `build_norm_layer`, `DropPath`, `trunc_normal_`, the two `rearrange` calls written out, and a
+  plain `torch.load`), and every factory takes `pretrained=<path>`, falling back to random
+  initialisation with a printed warning.
+- `models/monovit_depth.py`: `MonoViTDepth` = `mpvit_small` + `DepthDecoderT` behind the endodac
+  interface (`image -> {("disp", s)}`), the same wrapper trick `models/resnet_depth.py` uses.
+  27.87 M parameters (22.60 M encoder, 5.27 M decoder), features at H/2…H/32 =
+  [64, 128, 216, 288, 288], four disparity scales with `disp0` at full resolution.
+- `--depth_backbone monovit` in `options.py` / `trainer_end_to_end.py`, with `--mpvit_weights`
+  (default `<pretrained_path>/mpvit_small.pth`).
+- `--depth_lr`: learning rate of the depth network alone; `None` (the default) keeps the single
+  group, so nothing changes for the 41 existing runs. MonoViT's published recipe uses 5e-5 for
+  the MPViT encoder against 1e-4 elsewhere — only needed if MonoViT underfits at the shared 1e-4.
+- `cviu_revision.py`: the three B-grid entries, `load_depth_model_from_run` builds `MonoViTDepth`
+  for `depth_backbone == "monovit"`, `stage_train` downloads `mpvit_small.pth` (and skips the
+  MonoViT rows if it cannot, rather than training a random-init encoder and calling it MonoViT),
+  `BACKBONE_ORDER` → `tables/backbones.tex`, and a "Backbone × components" section in
+  `report.md` with the three paired differences (with-components − plain) per dataset.
+- `evaluate_depth_all.py`: `--model_type monovit` now also accepts a checkpoint trained here
+  (`depth_model.pth`), not only the official two-file layout.
+
+**The ImageNet MPViT-small weights have to be found, not downloaded.** The link both the MPViT
+and the MonoViT README give — `https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth` — is dead
+(checked 2026-09-15: Dropbox retired the `/s/` links and it answers with an HTML page; there is no
+Hugging Face mirror and the repo has no GitHub release). `ensure_mpvit_weights` therefore looks for
+a copy already on the machine before trying the download, starting with
+`/workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth` — **the path `models/monovit/mpvit.py`
+used to hard-code, so a copy very likely exists on the DGX** — then `./ckpt/mpvit_small.pth` and
+`~/mpvit_small.pth`, and copies what it finds into `pretrained_model/`. Anywhere else: set
+`mpvit_weights: <path>` in `cviu_config.yaml` (or `--mpvit_weights` for a single run). If no copy
+exists anywhere, the MonoViT rows are skipped rather than trained from random weights and
+mislabelled; `--skip_preflight` overrides that, and the run then prints
+`[mpvit] mpvit_small: ... random initialisation` — which must be said in the paper.
+
+```
+ls /workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth    # the likely copy on the server
+python cviu_revision.py train --gpus 0 --only MonoViT --extra_flags "--num_epochs 1"   # smoke test, then delete logs/cviu_MonoViT_s314
+python cviu_revision.py train --gpus 0 1 2 --only MonoII MonoViT MonoViT-II            # 9 jobs
+python cviu_revision.py predict && python cviu_revision.py stats && python cviu_revision.py report
+```
+
+### What this does and does not answer
+
+It answers R3 ("separate the backbone's contribution from the method's") across three
+architectures instead of two, and it puts three rows in Tables 4-6 that were trained under a
+protocol we control. It does **not** replace HADepth, AF-SfMLearner and Endo-SfMLearner: those
+are method-level baselines whose losses are not implemented here, and they still need their
+published checkpoints (`cviu_config.yaml::methods`, currently pointing at paths that do not exist
+on the server).

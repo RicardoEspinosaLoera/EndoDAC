@@ -125,11 +125,14 @@ Adding the components to the baseline one at a time tells the same story on the 
 the baseline, and only in-domain. On C3VD the combination is worth −0.0250 and essentially all
 of it comes from the highlight-aware term.
 
-We also repeated the same losses on a ResNet-18 U-Net backbone. There the method changes
-nothing: 0.0593 with the standard photometric loss against 0.0593 with the full method, a
-difference of 0.00003. The benefit of photometric calibration appears only on top of a strong
-foundation backbone, and we now say so as a limitation instead of presenting the losses as
-backbone-agnostic.
+To test the claim that the two mechanisms are backbone-agnostic, we train the same two components
+— the affine calibration and the illumination-invariant loss at the published λ₁ = 0.5, with
+monodepth2's photometric loss — on three depth networks of very different capacity: the ResNet-18
+U-Net of Monodepth2 (giving MonoII), MPViT-small with the HR decoder of MonoViT (giving MonoIIT)
+and the adapted Depth Anything encoder (giving MonoIIF). Each architecture is also trained plain
+under the identical recipe, so a row pair differs only in the two components and a column pair
+only in the architecture, all at three seeds. [RESULTS PENDING — B-grid, `CVIU_REVISION_PLAN.md`
+§12.]
 
 Finally, with three seeds per configuration we report the training-seed SD (0.0008-0.0029 in
 Abs Rel) separately from the sequence-level CI, so that readers can see which ablation gaps are
@@ -229,9 +232,15 @@ single pooled frame-level average.
    rewritten and the local-vs-global comparison re-run at 3 seeds.
 
 1. **Tables 4-6 have no external baselines.** `EndoDAC_MICCAI` and `AF_SfMLearner` failed to
-   load (the checkpoint paths in `cviu_config.yaml` do not exist on the server); HADepth,
-   MonoViT, Endo-SfMLearner and Monodepth2 were never configured. Fix the paths and re-run
-   `predict` + `stats`.
+   load (the checkpoint paths in `cviu_config.yaml` do not exist on the server); HADepth and
+   Endo-SfMLearner were never configured. Fix the paths and re-run `predict` + `stats`.
+   **Partly addressed 2026-09-15 (plan §12):** rather than chase foreign checkpoints, the
+   competing *architectures* are now trained here from scratch under the shared recipe —
+   Monodepth2 (`R1`, already trained), `MonoII` (ResNet-18 + local calibration + II at λ₁ = 0.5),
+   `MonoViT` and `MonoViT-II`. 9 jobs (3 runs × 3 seeds) to launch. This also turns R3 into a
+   3 × 2 table (three depth networks, each plain and with the two components). HADepth,
+   AF-SfMLearner and Endo-SfMLearner are method-level baselines whose losses are not implemented
+   here and still need their published weights.
 2. **Decide the method's identity.** The IIF term does not improve accuracy: removing it is
    neutral on SCARED (0.05052 vs 0.05116, 3 seeds), costs 0.0015 on Hamlyn, and **gains 0.0208
    on C3VD with the interval excluding zero** — the largest single component effect measured on
