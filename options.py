@@ -283,11 +283,19 @@ class MonodepthOptions:
         # CVIU revision switches (see CVIU_REVISION_PLAN.md); defaults reproduce MonoIIF
         self.parser.add_argument("--illum_calib",
                                  type=str,
-                                 choices=["none", "global", "local"],
+                                 choices=["none", "global", "local", "basis"],
                                  default="local",
                                  help="illumination calibration of the warped source: none, "
-                                      "one affine (c, b) pair per image, or the spatially "
-                                      "varying LightingDecoder maps")
+                                      "one affine (c, b) pair per image (global), the spatially "
+                                      "varying LightingDecoder maps (local), or a polynomial "
+                                      "field of degree --illum_basis_degree (basis), which "
+                                      "interpolates between the two: degree 0 IS the global model")
+        self.parser.add_argument("--illum_basis_degree",
+                                 type=int,
+                                 default=2,
+                                 help="polynomial degree of --illum_calib basis; the field has "
+                                      "(d+1)(d+2)/2 terms, so 0 -> 1 (global), 1 -> 3 (linear "
+                                      "gradient), 2 -> 6 (vignetting), 3 -> 10")
         self.parser.add_argument("--photometric",
                                  type=str,
                                  choices=["highlight", "standard"],

@@ -131,6 +131,13 @@ class Trainer:
                     self.models["lighting"] = decoders.LightingDecoder(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
                 elif self.opt.illum_calib == "global":
                     self.models["lighting"] = decoders.GlobalLightingHead(self.models["pose_encoder"].num_ch_enc, self.opt.scales)
+                elif self.opt.illum_calib == "basis":
+                    # the affine model of Eq. (1) restricted to a polynomial field: one family
+                    # whose degree 0 is the global model and whose limit is the dense one
+                    self.models["lighting"] = decoders.BasisLightingHead(
+                        self.models["pose_encoder"].num_ch_enc, self.opt.scales,
+                        degree=self.opt.illum_basis_degree,
+                        grid=(self.opt.height, self.opt.width))
                 if "lighting" in self.models:
                     self.models["lighting"].to(self.device)
                     self.parameters_to_train += list(self.models["lighting"].parameters())

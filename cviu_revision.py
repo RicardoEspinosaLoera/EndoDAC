@@ -92,7 +92,9 @@ DEFAULT_CONFIG = {
                             "MonoII", "MonoViT", "MonoViT-II",
                             "MonoII-none", "MonoII-glob",
                             "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
-                            "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200"],
+                            "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
+                  "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
+                            "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -167,6 +169,25 @@ GRID = {
     "A-MonoII": {"group": "AM", "desc": "MonoII (local calibration), consistent jitter",
                  "flags": "--depth_backbone resnet18 --photometric standard "
                           "--illumination_invariant 0.5 --color_aug_consistent True"},
+    # bas-res grid: the calibration as ONE family parameterised by capacity, on ResNet-18.
+    # degree 0 is the global model, the dense LightingDecoder is the limit, and MonoII /
+    # MonoII-none supply the two ends of the curve. Everything else is the published recipe.
+    "bas-res-0": {"group": "bas-res", "desc": "ResNet-18 + basis calibration, degree 0 (k=1, constant = global)",
+                    "flags": "--depth_backbone resnet18 --photometric standard "
+                             "--illumination_invariant 0.5 --illum_calib basis "
+                             "--illum_basis_degree 0"},
+    "bas-res-1": {"group": "bas-res", "desc": "ResNet-18 + basis calibration, degree 1 (k=3, linear gradient)",
+                    "flags": "--depth_backbone resnet18 --photometric standard "
+                             "--illumination_invariant 0.5 --illum_calib basis "
+                             "--illum_basis_degree 1"},
+    "bas-res-2": {"group": "bas-res", "desc": "ResNet-18 + basis calibration, degree 2 (k=6, quadratic, vignetting)",
+                    "flags": "--depth_backbone resnet18 --photometric standard "
+                             "--illumination_invariant 0.5 --illum_calib basis "
+                             "--illum_basis_degree 2"},
+    "bas-res-3": {"group": "bas-res", "desc": "ResNet-18 + basis calibration, degree 3 (k=10, cubic)",
+                    "flags": "--depth_backbone resnet18 --photometric standard "
+                             "--illumination_invariant 0.5 --illum_calib basis "
+                             "--illum_basis_degree 3"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
@@ -244,6 +265,11 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
+# capacity of the calibration field, from 0 free parameters to the dense map: the curve that
+# turns the none/global/local ternary of R2 into one family
+BASIS_ORDER = [("MonoII-none", "no calibration"), ("bas-res-0", "degree 0 ($k$=1, global)"),
+               ("bas-res-1", "degree 1 ($k$=3)"), ("bas-res-2", "degree 2 ($k$=6)"),
+               ("bas-res-3", "degree 3 ($k$=10)"), ("MonoII", "dense map (LightingDecoder)")]
 # lambda1 sweep on ResNet-18: the audit of the paper's Table 2, three seeds instead of one
 LAMBDA_RES_ORDER = [("lam-res-000", "$\lambda_1 = 0$"), ("lam-res-010", "$\lambda_1 = 0.1$"),
                     ("lam-res-025", "$\lambda_1 = 0.25$"), ("MonoII", "$\lambda_1 = 0.5$ (paper)"),
@@ -1377,6 +1403,10 @@ def load_run_models(cfg, run, seed, device):
     if calib != "none" and os.path.exists(lp):
         if calib == "global":
             lt = decoders.GlobalLightingHead(pe.num_ch_enc, opt["scales"])
+        elif opt.get("illum_calib") == "basis":
+            lt = decoders.BasisLightingHead(pe.num_ch_enc, opt["scales"],
+                                            degree=opt.get("illum_basis_degree", 2),
+                                            grid=(opt["height"], opt["width"]))
         else:
             lt = decoders.LightingDecoder(pe.num_ch_enc, opt["scales"])
         lt.load_state_dict(torch.load(lp, map_location="cpu"))
@@ -2068,7 +2098,8 @@ def write_tables(cfg, summary, paired, per_seq):
                          ("backbones.tex", BACKBONE_ORDER),
                          ("lambda_sweep.tex", LAMBDA_ORDER),
                          ("monoii_calib.tex", MONOII_CALIB_ORDER),
-                         ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER)):
+                         ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER),
+                         ("calib_capacity.tex", BASIS_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:

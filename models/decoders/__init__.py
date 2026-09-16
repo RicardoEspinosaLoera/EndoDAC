@@ -6,3 +6,4 @@ from .optical_flow_decoder import PositionDecoder
 from .depth_decoder import DepthDecoder
 from .lighting_decoder import LightingDecoder
 from .global_lighting_head import GlobalLightingHead
+from .basis_lighting_head import BasisLightingHead
