@@ -739,7 +739,7 @@ method".
 
 ---
 
-## 11. λ₁ sweep for the II loss (L-grid), and the checkpoint-selection bias
+## 11. λ₁ sweep for the II loss (lam-da grid), and the checkpoint-selection bias
 
 ### 11a. Why the paper's Table 2 is not the answer
 
@@ -759,10 +759,10 @@ differing only in λ₁, **three seeds each**:
 |---|---|---|
 | 0 | E4 | exists (1 seed), +2 queued |
 | 0.1 | E7 | exists (1 seed), +2 to train — the repo default the whole grid used |
-| 0.25 | **L025** | new |
+| 0.25 | **lam-da-025** | new |
 | 0.5 | M-local | queued — the published value |
-| 1.0 | **L100** | new |
-| 2.0 | **L200** | new |
+| 1.0 | **lam-da-100** | new |
+| 2.0 | **lam-da-200** | new |
 
 Three seeds, not one, because a λ curve drawn through single runs cannot separate the optimum from
 seed noise — which is exactly the weakness of the paper's Table 2. Analysis uses the existing
@@ -770,7 +770,7 @@ sequence-level machinery: the six points share the same test sequences, so λ va
 **paired across sequences**, far more powerful than comparing means. `stats` writes
 `tables/lambda_sweep.tex` (SCARED metrics plus Hamlyn and C3VD Abs Rel per λ).
 
-Cost: 11 new jobs (L025, L100, L200 × 3 seeds, plus E7 seeds 1 and 2) at ~10.5 h. Two rounds on
+Cost: 11 new jobs (lam-da-025, lam-da-100, lam-da-200 × 3 seeds, plus E7 seeds 1 and 2) at ~10.5 h. Two rounds on
 7 GPUs, ≈ 22 h.
 
 ### 11c. The selection problem, which the sweep must not compound

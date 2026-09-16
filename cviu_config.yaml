@@ -24,10 +24,10 @@ train:
   # M-local/M-none/M-global are MonoIIF as published (lambda1 = 0.5, no HADepth term); every
   # E/C/D/R run used the repo default lambda1 = 0.1, below the paper's tested range
   multi_seed_runs: [E3, E4, E7, E8, C0, C1, R1, R2, D3, M-local, M-none, M-global,
-                    L025, L100, L200, E8-DVLoRA, E8-IIF, C2-sup, C1-lora,
+                    lam-da-025, lam-da-100, lam-da-200, E8-DVLoRA, E8-IIF, C2-sup, C1-lora,
                     MonoII, MonoViT, MonoViT-II, MonoII-none, MonoII-glob,
                     A-MonoII-none, A-MonoII-glob, A-MonoII,
-                    LR000, LR010, LR025, LR100, LR200]
+                    lam-res-000, lam-res-010, lam-res-025, lam-res-100, lam-res-200]
   checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
   runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
   skip_runs: []                 # grid entries not to train, e.g. [N0, D3-EndoDAC]

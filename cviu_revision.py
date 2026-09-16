@@ -87,12 +87,12 @@ DEFAULT_CONFIG = {
         # is its ablation arm. E5/E7 stay single-seed: at lambda1=0.1 they are sensitivity points,
         # not the method.
         "multi_seed_runs": ["E3", "E4", "E7", "E8", "C0", "C1", "R1", "R2", "D3",
-                            "M-local", "M-none", "M-global", "L025", "L100", "L200",
+                            "M-local", "M-none", "M-global", "lam-da-025", "lam-da-100", "lam-da-200",
                             "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora",
                             "MonoII", "MonoViT", "MonoViT-II",
                             "MonoII-none", "MonoII-glob",
                             "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
-                            "LR000", "LR010", "LR025", "LR100", "LR200"],
+                            "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -167,19 +167,20 @@ GRID = {
     "A-MonoII": {"group": "AM", "desc": "MonoII (local calibration), consistent jitter",
                  "flags": "--depth_backbone resnet18 --photometric standard "
                           "--illumination_invariant 0.5 --color_aug_consistent True"},
-    # LR-grid: lambda1 sweep on the ResNet-18 backbone, i.e. an audit of the paper's own
+    # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
+    # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
     # applied the resulting 0.5 to all three variants including MonoIIF. Structure fixed to
     # MonoII (local calibration, monodepth2 photometric loss); lambda1 = 0.5 is MonoII itself.
-    "LR000": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0",
+    "lam-res-000": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=0",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0"},
-    "LR010": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0.1",
+    "lam-res-010": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=0.1",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0.1"},
-    "LR025": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0.25",
+    "lam-res-025": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=0.25",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0.25"},
-    "LR100": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=1.0",
+    "lam-res-100": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=1.0",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 1.0"},
-    "LR200": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=2.0",
+    "lam-res-200": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=2.0",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 2.0"},
     "MonoViT": {"group": "B", "desc": "MonoViT: MPViT-small + HR decoder, standard loss",
                 "flags": "--depth_backbone monovit --illum_calib none --illumination_invariant 0 "
@@ -207,11 +208,11 @@ GRID = {
     # lambda1 on the ResNet variant, single seed, frame-level; MonoIIF has no sweep at all. Together
     # with E4 (lambda1=0), E7 (0.1) and M-local (0.5) these give six points, 3 seeds each, all with
     # the method's structure (local calibration, monodepth2 photometric loss).
-    "L025": {"group": "L", "desc": "local calibration + II (lambda1=0.25)",
+    "lam-da-025": {"group": "lam-da", "desc": "local calibration + II (lambda1=0.25)",
              "flags": "--photometric standard --illumination_invariant 0.25"},
-    "L100": {"group": "L", "desc": "local calibration + II (lambda1=1.0)",
+    "lam-da-100": {"group": "lam-da", "desc": "local calibration + II (lambda1=1.0)",
              "flags": "--photometric standard --illumination_invariant 1.0"},
-    "L200": {"group": "L", "desc": "local calibration + II (lambda1=2.0)",
+    "lam-da-200": {"group": "lam-da", "desc": "local calibration + II (lambda1=2.0)",
              "flags": "--photometric standard --illumination_invariant 2.0"},
     # the two settings that won their own comparison, combined
     "C1-lora": {"group": "C", "desc": "global calibration + plain LoRA",
@@ -236,17 +237,17 @@ GRID = {
 }
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
                   "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
-                  "L025", "L100", "L200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
+                  "lam-da-025", "lam-da-100", "lam-da-200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
                   "MonoII-none", "MonoII-glob", "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
-                  "LR000", "LR010", "LR025", "LR100", "LR200",
+                  "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
                   "N0", "D3-EndoDAC", "D3", "A-C0", "A-C1", "A-E8"]
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
 # lambda1 sweep on ResNet-18: the audit of the paper's Table 2, three seeds instead of one
-LAMBDA_RES_ORDER = [("LR000", "$\lambda_1 = 0$"), ("LR010", "$\lambda_1 = 0.1$"),
-                    ("LR025", "$\lambda_1 = 0.25$"), ("MonoII", "$\lambda_1 = 0.5$ (paper)"),
-                    ("LR100", "$\lambda_1 = 1.0$"), ("LR200", "$\lambda_1 = 2.0$")]
+LAMBDA_RES_ORDER = [("lam-res-000", "$\lambda_1 = 0$"), ("lam-res-010", "$\lambda_1 = 0.1$"),
+                    ("lam-res-025", "$\lambda_1 = 0.25$"), ("MonoII", "$\lambda_1 = 0.5$ (paper)"),
+                    ("lam-res-100", "$\lambda_1 = 1.0$"), ("lam-res-200", "$\lambda_1 = 2.0$")]
 MONOII_CALIB_ORDER = [("MonoII-none", "none, jitter as shipped"),
                       ("MonoII-glob", "global affine, jitter as shipped"),
                       ("MonoII", "local affine (MonoII), jitter as shipped"),
@@ -267,8 +268,8 @@ BACKBONE_ORDER = [("R1", "ResNet-18 (Monodepth2), plain"),
 # lambda1 sweep of the II loss, in increasing order: the table the paper's Table 2 lacks for the
 # foundation backbone. Every point has the method's structure and differs only in lambda1.
 LAMBDA_ORDER = [("E4", "$\lambda_1 = 0$"), ("E7", "$\lambda_1 = 0.1$"),
-                ("L025", "$\lambda_1 = 0.25$"), ("M-local", "$\lambda_1 = 0.5$ (paper)"),
-                ("L100", "$\lambda_1 = 1.0$"), ("L200", "$\lambda_1 = 2.0$")]
+                ("lam-da-025", "$\lambda_1 = 0.25$"), ("M-local", "$\lambda_1 = 0.5$ (paper)"),
+                ("lam-da-100", "$\lambda_1 = 1.0$"), ("lam-da-200", "$\lambda_1 = 2.0$")]
 CALIB_ORDER = [("C0", "none"), ("C1", "global affine"), ("E8", "local affine (MonoIIF)"),
                ("A-C0", "none, consistent jitter"), ("A-C1", "global affine, consistent jitter"),
                ("A-E8", "local affine, consistent jitter")]
