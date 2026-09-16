@@ -91,7 +91,8 @@ DEFAULT_CONFIG = {
                             "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora",
                             "MonoII", "MonoViT", "MonoViT-II",
                             "MonoII-none", "MonoII-glob",
-                            "A-MonoII-none", "A-MonoII-glob", "A-MonoII"],
+                            "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
+                            "LR000", "LR010", "LR025", "LR100", "LR200"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -166,6 +167,20 @@ GRID = {
     "A-MonoII": {"group": "AM", "desc": "MonoII (local calibration), consistent jitter",
                  "flags": "--depth_backbone resnet18 --photometric standard "
                           "--illumination_invariant 0.5 --color_aug_consistent True"},
+    # LR-grid: lambda1 sweep on the ResNet-18 backbone, i.e. an audit of the paper's own
+    # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
+    # applied the resulting 0.5 to all three variants including MonoIIF. Structure fixed to
+    # MonoII (local calibration, monodepth2 photometric loss); lambda1 = 0.5 is MonoII itself.
+    "LR000": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0",
+             "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0"},
+    "LR010": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0.1",
+             "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0.1"},
+    "LR025": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=0.25",
+             "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 0.25"},
+    "LR100": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=1.0",
+             "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 1.0"},
+    "LR200": {"group": "LR", "desc": "ResNet-18 + local calibration, II lambda1=2.0",
+             "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 2.0"},
     "MonoViT": {"group": "B", "desc": "MonoViT: MPViT-small + HR decoder, standard loss",
                 "flags": "--depth_backbone monovit --illum_calib none --illumination_invariant 0 "
                          "--photometric standard"},
@@ -223,10 +238,15 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
                   "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
                   "L025", "L100", "L200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
                   "MonoII-none", "MonoII-glob", "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
+                  "LR000", "LR010", "LR025", "LR100", "LR200",
                   "N0", "D3-EndoDAC", "D3", "A-C0", "A-C1", "A-E8"]
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
+# lambda1 sweep on ResNet-18: the audit of the paper's Table 2, three seeds instead of one
+LAMBDA_RES_ORDER = [("LR000", "$\lambda_1 = 0$"), ("LR010", "$\lambda_1 = 0.1$"),
+                    ("LR025", "$\lambda_1 = 0.25$"), ("MonoII", "$\lambda_1 = 0.5$ (paper)"),
+                    ("LR100", "$\lambda_1 = 1.0$"), ("LR200", "$\lambda_1 = 2.0$")]
 MONOII_CALIB_ORDER = [("MonoII-none", "none, jitter as shipped"),
                       ("MonoII-glob", "global affine, jitter as shipped"),
                       ("MonoII", "local affine (MonoII), jitter as shipped"),
@@ -2046,7 +2066,8 @@ def write_tables(cfg, summary, paired, per_seq):
                          ("calibration.tex", CALIB_ORDER),
                          ("backbones.tex", BACKBONE_ORDER),
                          ("lambda_sweep.tex", LAMBDA_ORDER),
-                         ("monoii_calib.tex", MONOII_CALIB_ORDER)):
+                         ("monoii_calib.tex", MONOII_CALIB_ORDER),
+                         ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:
