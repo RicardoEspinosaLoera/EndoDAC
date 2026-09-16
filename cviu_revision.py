@@ -94,7 +94,9 @@ DEFAULT_CONFIG = {
                             "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
                             "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
                   "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
-                            "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3"],
+                  "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
+                            "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
+                            "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -188,6 +190,30 @@ GRID = {
                     "flags": "--depth_backbone resnet18 --photometric standard "
                              "--illumination_invariant 0.5 --illum_calib basis "
                              "--illum_basis_degree 3"},
+    # lam-bas grid: lambda1 swept on the BASIS calibration (degree 2), the other arm of the
+    # cross through (degree 2, lambda1 = 0.5) = bas-res-2. lam-res-* sweeps the same weight
+    # on the dense map instead, which audits the paper's Table 2; this one finds the weight
+    # that suits the constrained field.
+    "lam-bas-000": {"group": "lam-bas", "desc": "ResNet-18 + basis calibration (degree 2), II lambda1=0",
+                     "flags": "--depth_backbone resnet18 --photometric standard "
+                              "--illum_calib basis --illum_basis_degree 2 "
+                              "--illumination_invariant 0"},
+    "lam-bas-010": {"group": "lam-bas", "desc": "ResNet-18 + basis calibration (degree 2), II lambda1=0.1",
+                     "flags": "--depth_backbone resnet18 --photometric standard "
+                              "--illum_calib basis --illum_basis_degree 2 "
+                              "--illumination_invariant 0.1"},
+    "lam-bas-025": {"group": "lam-bas", "desc": "ResNet-18 + basis calibration (degree 2), II lambda1=0.25",
+                     "flags": "--depth_backbone resnet18 --photometric standard "
+                              "--illum_calib basis --illum_basis_degree 2 "
+                              "--illumination_invariant 0.25"},
+    "lam-bas-100": {"group": "lam-bas", "desc": "ResNet-18 + basis calibration (degree 2), II lambda1=1.0",
+                     "flags": "--depth_backbone resnet18 --photometric standard "
+                              "--illum_calib basis --illum_basis_degree 2 "
+                              "--illumination_invariant 1.0"},
+    "lam-bas-200": {"group": "lam-bas", "desc": "ResNet-18 + basis calibration (degree 2), II lambda1=2.0",
+                     "flags": "--depth_backbone resnet18 --photometric standard "
+                              "--illum_calib basis --illum_basis_degree 2 "
+                              "--illumination_invariant 2.0"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
@@ -265,6 +291,10 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
+# lambda1 swept with the basis calibration held at degree 2
+LAMBDA_BAS_ORDER = [("lam-bas-000", "$\lambda_1 = 0$"), ("lam-bas-010", "$\lambda_1 = 0.1$"),
+                    ("lam-bas-025", "$\lambda_1 = 0.25$"), ("bas-res-2", "$\lambda_1 = 0.5$"),
+                    ("lam-bas-100", "$\lambda_1 = 1.0$"), ("lam-bas-200", "$\lambda_1 = 2.0$")]
 # capacity of the calibration field, from 0 free parameters to the dense map: the curve that
 # turns the none/global/local ternary of R2 into one family
 BASIS_ORDER = [("MonoII-none", "no calibration"), ("bas-res-0", "degree 0 ($k$=1, global)"),
@@ -2099,7 +2129,8 @@ def write_tables(cfg, summary, paired, per_seq):
                          ("lambda_sweep.tex", LAMBDA_ORDER),
                          ("monoii_calib.tex", MONOII_CALIB_ORDER),
                          ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER),
-                         ("calib_capacity.tex", BASIS_ORDER)):
+                         ("calib_capacity.tex", BASIS_ORDER),
+                         ("lambda_sweep_basis.tex", LAMBDA_BAS_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:
