@@ -89,6 +89,8 @@ DEFAULT_CONFIG = {
         "multi_seed_runs": ["E3", "E4", "E7", "E8", "C0", "C1", "R1", "R2", "D3",
                             "M-local", "M-none", "M-global", "lam-da-025", "lam-da-100", "lam-da-200",
                             "E8-DVLoRA", "E8-IIF", "C2-sup", "C1-lora",
+                            "da-bas-0", "da-bas-1", "da-bas-2",
+                            "da-lam-010", "da-lam-025", "da-lam-050",
                             "MonoII", "MonoViT", "MonoViT-II",
                             "MonoII-none", "MonoII-glob",
                             "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
@@ -249,6 +251,30 @@ GRID = {
                       "flags": "--depth_backbone resnet18 --photometric standard "
                                "--illum_calib basis --illum_basis_degree 2 --iif_loss ssim "
                                "--illumination_invariant 2.0"},
+    # da-grid: the clean recipe on the paper's own backbone -- Depth Anything v1 + DV-LoRA with
+    # monodepth2's photometric loss, i.e. WITHOUT HADepth's highlight term, which is not part of
+    # the method. Two axes crossing at (basis degree 1, lambda1 = 0):
+    #   capacity  : E3 (no calibration) - da-bas-0 (global) - da-bas-1 - da-bas-2 - E4 (dense)
+    #   II weight : da-bas-1 (0) - da-lam-010 - da-lam-025 - da-lam-050
+    # E3 and E4 already exist and are reused; E4 gains its two missing seeds.
+    "da-bas-0": {"group": "da", "desc": "DA v1 + basis calibration degree 0 (global), no II loss",
+                 "flags": "--photometric standard --illumination_invariant 0 "
+                          "--illum_calib basis --illum_basis_degree 0"},
+    "da-bas-1": {"group": "da", "desc": "DA v1 + basis calibration degree 1, no II loss",
+                 "flags": "--photometric standard --illumination_invariant 0 "
+                          "--illum_calib basis --illum_basis_degree 1"},
+    "da-bas-2": {"group": "da", "desc": "DA v1 + basis calibration degree 2, no II loss",
+                 "flags": "--photometric standard --illumination_invariant 0 "
+                          "--illum_calib basis --illum_basis_degree 2"},
+    "da-lam-010": {"group": "da", "desc": "DA v1 + basis degree 1 + II loss, lambda1=0.1",
+                   "flags": "--photometric standard --illumination_invariant 0.1 "
+                            "--illum_calib basis --illum_basis_degree 1"},
+    "da-lam-025": {"group": "da", "desc": "DA v1 + basis degree 1 + II loss, lambda1=0.25",
+                   "flags": "--photometric standard --illumination_invariant 0.25 "
+                            "--illum_calib basis --illum_basis_degree 1"},
+    "da-lam-050": {"group": "da", "desc": "DA v1 + basis degree 1 + II loss, lambda1=0.5",
+                   "flags": "--photometric standard --illumination_invariant 0.5 "
+                            "--illum_calib basis --illum_basis_degree 1"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
@@ -359,6 +385,17 @@ CONTRASTS = [
      [("no calibration", "A-MonoII-none", "MonoII-none"),
       ("global affine", "A-MonoII-glob", "MonoII-glob"),
       ("local, dense map", "A-MonoII", "MonoII")]),
+    ("contrast_da_capacity.tex",
+     "Depth Anything, clean recipe (no highlight term), lambda1 = 0; negative = the calibration helps",
+     [("basis degree 0 (global)", "da-bas-0", "E3"),
+      ("basis degree 1", "da-bas-1", "E3"),
+      ("basis degree 2", "da-bas-2", "E3"),
+      ("dense map", "E4", "E3")]),
+    ("contrast_da_lambda.tex",
+     "Depth Anything, II weight at basis degree 1; negative = that weight helps",
+     [("lambda1 = 0.1", "da-lam-010", "da-bas-1"),
+      ("lambda1 = 0.25", "da-lam-025", "da-bas-1"),
+      ("lambda1 = 0.5", "da-lam-050", "da-bas-1")]),
     ("contrast_comparator.tex",
      "II comparator: the paper's SSIM against the l2 that was trained; negative = SSIM is better",
      [("dense map", "MonoII-ssim", "MonoII"),

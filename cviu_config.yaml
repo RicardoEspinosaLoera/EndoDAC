@@ -31,7 +31,8 @@ train:
                     bas-res-0, bas-res-1, bas-res-2, bas-res-3,
                     lam-bas-000, lam-bas-010, lam-bas-025, lam-bas-100, lam-bas-200,
                     MonoII-ssim, bas-res-2-ssim,
-                    lam-ssim-010, lam-ssim-025, lam-ssim-100, lam-ssim-200]
+                    lam-ssim-010, lam-ssim-025, lam-ssim-100, lam-ssim-200,
+                    da-bas-0, da-bas-1, da-bas-2, da-lam-010, da-lam-025, da-lam-050]
   checkpoint: best              # best = highest saved weights_<epoch> (saved only on RMSE improvement) | last
   runs: {}                      # add or override grid entries, e.g. C2a: {desc: "...", flags: "..."}
   skip_runs: []                 # grid entries not to train, e.g. [N0, D3-EndoDAC]
