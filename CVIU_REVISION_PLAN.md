@@ -1013,6 +1013,38 @@ with three seeds, paired. Measured with the l2 comparator; the SSIM check (`Mono
 - **Basis calibration of degree 2 with λ₁ = 0 on Depth Anything** does not exist yet. After 14c
   it is the candidate for the paper's best model, and the natural next run (3 seeds, ~32 h).
 
+### 14f. Degree 1 is the operating point, and it validates the local model (2026-09-17)
+
+Direct paired comparisons of the degree-1 field against both alternatives. Negative = degree 1
+better.
+
+| | vs global (`bas-res-0`) | vs dense map (`MonoII`) | vs no calibration |
+|---|---|---|---|
+| SCARED | −0.0004 tie | −0.0012 tie | −0.0002 tie |
+| Hamlyn | **−0.0037 [−0.0059,−0.0017]**, 34/58, p 0.004 | **−0.0058 [−0.0078,−0.0037]**, 47/58, p<0.001 | +0.0001 tie |
+| C3VD | **−0.0123 [−0.0172,−0.0068]**, **7/7**, p 0.016 | **−0.0101 [−0.0166,−0.0017]**, 6/7 | **−0.0085 [−0.0150,−0.0009]**, 6/7 |
+
+Four of six comparisons have CIs excluding zero and none goes the other way. `--illum_basis_degree`
+now defaults to 1.
+
+**This is the answer to R2, and it is a positive one.** The spatially varying affine model is
+validated: a linear-gradient field beats the global affine model of Ozyoruk et al. on both
+generalisation sets and also beats the free per-pixel parameterisation of the submission. The
+capacity curve locates the optimum between the two extremes.
+
+**Correction to §14d point 2.** It said the components hurt under geometric shift, from the global
+and dense cells. Degree 1 beats no calibration on C3VD (−0.0085, 6/7), so what fails there is the
+wrong capacity, not the geometric shift. The account simplifies: at the right capacity the
+calibration helps out of domain on both datasets.
+
+Unresolved: on C3VD degrees 1 and 3 beat no calibration while 0 and 2 do not. Non-monotonic with
+n = 7, read as noise of that dataset; degree 1's advantage is robust because it appears on both
+datasets and against both alternatives.
+
+Caveat for the λ₁ sweeps: `lam-bas-*` and `lam-ssim-*` fix degree **2**, not 1. They tie on SCARED,
+which is where λ₁ was selected, so the selection stands; repeating them at degree 1 would be 12
+jobs each.
+
 ---
 
 ## 15. The colour-augmentation factorial: §9's hypothesis is refuted (2026-09-17)
