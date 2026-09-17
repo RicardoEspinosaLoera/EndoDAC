@@ -1012,3 +1012,62 @@ with three seeds, paired. Measured with the l2 comparator; the SSIM check (`Mono
 - `MonoII-ssim` / `bas-res-2-ssim` are queued: whether the published SSIM comparator changes 14b.
 - **Basis calibration of degree 2 with λ₁ = 0 on Depth Anything** does not exist yet. After 14c
   it is the candidate for the paper's best model, and the natural next run (3 seeds, ~32 h).
+
+---
+
+## 15. The colour-augmentation factorial: §9's hypothesis is refuted (2026-09-17)
+
+Calibration {none, global, local} × colour jitter {as shipped, consistent}, ResNet-18, λ₁ = 0.5,
+monodepth2 photometric loss, three seeds per cell, sequence-level paired CIs.
+
+### 15a. Does the calibration help, under each jitter?
+
+`diff = calibration − no calibration`; negative = the calibration helps.
+
+| | jitter as shipped | jitter consistent |
+|---|---|---|
+| SCARED, global | +0.0001 tie | +0.0006 tie |
+| SCARED, local | +0.0009 tie | −0.0005 tie |
+| Hamlyn, global | **+0.0060 [+0.0033,+0.0087]**, 16/58 | **+0.0030 [+0.0015,+0.0045]**, 20/58 |
+| Hamlyn, local | **+0.0059 [+0.0034,+0.0083]**, 15/58 | **+0.0049 [+0.0034,+0.0065]**, 11/58 |
+| C3VD, global | −0.0074 [−0.0143,−0.0015], 5/7 | **+0.0130 [+0.0065,+0.0187]**, 1/7 |
+| C3VD, local | +0.0016 tie | −0.0009 tie |
+
+**With the defect fixed the calibration still does not help on any dataset.** In-domain everything
+is a tie either way; on Hamlyn it still hurts, on C3VD it is a tie (local) or hurts (global).
+
+### 15b. What fixing the jitter does by itself
+
+`diff = fixed − as shipped`; negative = the fix helps.
+
+| Cell | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| no calibration | +0.0010 tie | +0.0008 tie | **−0.0108 [−0.0174,−0.0041]**, 6/7, p 0.047 |
+| global | +0.0014 [+0.0000,+0.0029] | **−0.0022 [−0.0042,−0.0002]**, 38/58, p 0.027 | **+0.0096 [+0.0018,+0.0162]**, 1/7 |
+| local | −0.0004 tie | −0.0002 tie | **−0.0134 [−0.0218,−0.0052]**, 6/7, p 0.047 |
+
+The defect is real and costs real accuracy — up to 0.013 Abs Rel on C3VD — but it is not what made
+the calibration module look inert. **The §9 hypothesis is refuted.** Best C3VD number of the
+factorial: `A-MonoII` 0.3246, against 0.3363 for the same cell with the defect.
+
+Unexplained: the global cell moves the other way on C3VD (+0.0096 when fixed) while the other two
+improve by ~0.012. With n = 7 this may be noise, but the interval excludes zero. Flagged, not
+built upon.
+
+### 15c. The II comparator (partial)
+
+`MonoII-ssim` vs `MonoII`, i.e. the paper's SSIM_II of Eq. (14)-(15) against the l2 that every run
+of this study used: +0.0009 SCARED, −0.0017 Hamlyn, −0.0046 [−0.0098,−0.0000] C3VD. Nothing
+survives cleanly. **The published comparator does not rescue the II loss in-domain**, which was the
+question. `bas-res-2-ssim` pending. Caveat: SSIM_II sits at ~0.12 where l2 sits at ~0.05, so
+λ₁ = 0.5 is not the same effective weight in the two; this is a check that the comparator is not
+the cause, not a clean comparison between comparators.
+
+### 15d. Consequence
+
+Three explanations for the calibration's behaviour have now been proposed and measured, and all
+three are refuted: the IIF loss starving it of gradient (§8f), the LS-supervision route (§8e), and
+the colour-augmentation defect (here). What survives is the capacity account of §14a, which is the
+only one supported by an intervention: restrict the field to a low order and the harm disappears;
+leave it free per pixel and it costs 0.0059 on Hamlyn. The augmentation fix should nevertheless be
+adopted as the default for any future training, on its own merits.
