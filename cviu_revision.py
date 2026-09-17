@@ -96,9 +96,11 @@ DEFAULT_CONFIG = {
                   "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                   "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                   "MonoII-ssim", "bas-res-2-ssim",
+                  "lam-ssim-010", "lam-ssim-025", "lam-ssim-100", "lam-ssim-200",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
-                            "MonoII-ssim", "bas-res-2-ssim"],
+                            "MonoII-ssim", "bas-res-2-ssim",
+                            "lam-ssim-010", "lam-ssim-025", "lam-ssim-100", "lam-ssim-200"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -226,6 +228,27 @@ GRID = {
     "bas-res-2-ssim": {"group": "ssim", "desc": "basis degree 2 + II (0.5) with the SSIM_II comparator",
                        "flags": "--depth_backbone resnet18 --photometric standard --illum_calib basis "
                                 "--illum_basis_degree 2 --illumination_invariant 0.5 --iif_loss ssim"},
+    # lam-ssim grid: the same lambda1 sweep as lam-bas-*, with the paper's SSIM_II comparator
+    # (Eq. 14-15) instead of the l2 that every other run used. Same structure throughout:
+    # ResNet-18, basis calibration degree 2, monodepth2 photometric loss. lambda1 = 0 needs no
+    # run of its own -- the trainer skips the II branch entirely at weight 0, so lam-bas-000 is
+    # the shared origin of both sweeps -- and 0.5 is bas-res-2-ssim.
+    "lam-ssim-010": {"group": "lam-ssim", "desc": "basis degree 2 + II (SSIM comparator), lambda1=0.1",
+                      "flags": "--depth_backbone resnet18 --photometric standard "
+                               "--illum_calib basis --illum_basis_degree 2 --iif_loss ssim "
+                               "--illumination_invariant 0.1"},
+    "lam-ssim-025": {"group": "lam-ssim", "desc": "basis degree 2 + II (SSIM comparator), lambda1=0.25",
+                      "flags": "--depth_backbone resnet18 --photometric standard "
+                               "--illum_calib basis --illum_basis_degree 2 --iif_loss ssim "
+                               "--illumination_invariant 0.25"},
+    "lam-ssim-100": {"group": "lam-ssim", "desc": "basis degree 2 + II (SSIM comparator), lambda1=1.0",
+                      "flags": "--depth_backbone resnet18 --photometric standard "
+                               "--illum_calib basis --illum_basis_degree 2 --iif_loss ssim "
+                               "--illumination_invariant 1.0"},
+    "lam-ssim-200": {"group": "lam-ssim", "desc": "basis degree 2 + II (SSIM comparator), lambda1=2.0",
+                      "flags": "--depth_backbone resnet18 --photometric standard "
+                               "--illum_calib basis --illum_basis_degree 2 --iif_loss ssim "
+                               "--illumination_invariant 2.0"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
@@ -303,6 +326,11 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
+# lambda1 swept with the paper's SSIM_II comparator; lam-bas-000 is the shared origin because at
+# weight 0 the II branch is skipped and the comparator does not apply
+LAMBDA_SSIM_ORDER = [("lam-bas-000", "$\lambda_1 = 0$ (sin II)"), ("lam-ssim-010", "$\lambda_1 = 0.1$"),
+                     ("lam-ssim-025", "$\lambda_1 = 0.25$"), ("bas-res-2-ssim", "$\lambda_1 = 0.5$"),
+                     ("lam-ssim-100", "$\lambda_1 = 1.0$"), ("lam-ssim-200", "$\lambda_1 = 2.0$")]
 # the II comparator: l2 (what was trained) against SSIM (what the paper writes), same cells
 COMPARATOR_ORDER = [("MonoII", "dense map, II l2"), ("MonoII-ssim", "dense map, II SSIM"),
                     ("bas-res-2", "basis degree 2, II l2"), ("bas-res-2-ssim", "basis degree 2, II SSIM")]
@@ -2146,7 +2174,8 @@ def write_tables(cfg, summary, paired, per_seq):
                          ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER),
                          ("calib_capacity.tex", BASIS_ORDER),
                          ("lambda_sweep_basis.tex", LAMBDA_BAS_ORDER),
-                         ("ii_comparator.tex", COMPARATOR_ORDER)):
+                         ("ii_comparator.tex", COMPARATOR_ORDER),
+                         ("lambda_sweep_ssim.tex", LAMBDA_SSIM_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:
