@@ -95,10 +95,10 @@ DEFAULT_CONFIG = {
                             "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
                   "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                   "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
-                  "MonoII-ssim", "bas-res-2-ssim",
+                  "MonoII-ssim", "bas-res-2-ssim", "bas-da-2-noII",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
-                            "MonoII-ssim", "bas-res-2-ssim"],
+                            "MonoII-ssim", "bas-res-2-ssim", "bas-da-2-noII"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -226,6 +226,13 @@ GRID = {
     "bas-res-2-ssim": {"group": "ssim", "desc": "basis degree 2 + II (0.5) with the SSIM_II comparator",
                        "flags": "--depth_backbone resnet18 --photometric standard --illum_calib basis "
                                 "--illum_basis_degree 2 --illumination_invariant 0.5 --iif_loss ssim"},
+    # The 2x2 of plan section 14c on the foundation backbone: basis calibration of degree 2 with
+    # NO II loss, which on ResNet-18 was the best model of the study (SCARED 0.0576, below the
+    # published MonoII). Compares against E3 (same backbone, nothing added). User's choice of
+    # degree 2, 2026-09-16.
+    "bas-da-2-noII": {"group": "bas-da", "desc": "Depth Anything + basis calibration (degree 2), no II loss",
+                      "flags": "--photometric standard --illum_calib basis --illum_basis_degree 2 "
+                               "--illumination_invariant 0"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
