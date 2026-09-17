@@ -292,10 +292,14 @@ class MonodepthOptions:
                                       "interpolates between the two: degree 0 IS the global model")
         self.parser.add_argument("--illum_basis_degree",
                                  type=int,
-                                 default=2,
+                                 default=1,
                                  help="polynomial degree of --illum_calib basis; the field has "
                                       "(d+1)(d+2)/2 terms, so 0 -> 1 (global), 1 -> 3 (linear "
-                                      "gradient), 2 -> 6 (vignetting), 3 -> 10")
+                                      "gradient), 2 -> 6 (vignetting), 3 -> 10. Default 1 from the "
+                                      "capacity curve of CVIU_REVISION_PLAN.md section 14a: against "
+                                      "degree 2 it ties on SCARED and Hamlyn and wins on C3VD "
+                                      "(-0.0105 [-0.0173,-0.0035], 6/7), and it is the best absolute "
+                                      "point of the family on SCARED and C3VD")
         self.parser.add_argument("--photometric",
                                  type=str,
                                  choices=["highlight", "standard"],
