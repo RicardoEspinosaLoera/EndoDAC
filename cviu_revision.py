@@ -95,8 +95,10 @@ DEFAULT_CONFIG = {
                             "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
                   "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                   "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
+                  "MonoII-ssim", "bas-res-2-ssim",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
-                            "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200"],
+                            "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
+                            "MonoII-ssim", "bas-res-2-ssim"],
         "checkpoint": "best",
         "runs": {},
         "skip_runs": [],
@@ -214,6 +216,16 @@ GRID = {
                      "flags": "--depth_backbone resnet18 --photometric standard "
                               "--illum_calib basis --illum_basis_degree 2 "
                               "--illumination_invariant 2.0"},
+    # II-comparator check: the paper's Eq. (14)-(15) compare the descriptor images with SSIM,
+    # but --iif_loss defaults to l2 (0.25*||u_p-u_t||^2, from the 2026-09-09 review) and every
+    # run of this study used it. Same two cells at the published lambda1 = 0.5 with the
+    # published comparator: if they tie their l2 twins, the comparator is not what hurts.
+    "MonoII-ssim": {"group": "ssim", "desc": "MonoII with the paper's SSIM_II comparator",
+                    "flags": "--depth_backbone resnet18 --photometric standard "
+                             "--illumination_invariant 0.5 --iif_loss ssim"},
+    "bas-res-2-ssim": {"group": "ssim", "desc": "basis degree 2 + II (0.5) with the SSIM_II comparator",
+                       "flags": "--depth_backbone resnet18 --photometric standard --illum_calib basis "
+                                "--illum_basis_degree 2 --illumination_invariant 0.5 --iif_loss ssim"},
     # lam-res grid: sweep of lambda1, the WEIGHT OF THE II LOSS (--illumination_invariant,
     # eq. 18 of the paper), on the ResNet-18 backbone. Not the learning rate, i.e. an audit of the paper's own
     # Table 2, which swept lambda1 there with ONE seed and frame-level means and then
@@ -291,6 +303,9 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
 # R2 as a 3 x 2 factorial on the ResNet-18 backbone: calibration x colour augmentation. Reading
 # down a column gives the calibration comparison the reviewer asked for; reading across a row
 # gives the effect of the augmentation defect on that calibration model.
+# the II comparator: l2 (what was trained) against SSIM (what the paper writes), same cells
+COMPARATOR_ORDER = [("MonoII", "dense map, II l2"), ("MonoII-ssim", "dense map, II SSIM"),
+                    ("bas-res-2", "basis degree 2, II l2"), ("bas-res-2-ssim", "basis degree 2, II SSIM")]
 # lambda1 swept with the basis calibration held at degree 2
 LAMBDA_BAS_ORDER = [("lam-bas-000", "$\lambda_1 = 0$"), ("lam-bas-010", "$\lambda_1 = 0.1$"),
                     ("lam-bas-025", "$\lambda_1 = 0.25$"), ("bas-res-2", "$\lambda_1 = 0.5$"),
@@ -2130,7 +2145,8 @@ def write_tables(cfg, summary, paired, per_seq):
                          ("monoii_calib.tex", MONOII_CALIB_ORDER),
                          ("lambda_sweep_resnet.tex", LAMBDA_RES_ORDER),
                          ("calib_capacity.tex", BASIS_ORDER),
-                         ("lambda_sweep_basis.tex", LAMBDA_BAS_ORDER)):
+                         ("lambda_sweep_basis.tex", LAMBDA_BAS_ORDER),
+                         ("ii_comparator.tex", COMPARATOR_ORDER)):
         lines = ["\\begin{tabular}{ll" + "c" * (len(METRICS) + len(others)) + "}", "\\toprule",
                  "Run & Variant & " + " & ".join(k.replace("_", "\\_") for k in METRICS) + "".join(" & {} Abs Rel".format(d) for d in others) + " \\\\", "\\midrule"]
         for run, desc in order:
