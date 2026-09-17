@@ -331,6 +331,41 @@ ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0"
 LAMBDA_SSIM_ORDER = [("lam-bas-000", "$\lambda_1 = 0$ (sin II)"), ("lam-ssim-010", "$\lambda_1 = 0.1$"),
                      ("lam-ssim-025", "$\lambda_1 = 0.25$"), ("bas-res-2-ssim", "$\lambda_1 = 0.5$"),
                      ("lam-ssim-100", "$\lambda_1 = 1.0$"), ("lam-ssim-200", "$\lambda_1 = 2.0$")]
+# Paired contrasts that are not against cfg["proposed"], so paired.csv cannot express them: each
+# row names its own reference. diff = method - reference per sequence, so for a lower-is-better
+# metric a NEGATIVE diff means the method is better and `wins` counts the sequences where it is.
+# Rows whose method or reference has no results are written as "--".
+CONTRASTS = [
+    ("contrast_capacity.tex",
+     "capacity of the calibration field, lambda1 = 0.5 fixed; negative = the calibration helps",
+     [("degree 0 (global)", "bas-res-0", "MonoII-none"),
+      ("degree 1", "bas-res-1", "MonoII-none"),
+      ("degree 2", "bas-res-2", "MonoII-none"),
+      ("degree 3", "bas-res-3", "MonoII-none"),
+      ("dense map (submission)", "MonoII", "MonoII-none")]),
+    ("contrast_degree1.tex",
+     "the degree-1 field against each alternative; positive = degree 1 is better",
+     [("global affine (Ozyoruk et al.)", "bas-res-0", "bas-res-1"),
+      ("dense map (submission)", "MonoII", "bas-res-1"),
+      ("no calibration", "MonoII-none", "bas-res-1")]),
+    ("contrast_components.tex",
+     "calibration and II loss against the plain ResNet-18; negative = the cell is better",
+     [("calibration only", "lam-bas-000", "R1"),
+      ("II loss only", "MonoII-none", "R1"),
+      ("both", "bas-res-2", "R1"),
+      ("calibration only vs both", "lam-bas-000", "bas-res-2")]),
+    ("contrast_jitter.tex",
+     "consistent colour jitter against the jitter as shipped; negative = the fix helps",
+     [("no calibration", "A-MonoII-none", "MonoII-none"),
+      ("global affine", "A-MonoII-glob", "MonoII-glob"),
+      ("local, dense map", "A-MonoII", "MonoII")]),
+    ("contrast_comparator.tex",
+     "II comparator: the paper's SSIM against the l2 that was trained; negative = SSIM is better",
+     [("dense map", "MonoII-ssim", "MonoII"),
+      ("basis, degree 2", "bas-res-2-ssim", "bas-res-2")]),
+]
+
+
 # the II comparator: l2 (what was trained) against SSIM (what the paper writes), same cells
 COMPARATOR_ORDER = [("MonoII", "dense map, II l2"), ("MonoII-ssim", "dense map, II SSIM"),
                     ("bas-res-2", "basis degree 2, II l2"), ("bas-res-2-ssim", "basis degree 2, II SSIM")]
@@ -2108,8 +2143,72 @@ def _method_order(cfg, methods):
     return ext + known + rest + ([prop] if prop in methods else [])
 
 
+def _seq_index(per_seq, metric):
+    """{(method, dataset): {sequence: value}} from the per-sequence rows."""
+    idx = {}
+    for r in per_seq:
+        try:
+            v = float(r[metric])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if v == v:                                    # drop NaN
+            idx.setdefault((r["method"], r["dataset"]), {})[r["sequence"]] = v
+    return idx
+
+
+def paired_contrast(idx, a, b, ds, n_boot, alpha, rng):
+    """Paired difference a - b over the sequences both share, or None if either is missing."""
+    A, B = idx.get((a, ds)), idx.get((b, ds))
+    if not A or not B:
+        return None
+    keys = sorted(set(A) & set(B))
+    if len(keys) < 2:
+        return None
+    d = np.array([A[k] - B[k] for k in keys], dtype=float)
+    res = paired_tests(d)
+    res["blo"], res["bhi"] = bootstrap_ci(d, n_boot, alpha, rng)
+    return res
+
+
+def write_contrast_tables(cfg, per_seq, metric="abs_rel"):
+    """The comparisons that do not go through cfg["proposed"]; see CONTRASTS."""
+    tdir = ensure_dir(os.path.join(cfg["out_dir"], "tables"))
+    sc = cfg["stats"]
+    idx = _seq_index(per_seq, metric)
+    datasets = [d for d in cfg["datasets"] if any(dd == d for (_, dd) in idx)]
+    if not datasets:
+        return
+    for fname, caption, rows in CONTRASTS:
+        rng = np.random.default_rng(0)                # same draws for every table
+        lines = ["% {} ({}), paired by sequence, {} bootstrap draws".format(caption, metric, sc["n_boot"]),
+                 "\\begin{tabular}{l" + "cc" * len(datasets) + "}", "\\toprule",
+                 " & " + " & ".join("\\multicolumn{{2}}{{c}}{{{}}}".format(d) for d in datasets) + " \\\\",
+                 "Variant & " + " & ".join("$\\Delta$ [95\\% CI] & wins" for _ in datasets) + " \\\\",
+                 "\\midrule"]
+        any_row = False
+        for label, a, b in rows:
+            cells = []
+            for d in datasets:
+                r = paired_contrast(idx, a, b, d, sc["n_boot"], sc["alpha"], rng)
+                if r is None:
+                    cells += ["--", "--"]
+                    continue
+                any_row = True
+                clean = (r["blo"] > 0) == (r["bhi"] > 0)          # CI excludes zero
+                cell = "{} [{}, {}]".format(fmt(r["mean_diff"], 4), fmt(r["blo"], 4), fmt(r["bhi"], 4))
+                cells += ["\\textbf{{{}}}".format(cell) if clean else cell,
+                          "{}/{}".format(r["wins"], r["n"])]
+            lines.append("{} & {} \\\\".format(label.replace("_", "\\_"), " & ".join(cells)))
+        lines += ["\\bottomrule", "\\end{tabular}"]
+        if not any_row:
+            continue                                   # nothing trained yet for this contrast
+        with open(os.path.join(tdir, fname), "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+
+
 def write_tables(cfg, summary, paired, per_seq):
     tdir = ensure_dir(os.path.join(cfg["out_dir"], "tables"))
+    write_contrast_tables(cfg, per_seq)
     by = {(r["method"], r["dataset"]): r for r in summary}
     pb = {(r["dataset"], r["method"], r["metric"]): r for r in paired}
     sc = cfg["stats"]
