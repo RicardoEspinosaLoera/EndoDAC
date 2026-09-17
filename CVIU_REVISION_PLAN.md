@@ -1103,3 +1103,33 @@ the colour-augmentation defect (here). What survives is the capacity account of 
 only one supported by an intervention: restrict the field to a low order and the harm disappears;
 leave it free per pixel and it costs 0.0059 on Hamlyn. The augmentation fix should nevertheless be
 adopted as the default for any future training, on its own merits.
+
+---
+
+## 16. The II comparator: l2 against the paper's SSIM (2026-09-17)
+
+Both cells at the published λ₁ = 0.5, three seeds, paired by sequence. `diff = SSIM − l2`, so
+negative means the paper's comparator is better.
+
+| Cell | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| dense map (`MonoII-ssim` vs `MonoII`) | +0.0009 tie | −0.0017 tie | −0.0046 [−0.0098,−0.0001], 5/7 |
+| basis degree 2 (`bas-res-2-ssim` vs `bas-res-2`) | +0.0005 tie | **+0.0031 [+0.0010,+0.0054]**, 26/58, p 0.022 | **−0.0101 [−0.0154,−0.0049]**, 6/7, p 0.031 |
+
+**In-domain the comparator changes nothing**: both cells tie, so §14b's finding — the II loss
+degrades SCARED monotonically with its weight — holds for either way of comparing the descriptors.
+That part of the paper can be written without reservation.
+
+Out of domain there is no coherent story: SSIM wins both cells on C3VD but loses to l2 on Hamlyn
+with the basis while tying with the dense map. A real comparator effect would carry the same sign
+across both cells of a dataset. With the scale confound on top — SSIM_II sits at ~0.12 where l2
+sits at ~0.05, so λ₁ = 0.5 is not the same effective weight — nothing is built on it. The
+`lam-ssim-*` sweep, running, separates comparator from weight properly.
+
+Worth noting: `bas-res-2-ssim` reaches 0.3282 on C3VD, within noise of the best point of the whole
+ResNet family there (`bas-res-1`, 0.3278).
+
+**Manuscript decision this settles.** Describe the **l2** comparator, which produced every number
+in the study, and cite the SSIM variant of Eqs. (14)-(15) as an ablation that ties in-domain. The
+reverse — keeping SSIM in the text while the released code defaults to l2 — leaves a mismatch that
+anyone checking the code will find, and now there is data supporting the equivalence either way.
