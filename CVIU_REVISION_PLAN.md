@@ -926,3 +926,89 @@ items. Run either factor alone and the other confounds it.
 would support "backbone-agnostic"; a positive result here alone supports "it works on ResNet-18",
 which is still more than the submission evidences, since the paper's Table 2 has no row isolating
 the calibration on that backbone at all.
+
+---
+
+## 14. Results of the ResNet-18 grids (2026-09-16)
+
+All on MonoII's backbone (ResNet-18, ImageNet init), monodepth2 photometric loss, no HADepth term,
+batch 8, jitter as shipped, three seeds, sequence-level paired differences with 10 000-draw
+bootstrap CIs (SCARED n=7 sequences, Hamlyn n=58 blocks of its single sequence, C3VD n=7 scenes).
+Every run trains on SCARED only; Hamlyn and C3VD are evaluation-only.
+
+### 14a. Capacity of the calibration field, λ₁ = 0.5 fixed (`tables/calib_capacity.tex`)
+
+`diff = point − MonoII-none` (no calibration); negative = the calibration helps.
+
+| Calibration | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| none (`MonoII-none`) | 0.0599 | 0.1698 | 0.3363 |
+| degree 0 = global (`bas-res-0`) | +0.0002 tie | **+0.0039 [+0.0014,+0.0067]** | +0.0038 tie |
+| degree 1 (`bas-res-1`) | −0.0002 tie | +0.0001 tie | −0.0085 [−0.0150,−0.0009], 6/7, p 0.078 |
+| degree 2 (`bas-res-2`) | +0.0009 tie | −0.0008 tie | +0.0020 tie |
+| degree 3 (`bas-res-3`) | +0.0008 tie | **+0.0024 [+0.0005,+0.0044]** | −0.0070 tie |
+| dense map (`MonoII`) | +0.0009 tie | **+0.0059 [+0.0034,+0.0083], 15/58, p<0.001** | +0.0016 tie |
+
+In-domain the curve is flat within ±0.001. On Hamlyn the dense map is the worst point by the
+clearest margin in the study; degrees 1–2 are harmless. C3VD's degree-1 point is suggestive but
+degree 2 does not follow it, so it is not read as a capacity effect.
+
+### 14b. λ₁ of the II loss, basis calibration at degree 2 (`tables/lambda_sweep_basis.tex`)
+
+`diff = point − lam-bas-000` (calibration, no II loss).
+
+| λ₁ | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| 0 (`lam-bas-000`) | **0.0576** | 0.1706 | 0.3381 |
+| 0.1 | +0.0005 tie | −0.0031 [−0.0067,+0.0002] | +0.0040 [+0.0001,+0.0076] |
+| 0.25 | +0.0017 tie | +0.0026 [+0.0000,+0.0051] | −0.0020 tie |
+| **0.5 (paper)** | **+0.0032 [+0.0005,+0.0063]**, 1/7 | −0.0016 tie | +0.0002 tie |
+| 1.0 | **+0.0041 [+0.0017,+0.0069]**, 1/7, p 0.031 | +0.0009 tie | −0.0040 tie |
+| 2.0 | **+0.0048 [+0.0009,+0.0102]**, 1/7 | +0.0012 tie | −0.0053 tie |
+
+**In-domain the II loss degrades accuracy monotonically with its weight**; from the published 0.5
+upward every CI excludes zero. Out of domain no weight is distinguishable from zero. Under the
+pre-registered rule (select on SCARED) **λ₁ = 0**; the largest weight that costs nothing
+measurable is 0.1. The paper's Table 2 (0.062 → 0.058 on adding II at 0.5, one seed) reverses
+with three seeds, paired. Measured with the l2 comparator; the SSIM check (`MonoII-ssim`,
+`bas-res-2-ssim`) is queued.
+
+### 14c. The 2×2, calibration × II loss, against the plain ResNet-18 (`R1`)
+
+`diff = cell − R1`; negative = the cell is better.
+
+| Cell | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| calibration only (`lam-bas-000`) | −0.0017 tie | **−0.0058 [−0.0071,−0.0046], 53/58** | **+0.0102 [+0.0053,+0.0157], 0/7** |
+| II only (`MonoII-none`) | +0.0006 tie | **−0.0066 [−0.0101,−0.0033], 36/58** | +0.0084 [−0.0001,+0.0159] |
+| both (`bas-res-2`) | +0.0015 tie | **−0.0074 [−0.0117,−0.0034], 30/58** | **+0.0104 [+0.0024,+0.0178]** |
+| calibration only vs both | **−0.0032 [−0.0064,−0.0005], 6/7** | +0.0016 tie | −0.0002 tie |
+
+### 14d. Reading
+
+1. **The affine form is right; the free per-pixel implementation was the problem.** The dense map
+   hurts out of domain (14a); a field of degree ≤ 2 never does. This closes §8e: the mechanism
+   proposed there (spare capacity absorbing non-illumination residual) is now supported by an
+   intervention, not only by an interpretation.
+2. **The components help under photometric shift and hurt under geometric shift.** Hamlyn
+   (same laparoscopic geometry, different exposure and specularity statistics): both help, the
+   calibration in 53 of 58 blocks. C3VD (tubular colon, larger working distance, light moving
+   with the camera): both hurt, the calibration in 0 of 7 scenes. The paper's own §4.1.2 draws
+   exactly this distinction between the two shifts; the data now give it a sign on each side.
+   Intensity fall-off is depth information in a colon (the near-light shape-from-shading premise
+   of Wu et al. 2010, cited in §1.2), and calibrating it away removes signal.
+3. **The two components are not complementary.** On Hamlyn they do the same job and do not add;
+   on SCARED the II loss added to the calibration costs 0.0032 with the CI excluding zero.
+4. **Backbone interaction.** On Depth Anything the plain model was the best on Hamlyn (§8g); on
+   ResNet-18 the plain model is the worst there. The foundation features already carry the
+   photometric robustness the components provide; the weak backbone needs it.
+5. **Best ResNet-18 model of the study: `lam-bas-000`**, basis calibration of degree 2 with no II
+   loss, SCARED 0.0576 — below the 0.058 the submission reports for MonoII.
+
+### 14e. Open
+
+- The calibration × colour-jitter factorial (`MonoII-glob`, `A-MonoII-*`) is training: the last
+  untested explanation for the dense map's behaviour.
+- `MonoII-ssim` / `bas-res-2-ssim` are queued: whether the published SSIM comparator changes 14b.
+- **Basis calibration of degree 2 with λ₁ = 0 on Depth Anything** does not exist yet. After 14c
+  it is the candidate for the paper's best model, and the natural next run (3 seeds, ~32 h).
