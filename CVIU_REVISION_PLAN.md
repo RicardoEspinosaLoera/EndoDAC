@@ -1133,3 +1133,32 @@ ResNet family there (`bas-res-1`, 0.3278).
 in the study, and cite the SSIM variant of Eqs. (14)-(15) as an ablation that ties in-domain. The
 reverse — keeping SSIM in the text while the released code defaults to l2 — leaves a mismatch that
 anyone checking the code will find, and now there is data supporting the equivalence either way.
+
+### 16a. The two λ₁ curves collapse onto one (2026-09-17)
+
+Both sweeps share their origin (`lam-bas-000`: calibration, no II loss, so no comparator applies),
+so they can be superposed. SCARED Abs Rel:
+
+| λ₁ | l2 | SSIM |
+|---|---|---|
+| 0 | 0.0576 | 0.0576 |
+| 0.1 | 0.0581 | **0.0592** |
+| 0.25 | **0.0593** | **0.0605** |
+| 0.5 | **0.0608** | 0.0613 |
+| 1.0 | 0.0616 | pending |
+| 2.0 | 0.0624 | pending |
+
+SSIM at 0.1 lands on l2 at 0.25; SSIM at 0.25 lands on l2 at 0.5. The factor is **2.4**, which is
+exactly the ratio of the two losses' magnitudes (~0.12 against ~0.05). **The comparator does not
+matter; only the effective weight does.** The curves are one curve in units of effective weight,
+which settles §16's question mechanically rather than statistically, and means the published
+λ₁ = 0.5 with SSIM is equivalent to λ₁ ≈ 1.2 with l2 — well inside the range where the in-domain
+damage has a CI excluding zero.
+
+**The one piece of evidence in favour of the II loss in the whole study.** On C3VD the SSIM curve
+improves at every weight and at 0.5 reaches −0.0099 [−0.0178, −0.0013], 5/7 — 0.3282 against
+0.3381 without the loss. The l2 curve moves the same way there without a clean interval (−0.0040
+at 1.0, −0.0053 at 2.0). If the pending SSIM points confirm it, the defensible claim becomes:
+*the illumination-invariant loss helps under geometric domain shift at the cost of in-domain
+accuracy*, which fits the mechanism — in a colon the intensity fall-off carries depth information
+that an invariant descriptor discards by construction. Hamlyn shows no pattern either way.
