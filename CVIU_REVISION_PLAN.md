@@ -1134,7 +1134,7 @@ in the study, and cite the SSIM variant of Eqs. (14)-(15) as an ablation that ti
 reverse — keeping SSIM in the text while the released code defaults to l2 — leaves a mismatch that
 anyone checking the code will find, and now there is data supporting the equivalence either way.
 
-### 16a. The two λ₁ curves collapse onto one (2026-09-17)
+### 16a. The two λ₁ curves collapse only below λ₁ = 0.5 (2026-09-17, corrected 2026-09-18)
 
 Both sweeps share their origin (`lam-bas-000`: calibration, no II loss, so no comparator applies),
 so they can be superposed. SCARED Abs Rel:
@@ -1162,3 +1162,39 @@ at 1.0, −0.0053 at 2.0). If the pending SSIM points confirm it, the defensible
 *the illumination-invariant loss helps under geometric domain shift at the cost of in-domain
 accuracy*, which fits the mechanism — in a colon the intensity fall-off carries depth information
 that an invariant descriptor discards by construction. Hamlyn shows no pattern either way.
+
+### 16b. Correction: the collapse breaks above λ₁ = 0.5 (2026-09-18)
+
+With the last two points of the SSIM sweep in, §16a's clean claim does not hold. SCARED Abs Rel:
+
+| λ₁ | l2 | SSIM |
+|---|---|---|
+| 0 | 0.0576 | 0.0576 |
+| 0.1 | 0.0581 | 0.0592 |
+| 0.25 | 0.0593 | 0.0605 |
+| 0.5 | 0.0608 | 0.0613 |
+| 1.0 | 0.0616 | **0.0602** |
+| 2.0 | 0.0624 | **0.0608** |
+
+l2 rises monotonically; SSIM rises to 0.5 and then **turns back**. The 2.4 factor fitted the
+0.1-0.5 range and I took it for a law; the high-weight points show it was a coincidence of the
+linear regime. The reason is the shape of the two losses: l2 is quadratic in the descriptor error
+so its gradient grows linearly, while SSIM's ratio form is concave (as the code's own comment
+notes) and saturates, so at large weight it stops pushing. **Retract "the comparator does not
+matter; only the effective weight does."**
+
+What survives, and is now stronger: **no λ₁ improves on zero in-domain under either comparator.**
+With l2 the damage is monotone with CIs excluding zero from 0.5 up. With SSIM it peaks at 0.5
+(+0.0037, CI excluding zero) and then decays into ties. λ₁ = 0 remains the answer, and it no longer
+depends on which comparator the paper describes.
+
+**C3VD, the one positive result for the II loss, now consistent.** The SSIM curve is negative at
+all five weights — −0.0034, −0.0081, −0.0099, −0.0087, −0.0107 — with 5/7 scenes at every weight
+and a CI excluding zero at 0.5. Five independent training runs pointing the same way is not noise
+even though only one interval separates from zero. The l2 curve agrees but weaker (−0.0040 and
+−0.0053 at the two highest weights). Hamlyn goes the other way: SSIM at 2.0 costs +0.0043
+[+0.0021,+0.0065].
+
+Defensible claim: *the illumination-invariant loss helps under geometric domain shift and costs
+in-domain accuracy*, with the mechanism that in a colon the intensity fall-off carries depth
+information an invariant descriptor discards by construction.
