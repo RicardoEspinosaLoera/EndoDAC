@@ -405,6 +405,33 @@ The pretrained weights and EndoDAC's adaptation machinery (Conv-neck + DV-LoRA) 
 reduction in Abs Rel whose CI excludes zero. E3 = 0.0517 reproduces the published EndoDAC
 number (0.052), so the anchor holds.
 
+**The "Conv-neck" row is not EndoDAC's Conv-neck (settled 2026-09-20).** `ResBottleneckBlock` in
+`models/backbones/layers/utils.py` carries ViTDet's class name and docstring — "the standard
+bottleneck residual block ... 3 conv layers with kernels 1x1, 3x3, 1x1" — but its body implements
+a large-kernel-attention module: three parallel gated depthwise branches (3/5/7 with dilated
+9/7/5 companions), `proj_first`/`proj_last`, and a zero-initialised `scale`. That is HADepth's
+neck. EndoDAC's real Conv-neck is ViTDet's 1x1/3x3/1x1 bottleneck, as both upstream
+(`BeileiCui/EndoDAC`) and this repo's own commit `0914358` show, before the class was overwritten
+in `6337c3c`. Both are now available behind `residual_block_kind` ("lka" default, "bottleneck");
+no trained run changes.
+
+Two consequences:
+
+1. *Reproduction.* EndoDAC's released checkpoint could not load into the LKA class: its 36
+   residual weights were silently dropped by `strict=False` and 124 LKA weights stayed random.
+   Because the LKA `scale` is zero-initialised, the neck was then **exactly the identity** — the
+   "EndoDAC" column was running with no Conv-neck at all, and still scored 0.0566. With the
+   bottleneck restored the checkpoint loads whole and gives **0.0513 / 4.422 / 0.9790** against
+   0.051 published. The five external methods now reproduce the paper in every cell.
+2. *Attribution.* E2's 47% was trained with the LKA neck, so that row measures HADepth's
+   large-kernel neck, not EndoDAC's bottleneck. The runs are internally consistent (in our own
+   training the block is learned from scratch, so `scale` is not stuck at zero), but the label is
+   wrong. The honest split of the N0 -> C1 span is: 34% the foundation weights, **47% an LKA conv
+   neck inherited from HADepth**, 16% DV-LoRA, -0.3% HADepth's highlight term plus our IIF loss,
+   3.8% our calibration. Likewise E3 is not "= EndoDAC": it is DA v1 + LKA neck + DV-LoRA, which
+   lands at 0.0517, near where EndoDAC's own checkpoint lands (0.0513), but it is a different
+   architecture. **Manuscript correction:** every place that credits the Conv-neck to EndoDAC.
+
 **RETRACTED 2026-09-15.** This paragraph read: "the R-grid is a negative result worth stating: on
 a ResNet-18 backbone the full method is R2 − R1 = −0.00003, i.e. nothing; the benefit of the
 photometric machinery appears only on top of a strong foundation backbone." **That is not a test
