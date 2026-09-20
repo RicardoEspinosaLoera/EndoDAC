@@ -295,6 +295,13 @@ GRID = {
                          "--photometric standard"},
     "MonoViT-II": {"group": "B", "desc": "MonoViT + local calibration + II (lambda1=0.5)",
                    "flags": "--depth_backbone monovit --photometric standard --illumination_invariant 0.5"},
+    # bas-res-2-ssim on the third backbone: whether the best C3VD point of the ResNet family
+    # (0.3282, basis degree 2 + II at 0.5 with the paper's SSIM_II comparator) is a property of
+    # that cell or of ResNet-18. Its twins are MonoViT-II (same weight, dense map, l2 comparator)
+    # and MonoViT (neither component).
+    "bas-vit-2-ssim": {"group": "vit-ssim", "desc": "MonoViT + basis degree 2 + II (0.5), SSIM_II comparator",
+                       "flags": "--depth_backbone monovit --photometric standard --illum_calib basis "
+                                "--illum_basis_degree 2 --illumination_invariant 0.5 --iif_loss ssim"},
     # C-grid: illumination model
     "C1": {"group": "C", "desc": "global affine calibration", "flags": "--illum_calib global"},
     # diagnostic: does the calibration behave once it is supervised with its least-squares fit?
