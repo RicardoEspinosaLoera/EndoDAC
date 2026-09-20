@@ -1198,3 +1198,56 @@ even though only one interval separates from zero. The l2 curve agrees but weake
 Defensible claim: *the illumination-invariant loss helps under geometric domain shift and costs
 in-domain accuracy*, with the mechanism that in a colon the intensity fall-off carries depth
 information an invariant descriptor discards by construction.
+
+---
+
+## 17. The clean recipe on Depth Anything (da-grid, 2026-09-20)
+
+DA v1 + DV-LoRA + monodepth2's photometric loss — no HADepth term — with two axes crossing at
+(basis degree 1, λ₁ = 0). Three seeds, sequence-level paired CIs. This is the paper's own backbone
+with only the authors' components.
+
+### 17a. Capacity, λ₁ = 0, against `E3` (EndoDAC, no calibration)
+
+| Capacity | SCARED (E3 = 0.0517) | Hamlyn (0.1565) | C3VD (0.2929) |
+|---|---|---|---|
+| degree 0 = global | 0.0505, −0.0012 [−0.0028,+0.0002], 6/7 | 0.1597, **+0.0032**, 22/58 | 0.2672, **−0.0256 [−0.0297,−0.0222], 7/7** |
+| **degree 1** | **0.0502, −0.0015 [−0.0024,−0.0004], 6/7, p 0.047** | 0.1597, **+0.0033**, 17/58 | 0.2956, +0.0028 tie |
+| degree 2 | 0.0510, −0.0006 tie | 0.1586, **+0.0021**, 17/58 | 0.2870, −0.0059 tie |
+| dense map | 0.0517, +0.0000 tie | 0.1594, **+0.0029**, 18/58 | 0.2669, **−0.0260 [−0.0360,−0.0164], 7/7** |
+
+### 17b. λ₁ of the II loss, at basis degree 1, against `da-bas-1` (0.0502 / 0.1597 / 0.2956)
+
+| λ₁ | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| 0.1 | **+0.0011 [+0.0006,+0.0015]**, 1/7, p 0.031 | **−0.0027 [−0.0044,−0.0011]**, 38/58, p 0.004 | **+0.0074 [+0.0024,+0.0117]**, 1/7 |
+| 0.25 | +0.0018 tie | −0.0022 [−0.0043,−0.0003], 38/58 | −0.0017 tie |
+| 0.5 | **+0.0024 [+0.0001,+0.0050]**, 1/7 | **+0.0022 [+0.0007,+0.0039]**, 24/58 | −0.0034 tie |
+
+### 17c. Readings
+
+1. **The calibration wins in-domain on the paper's own backbone, for the first time in the study.**
+   Degree 1 beats EndoDAC by −0.0015 with a CI excluding zero, 6/7 sequences. At 0.0502 it is
+   within seed noise of `C1`'s 0.0497 while using **only the authors' own components** — no
+   HADepth term, no II loss.
+2. **RETRACTION: the degree-1 result does not transfer across backbones.** On ResNet-18 degree 1
+   beat the global model on both generalisation sets (§14f). Here it does neither: on C3VD the two
+   *extremes* win by a wide margin (global −0.0256 and dense −0.0260, both 7/7) while degree 1
+   ties, and on Hamlyn every capacity hurts. **The capacity optimum is backbone-dependent**, so
+   §14f's curve cannot be quoted as a property of the method. What survives of §14f is the
+   in-domain claim and the ResNet-specific ordering.
+3. On Hamlyn no calibration at any capacity beats plain EndoDAC, consistent with §8g.
+4. **First clean positive for the II loss on this backbone**: λ₁ = 0.1 is worth −0.0027
+   [−0.0044,−0.0011], 38/58, on Hamlyn. It costs in-domain (+0.0011, CI excluding zero) and costs
+   on C3VD (+0.0074). A weight this small was never in the paper's Table 2 range.
+5. The C3VD pattern is not monotone in capacity in either direction on either backbone (here the
+   extremes win; on ResNet the middle won). With n = 7 it is the least trustworthy of the three
+   datasets and no capacity story should lean on it.
+
+### 17d. What this makes available for the paper
+
+`da-bas-1` — DA v1 + DV-LoRA + a degree-1 affine calibration field, no II loss, monodepth2's
+photometric loss — is the configuration whose every component is the authors' own and justified
+by a contrast with a CI excluding zero, on the submission's own backbone. It matches the best
+number of the whole study in-domain. It does not beat EndoDAC out of domain, and the paper must
+say so.
