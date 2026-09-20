@@ -857,6 +857,21 @@ that these are not the published numbers of MonoViT or Monodepth2; say so in the
 `R1`, `E3` and `M-local` are already trained at 3 seeds, so the new compute is 9 jobs:
 `MonoII`, `MonoViT`, `MonoViT-II` × 3 seeds.
 
+**Status 2026-09-20.** Of this grid only `MonoII` ever trained. `M-local`, `M-none` and `M-global`
+were never launched — the sentence above is wrong, `M-local` has no run and no predictions — and
+`MonoViT`/`MonoViT-II` have been blocked since 2026-09-15 on the missing ImageNet MPViT-small
+weights, which a `find / -name mpvit_small.pth` on the DGX did not turn up. The B-grid's
+architecture axis therefore has two columns, ResNet-18 and Depth Anything, not three.
+
+**And its motivation is gone.** The B-grid existed because Tables 4-6 had no external baselines
+(open item 1 of the response letter). Since 2026-09-20 the five published checkpoints —
+EndoDAC, HADepth, AF-SfMLearner, Monodepth2, MonoPCC — reproduce the paper in every cell, which
+is stronger evidence than retraining competitors under our own recipe. MonoViT/MonoIIT is now a
+nice-to-have; the response letter's R3 text must drop its `[RESULTS PENDING]` placeholder and
+present the two backbones that are measured. What `M-local` would have tested — the method at the
+λ₁ = 0.5 the paper describes rather than the 0.1 the code defaults to — is covered on Depth
+Anything by `da-lam-050` and on ResNet-18 by `bas-res-2`.
+
 **`MonoII` is not `R2`.** `R2` is `--depth_backbone resnet18` with the repo defaults, i.e.
 λ₁ = 0.1 *and* HADepth's highlight-aware term. MonoII, like `M-local`, is the method as published:
 λ₁ = 0.5, monodepth2 photometric loss, nothing of HADepth's.
