@@ -1251,3 +1251,38 @@ photometric loss — is the configuration whose every component is the authors' 
 by a contrast with a CI excluding zero, on the submission's own backbone. It matches the best
 number of the whole study in-domain. It does not beat EndoDAC out of domain, and the paper must
 say so.
+
+### 17e. Correction: the clean-recipe model is `da-bas-0`, not `da-bas-1` (same day)
+
+Direct comparisons of `da-bas-1` against the candidates:
+
+| against | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| `C1` (global + II + highlight) | +0.0005 tie | +0.0002 tie | **+0.0239 [+0.0162,+0.0321], 0/7** |
+| `E8` (the submitted MonoIIF) | −0.0010 tie | −0.0011 tie | **+0.0278 [+0.0209,+0.0341], 0/7** |
+| `E3` (EndoDAC) | **−0.0015**, 6/7 | **+0.0033**, 17/58 | +0.0028 tie |
+| `da-bas-0` (global, same recipe) | −0.0003 tie | +0.0000 tie | **+0.0284 [+0.0212,+0.0349], 0/7** |
+
+What stands from §17d: `da-bas-1` matches `C1` and `E8` in-domain with only the authors' own
+components, and beats EndoDAC there. What falls: it is not the model to propose. **`da-bas-0`
+dominates it** — equal on SCARED and Hamlyn, better by 0.028 on C3VD — and also beats the dense
+map in-domain while tying elsewhere. Across the clean family:
+
+| | SCARED | Hamlyn | C3VD |
+|---|---|---|---|
+| `E3` no calibration | 0.0517 | **0.1565** | 0.2929 |
+| **`da-bas-0` global** | 0.0505 | 0.1597 | **0.2672** |
+| `da-bas-1` | **0.0502** | 0.1597 | 0.2956 |
+| `da-bas-2` | 0.0510 | 0.1586 | 0.2870 |
+| `E4` dense | 0.0517 | 0.1594 | 0.2669 |
+
+`da-bas-0` dominates the family except for `E3` on Hamlyn. That it is the *global* model
+reproduces §8a's `C1` result from an independent experiment with a different recipe — no HADepth
+term, no II loss — which is the strongest form of corroboration available here.
+
+**C3VD supports no capacity conclusion on either backbone.** Degree 1 is the worst of the family
+here, below no calibration, while degree 0 and the dense map are the best: a 0.028 jump between
+neighbouring degrees is not a capacity effect, it is a zigzag. On ResNet the same dataset put
+degrees 1 and 3 on top and 0 and 2 below. The 0/7 counts are consistent within each comparison,
+but the ordering across degrees has no interpretable shape, and with n = 7 nothing about capacity
+should be read from it.
