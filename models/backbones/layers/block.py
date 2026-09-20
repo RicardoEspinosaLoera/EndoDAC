@@ -19,7 +19,7 @@ from .attention import Attention, MemEffAttention
 from .drop_path import DropPath
 from .layer_scale import LayerScale
 from .mlp import Mlp
-from .utils import ResBottleneckBlock
+from .utils import ResBottleneckBlock, ResBottleneckBlockOriginal
 
 logger = logging.getLogger("dinov2")
 
@@ -63,6 +63,7 @@ class Block(nn.Module):
         res_conv_kernel_size=3,
         res_conv_padding=1,
         include_cls_token=True,
+        residual_block_kind="lka",
     ) -> None:
         super().__init__()
         # print(f"biases: qkv: {qkv_bias}, proj: {proj_bias}, ffn: {ffn_bias}")
@@ -98,7 +99,11 @@ class Block(nn.Module):
         self.use_residual_block = use_residual_block
         if use_residual_block:
             # Use a residual block with bottleneck channel as dim // 2
-            self.residual_ = ResBottleneckBlock(
+            # "lka" is this repo's large-kernel-attention neck and the default everywhere;
+            # "bottleneck" is ViTDet's 1x1/3x3/1x1, which is what EndoDAC's released checkpoint
+            # was trained with and the only way to load it without dropping its residual weights.
+            block_cls = ResBottleneckBlockOriginal if residual_block_kind == "bottleneck" else ResBottleneckBlock
+            self.residual_ = block_cls(
                 in_channels=dim,
                 out_channels=dim,
                 bottleneck_channels=dim // 8,

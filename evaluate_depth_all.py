@@ -264,7 +264,8 @@ class DepthModelFactory:
             backbone_size="base", r=opt.lora_rank, lora_type=opt.lora_type,
             image_shape=(224, 280), pretrained_path=opt.pretrained_path,
             residual_block_indexes=opt.residual_block_indexes,
-            include_cls_token=opt.include_cls_token)
+            include_cls_token=opt.include_cls_token,
+            residual_block_kind=getattr(opt, "residual_block_kind", "lka"))
         model_dict = depther.state_dict()
         depther.load_state_dict({k: v for k, v in depther_dict.items() if k in model_dict}, strict=False)
         depther.cuda()

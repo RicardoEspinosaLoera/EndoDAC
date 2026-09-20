@@ -94,6 +94,39 @@ class Conv3x3(nn.Module):
         return out
 
 
+class ResBottleneckBlockOriginal(nn.Module):
+    """The 1x1 / 3x3 / 1x1 bottleneck of ViTDet, which is what EndoDAC's Conv-neck actually is.
+
+    `ResBottleneckBlock` below keeps this class's name and docstring but implements a
+    large-kernel-attention module instead, so EndoDAC's released checkpoint cannot be loaded into
+    it: its 36 residual weights (conv1/norm1/conv2/norm2/conv3/norm3 per block) are silently
+    dropped by the strict=False loader and 124 LKA weights stay randomly initialised. Selected
+    with residual_block_kind="bottleneck"; nothing uses it by default, so every run of the CVIU
+    grid is unaffected.
+    """
+
+    def __init__(self, in_channels, out_channels, bottleneck_channels,
+                 act_layer=nn.GELU, conv_kernels=3, conv_paddings=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, bottleneck_channels, 1, bias=False)
+        self.norm1 = LayerNorm(bottleneck_channels, data_format="channels_first")
+        self.act1 = act_layer()
+        self.conv2 = nn.Conv2d(bottleneck_channels, bottleneck_channels, conv_kernels,
+                               padding=conv_paddings, bias=False)
+        self.norm2 = LayerNorm(bottleneck_channels, data_format="channels_first")
+        self.act2 = act_layer()
+        self.conv3 = nn.Conv2d(bottleneck_channels, out_channels, 1, bias=False)
+        self.norm3 = LayerNorm(out_channels, data_format="channels_first")
+
+    def forward(self, x):
+        out = x
+        for layer in (self.conv1, self.norm1, self.act1,
+                      self.conv2, self.norm2, self.act2,
+                      self.conv3, self.norm3):
+            out = layer(out)
+        return x + out
+
+
 class ResBottleneckBlock(nn.Module):
     """
     The standard bottleneck residual block without the last activation layer.

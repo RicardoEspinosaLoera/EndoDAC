@@ -67,6 +67,7 @@ class DinoVisionTransformer(nn.Module):
         interpolate_offset=0.1,
         residual_block_indexes=[],
         include_cls_token=True,
+        residual_block_kind="lka",
     ):
         """
         Args:
@@ -154,6 +155,7 @@ class DinoVisionTransformer(nn.Module):
                 init_values=init_values,
                 use_residual_block=i in residual_block_indexes,
                 include_cls_token=include_cls_token,
+                residual_block_kind=residual_block_kind,
             )
             for i in range(depth)
         ]

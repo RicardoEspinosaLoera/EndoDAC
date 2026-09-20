@@ -163,7 +163,8 @@ class endodac(nn.Module):
                  use_bn=False,
                  backbone_weights="da1",
                  da3_weights=None,
-                 train_depth_head=False):
+                 train_depth_head=False,
+                 residual_block_kind="lka"):
         """backbone_weights: "da1" Depth Anything v1 encoder + DPT head (EndoDAC / MonoIIF);
         "da3" DA3-Base encoder + DA3's own DPT neck (models/endodac/da3_vit.py; weights from
         da3_weights, default <pretrained_path>/da3_base.safetensors); "none" random ViT-B with the
@@ -176,9 +177,11 @@ class endodac(nn.Module):
         self.backbone_size = backbone_size
         self.backbone = {
             "small": backbones.vits.vit_small(residual_block_indexes=residual_block_indexes,
-                                              include_cls_token=include_cls_token),
+                                              include_cls_token=include_cls_token,
+                                              residual_block_kind=residual_block_kind),
             "base": backbones.vits.vit_base(residual_block_indexes=residual_block_indexes,
-                                            include_cls_token=include_cls_token),
+                                            include_cls_token=include_cls_token,
+                                            residual_block_kind=residual_block_kind),
         }
         self.backbone_archs = {
             "small": "vits14",

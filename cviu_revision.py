@@ -1104,7 +1104,8 @@ def build_predictor(cfg, name, spec, device):
                                 pretrained_path=_pretrained_or_none(cfg),
                                 residual_block_indexes=spec.get("residual_block_indexes", [2, 5, 8, 11]),
                                 include_cls_token=spec.get("include_cls_token", True),
-                                num_layers=spec.get("num_layers", 18))
+                                num_layers=spec.get("num_layers", 18),
+                                residual_block_kind=spec.get("residual_block_kind", "lka"))
         model, _ = DepthModelFactory.load_model(spec["type"], ns)
     from utils.layers import disp_to_depth
 
