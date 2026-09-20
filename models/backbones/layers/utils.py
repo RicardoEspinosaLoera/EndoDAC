@@ -109,22 +109,34 @@ class ResBottleneckBlockOriginal(nn.Module):
                  act_layer=nn.GELU, conv_kernels=3, conv_paddings=1):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, bottleneck_channels, 1, bias=False)
-        self.norm1 = LayerNorm(bottleneck_channels, data_format="channels_first")
+        self.norm1 = LayerNorm(bottleneck_channels)
         self.act1 = act_layer()
         self.conv2 = nn.Conv2d(bottleneck_channels, bottleneck_channels, conv_kernels,
                                padding=conv_paddings, bias=False)
-        self.norm2 = LayerNorm(bottleneck_channels, data_format="channels_first")
+        self.norm2 = LayerNorm(bottleneck_channels)
         self.act2 = act_layer()
         self.conv3 = nn.Conv2d(bottleneck_channels, out_channels, 1, bias=False)
-        self.norm3 = LayerNorm(out_channels, data_format="channels_first")
+        self.norm3 = LayerNorm(out_channels)
+
+        for layer in [self.conv1, self.conv2, self.conv3]:
+            weight_init.c2_msra_fill(layer)
+        for layer in [self.norm1, self.norm2]:
+            layer.weight.data.fill_(1.0)
+            layer.bias.data.zero_()
+        # zero init last norm layer, so the block starts as a no-op
+        self.norm3.weight.data.zero_()
+        self.norm3.bias.data.zero_()
 
     def forward(self, x):
+        # Returns the branch only: Block.forward adds it back with
+        # `x[:, cls:, :] = x[:, cls:, :] + patch_embed`, so adding x here too would
+        # double the patch embeddings at every residual block.
         out = x
         for layer in (self.conv1, self.norm1, self.act1,
                       self.conv2, self.norm2, self.act2,
                       self.conv3, self.norm3):
             out = layer(out)
-        return x + out
+        return out
 
 
 class ResBottleneckBlock(nn.Module):
