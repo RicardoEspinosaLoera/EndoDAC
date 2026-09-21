@@ -238,26 +238,33 @@ compute budget at three seeds, and is then confirmed on the method's own backbon
 ```latex
 \begin{table}[t]
 \centering
-\caption{Photometric calibration models on the ResNet-18 backbone. All five rows share one recipe
---- monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$, three seeds ---
-and differ \emph{only} in how the affine field $(c,b)$ is parameterised, from a single pair per
-image to a free per-pixel map. The lower block is the paired difference (variant $-$ degree 1) in
-Abs Rel per sequence, so a \textbf{positive} value means the degree-1 field is better; bold marks
-intervals excluding zero.}
+\caption{Photometric calibration models on the ResNet-18 backbone. The five calibration rows share
+one recipe --- monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$,
+three seeds --- and differ \emph{only} in how the affine field $(c,b)$ is parameterised, from a
+single pair per image to a free per-pixel map. The first row is a reference outside that family:
+it has \emph{neither} of the method's components and is therefore the Monodepth2 architecture
+under our recipe, which is why its number differs from the released Monodepth2 checkpoint of
+Table~\ref{tab:scared} (0.0933); that checkpoint was trained by its authors, not here. The lower
+block is the paired difference (variant $-$ degree 1) in Abs Rel per sequence, so a
+\textbf{positive} value means the degree-1 field is better; bold marks intervals excluding zero.}
 \label{tab:calib-resnet}
 \small
 \begin{tabular}{lccc}
 \toprule
 Calibration model & SCARED & Hamlyn & C3VD \\
 \midrule
-no lighting model             & 0.0599\,$\pm$\,0.0016 & 0.1698\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
+\emph{neither component} ($=$ Monodepth2, our recipe) & 0.0593\,$\pm$\,0.0015 & 0.1764\,$\pm$\,0.0070 & 0.3280\,$\pm$\,0.0117 \\
+\midrule
+no calibration, invariant loss kept & 0.0599\,$\pm$\,0.0016 & 0.1698\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
 global, one $(c,b)$ pair      & 0.0600\,$\pm$\,0.0009 & 0.1758\,$\pm$\,0.0065 & 0.3290\,$\pm$\,0.0072 \\
 \textbf{linear field (degree 1)} & \textbf{0.0596\,$\pm$\,0.0002} & 0.1700\,$\pm$\,0.0014 & \textbf{0.3278\,$\pm$\,0.0101} \\
 quadratic field (degree 2)    & 0.0608\,$\pm$\,0.0008 & \textbf{0.1690\,$\pm$\,0.0010} & 0.3383\,$\pm$\,0.0040 \\
 dense map (original submission) & 0.0608\,$\pm$\,0.0007 & 0.1757\,$\pm$\,0.0021 & 0.3379\,$\pm$\,0.0057 \\
 \midrule
 \multicolumn{4}{l}{\emph{paired against the degree-1 field}} \\
-no lighting model  & $+0.0002$ $[-0.0037, +0.0047]$ & $-0.0001$ $[-0.0017, +0.0015]$ &
+neither component  & $-0.0003$ $[-0.0041, +0.0038]$ & $\mathbf{+0.0064}$ $[+0.0034, +0.0097]$, 40/58 &
+                     $+0.0002$ $[-0.0089, +0.0081]$ \\
+no calibration     & $+0.0002$ $[-0.0037, +0.0047]$ & $-0.0001$ $[-0.0017, +0.0015]$ &
                      $\mathbf{+0.0085}$ $[+0.0009, +0.0153]$, 6/7 \\
 global             & $+0.0004$ $[-0.0023, +0.0030]$ & $\mathbf{+0.0058}$ $[+0.0036, +0.0081]$, 43/58 &
                      $+0.0012$ $[-0.0066, +0.0101]$ \\
@@ -284,6 +291,15 @@ free per-pixel map --- are both worse than a linear gradient."*
 This is the positive answer to Reviewer 2: five comparisons in favour of the low-order field with
 intervals excluding zero, none against it, and the two forms the reviewer named are both on the
 axis as special cases.
+
+**Three rows that are easy to confuse, and must be distinguished in the caption.** *Neither
+component* (0.0593) is the Monodepth2 architecture with no calibration and no invariant loss.
+*No calibration* (0.0599) keeps the invariant loss at $\lambda_1=0.5$ and removes only the
+lighting model — it is the control for the calibration, not a baseline. And the *Monodepth2* row
+of Table~\ref{tab:scared} (0.0933) is the checkpoint released by its authors, trained elsewhere.
+The gap between the first and the third is the training recipe, not the architecture; the gap
+between the first and the second is the invariant loss alone, which is a tie in-domain
+($+0.0006$ $[-0.0021, +0.0037]$) and costs 0.0066 on Hamlyn.
 
 ### 6.2 Confirmation on the method's own backbone
 
