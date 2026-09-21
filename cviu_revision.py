@@ -373,6 +373,7 @@ GRID = {
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
                   "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
                   "lam-da-025", "lam-da-100", "lam-da-200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
+                  "MonoIIT-repro", "MonoIIT-base", "MonoIIT-components",
                   "MonoII-none", "MonoII-glob", "A-MonoII-none", "A-MonoII-glob", "A-MonoII",
                   "lam-res-000", "lam-res-010", "lam-res-025", "lam-res-100", "lam-res-200",
                   "N0", "D3-EndoDAC", "D3", "A-C0", "A-C1", "A-E8"]
@@ -457,12 +458,16 @@ MONOII_CALIB_ORDER = [("MonoII-none", "none, jitter as shipped"),
 # depth networks of very different capacity, each also trained plain. Every row is 3 seeds and
 # the shared recipe, so a row pair differs only in the components and a column pair only in the
 # architecture.
+# The architecture column of the proposed method: each pair is "repo defaults, changing only
+# --depth_backbone" against the same network with neither component and monodepth2's photometric
+# loss. The earlier version of this list pointed at the lambda1 = 0.5 family (MonoII, MonoViT-II,
+# M-local), of which only MonoII was ever trained.
 BACKBONE_ORDER = [("R1", "ResNet-18 (Monodepth2), plain"),
-                  ("MonoII", "ResNet-18 + calibration + II (MonoII)"),
-                  ("MonoViT", "MPViT-small + HR decoder (MonoViT), plain"),
-                  ("MonoViT-II", "MPViT-small + calibration + II"),
+                  ("R2", "ResNet-18 + calibration + II (MonoII)"),
+                  ("MonoIIT-repro", "MPViT-small, random init, plain (MonoIIT as submitted)"),
+                  ("MonoIIT-components", "MPViT-small + calibration + II (MonoIIT)"),
                   ("E3", "Depth Anything v1 + DV-LoRA (EndoDAC), plain"),
-                  ("M-local", "Depth Anything v1 + calibration + II (MonoIIF)")]
+                  ("E8", "Depth Anything v1 + calibration + II (MonoIIF)")]
 # lambda1 sweep of the II loss, in increasing order: the table the paper's Table 2 lacks for the
 # foundation backbone. Every point has the method's structure and differs only in lambda1.
 LAMBDA_ORDER = [("E4", "$\lambda_1 = 0$"), ("E7", "$\lambda_1 = 0.1$"),
@@ -2454,16 +2459,20 @@ def stage_report(cfg, args):
                 md += ["![per-sequence {}](figures/per_sequence_{}.pdf)".format(d, d), ""]
 
     # backbone x components (R3): is the gain the architecture or the two components?
-    bb_pairs = [("R1", "MonoII", "ResNet-18 (Monodepth2 / MonoII)"),
-                ("MonoViT", "MonoViT-II", "MPViT-small + HR decoder (MonoViT)"),
-                ("E3", "M-local", "Depth Anything v1 + DV-LoRA (EndoDAC / MonoIIF)")]
+    bb_pairs = [("R1", "R2", "ResNet-18 (Monodepth2 / MonoII)"),
+                ("MonoIIT-repro", "MonoIIT-components", "MPViT-small + HR decoder, random init (MonoIIT)"),
+                ("E3", "E8", "Depth Anything v1 + DV-LoRA (EndoDAC / MonoIIF)")]
     have = {r["method"] for r in per_seq}
     if any(b in have and f in have for b, f, _ in bb_pairs):
-        md += ["## Backbone × components (R3): local calibration + II loss (λ₁ = 0.5) on three depth networks", "",
+        md += ["## Backbone × components (R3): local calibration + II loss (λ₁ = 0.1) on three depth networks", "",
                "Every row is the same pair of components on a different architecture, with everything "
                "else equal (shared recipe: same pose net, same splits, 20 epochs, learned intrinsics). "
                "The difference is (with components) − (plain) per sequence, so **negative means the "
-               "components help**.", ""]
+               "components help**. The 'with' cell is the repo defaults changing only "
+               "`--depth_backbone`, so it also adds HADepth's photometric term; on MPViT "
+               "`MonoIIT-base` isolates that term. The MPViT encoder starts from random weights in "
+               "both of its cells, since the ImageNet MPViT-small checkpoint no longer exists "
+               "anywhere downloadable -- which is also how the submission trained it.", ""]
         rows = []
         for d in sorted({r["dataset"] for r in per_seq}):
             ps = {(r["method"], r["sequence"]): float(r["abs_rel"]) for r in per_seq if r["dataset"] == d}
