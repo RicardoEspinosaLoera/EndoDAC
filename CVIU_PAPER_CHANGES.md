@@ -918,9 +918,10 @@ The submission's Table~\ref{tab:ablation} with a backbone column, a seeds column
 \end{table*}
 ```
 
-### 9b.1 Compact variant: the submitted rows plus MonoIIF, DA3 (EndoDAC recipe) and DA3 (MonoIIF recipe)
 
-The author's selection. Same columns as §9b; 17 lines; best/second best recomputed over the 17. The label is `tab:ablation`, so paste this one *or* the full one, not both.
+### 9b.1 Compact variant: the submitted rows plus EndoDAC (DA v1), MonoIIF, DA3 (EndoDAC recipe) and DA3 (MonoIIF recipe)
+
+The author's selection. Same columns as §9b; 18 lines; best/second best recomputed over the 18. The label is `tab:ablation`, so paste this one *or* the full one, not both.
 
 ```latex
 \begin{table*}[!t]
@@ -941,20 +942,21 @@ The author's selection. Same columns as §9b; 17 lines; best/second best recompu
         \textcolor{gray}{8} & ResNet-18 & \xmark & \cmark & local & \cmark $(\lambda_1 = 4)$ & 0.064 & 0.506 & 5.193 & 0.088 & 0.960 & 1 \\
         \textcolor{gray}{9} & ResNet-18 & \xmark & \cmark & local & \cmark $(\lambda_1 = 5)$ & 0.063 & 0.478 & 4.992 & 0.086 & 0.963 & 1 \\
         \textcolor{gray}{10} & ResNet-18 & \xmark & \cmark & local & \cmark $(\lambda_1 = 10)$ & 0.061 & 0.469 & 4.997 & 0.084 & 0.966 & 1 \\
-        \textcolor{gray}{11} & MPViT-S & \cmark & \cmark & local & \cmark $(\lambda_1 = 0.5)$ & 0.055 & \underline{0.412} & \textbf{4.614} & \underline{0.077} & 0.969 & 1 \\
+        \textcolor{gray}{11} & MPViT-S & \cmark & \cmark & local & \cmark $(\lambda_1 = 0.5)$ & 0.055 & 0.412 & \textbf{4.614} & 0.077 & 0.969 & 1 \\
         \textcolor{gray}{12} & MPViT-S & \cmark & \cmark & local & \xmark & 0.059 & 0.502 & 5.221 & 0.085 & 0.968 & 1 \\
         \textcolor{gray}{13} & MPViT-S & \cmark & \cmark & \xmark & \xmark & 0.059 & 0.492 & 5.108 & 0.084 & 0.964 & 1 \\
         \textcolor{gray}{14} & MPViT-S & \cmark & \cmark & \xmark & \cmark $(\lambda_1 = 0.5)$ & 0.057 & 0.439 & 4.737 & 0.080 & 0.966 & 1 \\
         \hline
-        \textcolor{gray}{15} & DA v1 $+$ DV-LoRA (MonoIIF) & \cmark & \cmark$^{\dagger}$ & local & \cmark $(\lambda_1 = 0.1)$ & \textbf{0.051} & \textbf{0.381} & \underline{4.619} & \textbf{0.074} & \textbf{0.980} & 3 \\
-        \textcolor{gray}{16} & DA3 $+$ DV-LoRA (EndoDAC recipe) & \cmark & \cmark & \xmark & \xmark & \underline{0.053} & 0.448 & 4.939 & 0.077 & \underline{0.977} & 1 \\
-        \textcolor{gray}{17} & DA3 $+$ DV-LoRA (MonoIIF recipe) & \cmark & \cmark$^{\dagger}$ & local & \cmark $(\lambda_1 = 0.1)$ & 0.054 & 0.441 & 4.904 & 0.078 & 0.974 & 3 \\
+        \textcolor{gray}{15} & DA v1 $+$ DV-LoRA (EndoDAC recipe) & \cmark & \cmark & \xmark & \xmark & \underline{0.052} & \underline{0.404} & 4.737 & \underline{0.075} & \underline{0.979} & 3 \\
+        \textcolor{gray}{16} & DA v1 $+$ DV-LoRA (MonoIIF) & \cmark & \cmark$^{\dagger}$ & local & \cmark $(\lambda_1 = 0.1)$ & \textbf{0.051} & \textbf{0.381} & \underline{4.619} & \textbf{0.074} & \textbf{0.980} & 3 \\
+        \textcolor{gray}{17} & DA3 $+$ DV-LoRA (EndoDAC recipe) & \cmark & \cmark & \xmark & \xmark & 0.053 & 0.448 & 4.939 & 0.077 & 0.977 & 1 \\
+        \textcolor{gray}{18} & DA3 $+$ DV-LoRA (MonoIIF recipe) & \cmark & \cmark$^{\dagger}$ & local & \cmark $(\lambda_1 = 0.1)$ & 0.054 & 0.441 & 4.904 & 0.078 & 0.974 & 3 \\
         \hline
     \end{tabular}
     }
     \caption{Overview of the ablation study results on SCARED. 
     Five columns define the model configuration: i) the backbone of the depth network; ii) whether the transformer-based depth estimation blocks described in Section \ref{sec:Architectures} were used (symbol \cmark) or not (\xmark) --- for the Depth Anything rows the encoder itself is a vision transformer; iii) the photometric similarity loss $\mathcal{L}_\textrm{PML}$ is only used when a \cmark-symbol appears in the fourth column, and \cmark$^{\dagger}$ denotes its highlight-aware variant adopted from HADepth; iv) the fifth column gives the illumination change model with which the synthesized target images $\hat{I}_t$ are corrected (see Section \ref{sec:lit}): none (\xmark) or the dense per-pixel map (local); and v) the sixth column gives either the weight of the illumination invariant loss $\mathcal{L}_\textrm{II}$ in Eq.~\eqref{eq:global_loss} or indicates that this loss is not used (i.e., symbol \xmark\, is equivalent to $\lambda_1=0$).
-    The next five columns give the values computed for the quality criteria defined in Table \ref{tab:metrics}; the last column gives the number of training seeds averaged. Lines 1--14 use one seed and average the metrics over the 551 test frames; lines 15--17 average within each of the seven test sequences and then across sequences, and over the seeds indicated. The best and second best values per metric are respectively in bold and underlined.
+    The next five columns give the values computed for the quality criteria defined in Table \ref{tab:metrics}; the last column gives the number of training seeds averaged. Lines 1--14 use one seed and average the metrics over the 551 test frames; lines 15--18 average within each of the seven test sequences and then across sequences, and over the seeds indicated. The best and second best values per metric are respectively in bold and underlined.
     \label{tab:ablation}}
 \end{table*}
 ```
