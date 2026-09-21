@@ -229,7 +229,55 @@ scenes with the interval excluding zero, while on SCARED and Hamlyn the two are 
 
 ## 6. Section 4.x — the calibration ablation (Reviewer 2)
 
-New table, replacing the ablation that compared the module only against nothing.
+New table, replacing the ablation that compared the module only against nothing. The controlled
+comparison is run on the **ResNet-18 backbone**, where the full three-cell design fits in the
+compute budget at three seeds, and is then confirmed on the method's own backbone.
+
+### 6.1 The controlled comparison, ResNet-18
+
+```latex
+\begin{table}[t]
+\centering
+\caption{Photometric calibration models on the ResNet-18 backbone under an otherwise identical
+recipe: monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$, three
+seeds. Only the calibration changes across rows. The paired difference is (variant $-$ local) in
+Abs Rel per sequence, so a \textbf{negative} value means the variant beats the dense map of the
+original submission; bold marks intervals excluding zero.}
+\label{tab:calib-resnet}
+\small
+\begin{tabular}{lccc}
+\toprule
+Calibration model & SCARED & Hamlyn & C3VD \\
+\midrule
+no lighting model        & \textbf{0.0599}\,$\pm$\,0.0016 & \textbf{0.1698}\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
+global, one $(c,b)$ pair & 0.0600\,$\pm$\,0.0009 & 0.1758\,$\pm$\,0.0065 & \textbf{0.3290}\,$\pm$\,0.0072 \\
+local, dense map (ours)  & 0.0608\,$\pm$\,0.0007 & 0.1757\,$\pm$\,0.0021 & 0.3379\,$\pm$\,0.0057 \\
+\midrule
+\multicolumn{4}{l}{\emph{paired against the local model}} \\
+no lighting model        & $-0.0009$ $[-0.0044, +0.0031]$ &
+                           $\mathbf{-0.0059}$ $[-0.0083, -0.0034]$, 43/58 &
+                           $-0.0016$ $[-0.0066, +0.0028]$ \\
+global, one $(c,b)$ pair & $-0.0008$ $[-0.0023, +0.0006]$ &
+                           $+0.0001$ $[-0.0025, +0.0025]$ &
+                           $\mathbf{-0.0090}$ $[-0.0164, -0.0011]$, 5/7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+**Text.** *"In the training domain the three calibration models are indistinguishable: the
+intervals of both alternatives against the dense map cover zero and the three means lie within
+0.001 of one another. Out of domain the dense map is beaten on both datasets, by a different
+alternative each time --- on Hamlyn by not calibrating at all ($-0.0059$ $[-0.0083, -0.0034]$,
+better in 43 of 58 blocks) and on C3VD by the global two-parameter model ($-0.0090$ $[-0.0164,
+-0.0011]$, better in 5 of 7 scenes). The free per-pixel parameterisation is therefore never the
+best of the three, which is the result that motivates the capacity analysis below."*
+
+### 6.2 Confirmation on the method's own backbone
+
+Same three-cell design on Depth Anything, where the method's loss configuration is used
+($\lambda_1 = 0.1$ with the highlight-aware term). Within each table the contrast is clean; across
+the two tables the loss configurations differ, so they corroborate rather than pool.
 
 ```latex
 \begin{table}[t]
@@ -241,7 +289,7 @@ what makes the contrast attributable to it. The first row is therefore \emph{not
 baseline: the model without any of the three components is EndoDAC, at 0.0517 (Table~\ref{tab:ladder}).
 The paired difference is (variant $-$ local) in Abs Rel per sequence on SCARED, so a negative value
 means the variant is better than the dense map of the original submission.}
-\label{tab:calib}
+\label{tab:calib-da}
 \small
 \begin{tabular}{lcccc}
 \toprule
