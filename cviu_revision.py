@@ -308,6 +308,13 @@ GRID = {
                                "--illumination_invariant 0 --photometric standard"},
     "MonoIIT-components": {"group": "B", "desc": "MPViT-small random init + local calibration + II, repo defaults",
                            "flags": "--depth_backbone monovit --mpvit_weights random"},
+    # MonoIIT-repro is not a clean twin of MonoIIT-components: it also drops HADepth's photometric
+    # term, so their difference mixes three things. This row holds the highlight term and drops
+    # only the method's two components, so MonoIIT-base -> MonoIIT-components isolates them, the
+    # way R1 -> R2 does on ResNet-18.
+    "MonoIIT-base": {"group": "B", "desc": "MPViT-small random init + HADepth's highlight term, neither component",
+                     "flags": "--depth_backbone monovit --mpvit_weights random --illum_calib none "
+                              "--illumination_invariant 0 --photometric highlight"},
     # bas-res-2-ssim on the third backbone: whether the best C3VD point of the ResNet family
     # (0.3282, basis degree 2 + II at 0.5 with the paper's SSIM_II comparator) is a property of
     # that cell or of ResNet-18. Its twins are MonoViT-II (same weight, dense map, l2 comparator)
