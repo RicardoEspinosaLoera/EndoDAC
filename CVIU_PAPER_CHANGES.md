@@ -234,17 +234,20 @@ New table, replacing the ablation that compared the module only against nothing.
 ```latex
 \begin{table}[t]
 \centering
-\caption{Photometric calibration models under an otherwise identical recipe. Only the calibration
-changes; the invariant loss and the photometric term are held fixed. The paired difference is
-(variant $-$ local) in Abs Rel per sequence on SCARED, so a negative value means the variant is
-better than the dense map of the original submission.}
+\caption{Photometric calibration models under an otherwise identical recipe. \textbf{All three rows
+are the full method on the Depth Anything backbone and keep the illumination-invariant loss at
+$\lambda_1=0.1$ and the highlight-aware photometric term}; only the calibration changes, which is
+what makes the contrast attributable to it. The first row is therefore \emph{not} a plain
+baseline: the model without any of the three components is EndoDAC, at 0.0517 (Table~\ref{tab:ladder}).
+The paired difference is (variant $-$ local) in Abs Rel per sequence on SCARED, so a negative value
+means the variant is better than the dense map of the original submission.}
 \label{tab:calib}
 \small
 \begin{tabular}{lcccc}
 \toprule
-Calibration & SCARED & Hamlyn & C3VD & paired vs local (SCARED) \\
+Calibration model & SCARED & Hamlyn & C3VD & paired vs local (SCARED) \\
 \midrule
-none                    & 0.0518\,$\pm$\,0.0029 & 0.1593 & 0.2658 & $+0.0007$ $[-0.0010, +0.0028]$, 3/7 \\
+no lighting model        & 0.0518\,$\pm$\,0.0029 & 0.1593 & 0.2658 & $+0.0007$ $[-0.0010, +0.0028]$, 3/7 \\
 global, one $(c,b)$ pair & \textbf{0.0497\,$\pm$\,0.0021} & \textbf{0.1595} & 0.2717 &
                            $\mathbf{-0.0015}$ $[-0.0032, -0.0005]$, \textbf{0/7}, $p=0.016$ \\
 local, dense map (ours)  & 0.0512\,$\pm$\,0.0014 & 0.1608 & \textbf{0.2679} & --- \\
@@ -570,6 +573,20 @@ Backbone & Configuration & SCARED & Hamlyn & C3VD \\
 
 The MPViT rows are training (`MonoIIT-repro`, `MonoIIT-components`); fill them from
 `results/cviu/summary.csv` when they finish.
+
+**11.3 — Explain why Monodepth2 appears twice with different numbers.** Table 4 lists Monodepth2
+at 0.093 and the table above lists a plain ResNet-18 at 0.0593. They are the same architecture and
+the gap is the training, not the network: Table 4's row is the authors' released checkpoint,
+evaluated unchanged, while the row here is that architecture retrained on SCARED under our shared
+recipe (learned intrinsics, 20 epochs, our augmentation). Add one sentence saying so, otherwise the
+two rows read as a contradiction. The same distinction applies to EndoDAC, which appears as a
+released checkpoint (0.0507) and as a retrained baseline (`E3`, 0.0517) — there the two agree,
+which is the evidence that the recipe is faithful.
+
+**11.4 — Do not call the first row of the calibration table a baseline.** It keeps the invariant
+loss and the highlight term and removes only the lighting model; the model with none of the three
+components is EndoDAC at 0.0517. The caption in §6 now says this explicitly, because the row label
+"none" invites exactly the opposite reading.
 
 ---
 
