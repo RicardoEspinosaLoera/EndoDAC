@@ -290,6 +290,19 @@ GRID = {
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 1.0"},
     "lam-res-200": {"group": "lam-res", "desc": "ResNet-18 + local calibration, II lambda1=2.0",
              "flags": "--depth_backbone resnet18 --photometric standard --illumination_invariant 2.0"},
+    # The calibration axis on ResNet-18 with the II loss switched OFF, so the rows differ only in
+    # the calibration model. Two of the five points already exist -- R1 is the no-calibration cell
+    # and lam-bas-000 the degree-2 one -- and these three complete it. Same recipe as both:
+    # monodepth2 photometric loss, no HADepth term, lambda1 = 0, batch 8, 20 epochs.
+    "cal0-glob": {"group": "cal0", "desc": "ResNet-18, global calibration only (lambda1=0)",
+                  "flags": "--depth_backbone resnet18 --photometric standard "
+                           "--illumination_invariant 0 --illum_calib global"},
+    "cal0-local": {"group": "cal0", "desc": "ResNet-18, dense local calibration only (lambda1=0)",
+                   "flags": "--depth_backbone resnet18 --photometric standard "
+                            "--illumination_invariant 0 --illum_calib local"},
+    "cal0-deg1": {"group": "cal0", "desc": "ResNet-18, degree-1 basis calibration only (lambda1=0)",
+                  "flags": "--depth_backbone resnet18 --photometric standard "
+                           "--illumination_invariant 0 --illum_calib basis --illum_basis_degree 1"},
     "MonoViT": {"group": "B", "desc": "MonoViT: MPViT-small + HR decoder, standard loss",
                 "flags": "--depth_backbone monovit --illum_calib none --illumination_invariant 0 "
                          "--photometric standard"},
