@@ -5,3 +5,4 @@ wandb/
 results/
 *.tgz
 cviu_results.tgz
+CVIU_Response_Letter.docx
