@@ -262,6 +262,76 @@ the variation between training runs of a single one of them, and we report these
 than ranking them. The ordering is also dataset-dependent: on C3VD HADepth is better in all seven
 scenes with the interval excluding zero, while on SCARED and Hamlyn the two are indistinguishable."*
 
+### 5.5 The same comparison, one column per test sequence
+
+Table 7 summarises; these two show *where* each comparison is decided. They are the per-sequence values that Table 7's intervals and paired tests are computed from, so they carry the uncertainty estimate (the spread across columns and the mean's CI) and the paired comparison (the lower block) in the raw. Hamlyn is not tabulated this way: its unit is 58 blocks of one video, which does not fit a page; the per-block values are in `results/cviu/per_sequence.csv` and a dot plot is the right figure for it (§12.2). Needs `\usepackage{multirow}` and a `table*` environment.
+
+```latex
+\begin{table*}[t]
+\centering
+\caption{SCARED, per keyframe video. Upper block: Abs Rel of every method on each of the $n=7$ test keyframe videos, then the mean over keyframe videos with its 95\% cluster bootstrap CI (10\,000 draws) --- the uncertainty estimate. Lower block: the paired difference (method $-$ MonoIIF) on the same keyframe video, signed so that \textbf{positive means MonoIIF is better}, then its mean with bootstrap CI, the count of keyframe videos in which MonoIIF is better, and the exact two-sided Wilcoxon $p$ --- the paired comparison. d$i$k$j$ is keyframe $j$ of dataset $i$ of the test split. Best per column in bold in the upper block; paired means whose interval excludes zero in bold in the lower block. MonoIIF is the mean of three training seeds; the comparison methods are released checkpoints.}
+\label{tab:perseq-scared}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccccc}
+\toprule
+Method & d1k3 & d2k4 & d3k4 & d4k4 & d5k4 & d6k4 & d7k4 & mean [95\% CI] \\
+\midrule
+\multicolumn{9}{l}{\emph{Abs Rel per keyframe video}} \\
+HADepth & 0.0373 & 0.0277 & 0.0534 & 0.0524 & 0.0659 & 0.0500 & \textbf{0.0557} & 0.0489 $[0.0399, 0.0570]$ \\
+MonoPCC & 0.0405 & \textbf{0.0231} & \textbf{0.0517} & 0.0564 & \textbf{0.0640} & 0.0551 & 0.0625 & 0.0505 $[0.0399, 0.0591]$ \\
+EndoDAC & \textbf{0.0351} & 0.0266 & 0.0561 & 0.0595 & 0.0715 & 0.0483 & 0.0580 & 0.0507 $[0.0399, 0.0610]$ \\
+\textbf{MonoIIF} & 0.0369 & 0.0295 & 0.0670 & \textbf{0.0490} & 0.0722 & \textbf{0.0460} & 0.0576 & 0.0512 $[0.0407, 0.0616]$ \\
+AF-SfMLearner & 0.0414 & 0.0290 & 0.0630 & 0.0497 & 0.0914 & 0.0610 & 0.0732 & 0.0584 $[0.0445, 0.0726]$ \\
+Monodepth2 & 0.1195 & 0.0584 & 0.1237 & 0.0603 & 0.0931 & 0.0938 & 0.1040 & 0.0933 $[0.0750, 0.1110]$ \\
+\midrule
+\multicolumn{9}{l}{\emph{paired difference vs MonoIIF, positive $=$ MonoIIF better}} \\
+Method & d1k3 & d2k4 & d3k4 & d4k4 & d5k4 & d6k4 & d7k4 & mean [95\% CI], $k/n$, $p$ \\
+\midrule
+HADepth & $+0.0005$ & $-0.0018$ & $-0.0136$ & $+0.0035$ & $-0.0064$ & $+0.0040$ & $-0.0019$ & $-0.0023$ $[-0.0068, +0.0016]$, 3/7, 0.578 \\
+MonoPCC & $+0.0036$ & $-0.0064$ & $-0.0152$ & $+0.0074$ & $-0.0082$ & $+0.0091$ & $+0.0049$ & $-0.0007$ $[-0.0071, +0.0052]$, 4/7, 0.938 \\
+EndoDAC & $-0.0018$ & $-0.0029$ & $-0.0108$ & $+0.0106$ & $-0.0007$ & $+0.0023$ & $+0.0004$ & $-0.0004$ $[-0.0048, +0.0041]$, 3/7, 0.688 \\
+AF-SfMLearner & $+0.0046$ & $-0.0005$ & $-0.0040$ & $+0.0008$ & $+0.0192$ & $+0.0150$ & $+0.0156$ & $\mathbf{+0.0072}$ $[+0.0011, +0.0137]$, 5/7, 0.109 \\
+Monodepth2 & $+0.0826$ & $+0.0289$ & $+0.0568$ & $+0.0113$ & $+0.0209$ & $+0.0479$ & $+0.0464$ & $\mathbf{+0.0421}$ $[+0.0266, +0.0587]$, 7/7, 0.016 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+```
+
+```latex
+\begin{table*}[t]
+\centering
+\caption{C3VD, per scene. Upper block: Abs Rel of every method on each of the $n=7$ test scenes, then the mean over scenes with its 95\% cluster bootstrap CI (10\,000 draws) --- the uncertainty estimate. Lower block: the paired difference (method $-$ MonoIIF) on the same scene, signed so that \textbf{positive means MonoIIF is better}, then its mean with bootstrap CI, the count of scenes in which MonoIIF is better, and the exact two-sided Wilcoxon $p$ --- the paired comparison. t$i$\_$x$ is the C3VD transverse-colon scene of that name. Best per column in bold in the upper block; paired means whose interval excludes zero in bold in the lower block. MonoIIF is the mean of three training seeds; the comparison methods are released checkpoints.}
+\label{tab:perseq-c3vd}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccccc}
+\toprule
+Method & t1_a & t1_b & t2_a & t2_b & t2_c & t3_a & t3_b & mean [95\% CI] \\
+\midrule
+\multicolumn{9}{l}{\emph{Abs Rel per scene}} \\
+HADepth & \textbf{0.2400} & 0.2661 & \textbf{0.1882} & \textbf{0.1958} & 0.2107 & \textbf{0.2017} & \textbf{0.2465} & 0.2213 $[0.2024, 0.2419]$ \\
+EndoDAC & 0.3195 & \textbf{0.2054} & 0.2813 & 0.2515 & \textbf{0.1887} & 0.2291 & 0.3220 & 0.2568 $[0.2213, 0.2938]$ \\
+\textbf{MonoIIF} & 0.2922 & 0.2914 & 0.2924 & 0.2308 & 0.2246 & 0.2409 & 0.3027 & 0.2679 $[0.2445, 0.2893]$ \\
+AF-SfMLearner & 0.3843 & 0.4355 & 0.3402 & 0.3142 & 0.2009 & 0.3792 & 0.2951 & 0.3356 $[0.2815, 0.3854]$ \\
+Monodepth2 & 0.4051 & 0.3716 & 0.3828 & 0.3456 & 0.2133 & 0.3345 & 0.3402 & 0.3419 $[0.2947, 0.3778]$ \\
+MonoPCC & 0.4117 & 0.3748 & 0.3923 & 0.3482 & 0.2527 & 0.3625 & 0.3553 & 0.3568 $[0.3177, 0.3865]$ \\
+\midrule
+\multicolumn{9}{l}{\emph{paired difference vs MonoIIF, positive $=$ MonoIIF better}} \\
+Method & t1_a & t1_b & t2_a & t2_b & t2_c & t3_a & t3_b & mean [95\% CI], $k/n$, $p$ \\
+\midrule
+HADepth & $-0.0522$ & $-0.0252$ & $-0.1042$ & $-0.0350$ & $-0.0139$ & $-0.0392$ & $-0.0562$ & $\mathbf{-0.0466}$ $[-0.0683, -0.0292]$, 0/7, 0.016 \\
+EndoDAC & $+0.0273$ & $-0.0860$ & $-0.0112$ & $+0.0206$ & $-0.0359$ & $-0.0118$ & $+0.0193$ & $-0.0111$ $[-0.0412, +0.0133]$, 3/7, 0.812 \\
+AF-SfMLearner & $+0.0921$ & $+0.1441$ & $+0.0478$ & $+0.0833$ & $-0.0237$ & $+0.1383$ & $-0.0076$ & $\mathbf{+0.0678}$ $[+0.0217, +0.1117]$, 5/7, 0.078 \\
+Monodepth2 & $+0.1129$ & $+0.0802$ & $+0.0904$ & $+0.1147$ & $-0.0113$ & $+0.0936$ & $+0.0375$ & $\mathbf{+0.0740}$ $[+0.0407, +0.1019]$, 6/7, 0.031 \\
+MonoPCC & $+0.1195$ & $+0.0835$ & $+0.0999$ & $+0.1174$ & $+0.0281$ & $+0.1216$ & $+0.0526$ & $\mathbf{+0.0889}$ $[+0.0631, +0.1119]$, 7/7, 0.016 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+```
+
+**Text.** *"The per-sequence view shows that the aggregate gap between the leading methods on SCARED is not a consistent advantage: the sign of the difference between HADepth and MonoIIF changes from sequence to sequence, MonoIIF is better on three of the seven, and a single sequence (d3k4) contributes most of the aggregate. On C3VD, by contrast, HADepth is better on every scene, which is why that comparison resolves and the SCARED one does not."*
+
 ---
 
 ## 6. Section 4.x — the calibration ablation (Reviewer 2)
