@@ -259,6 +259,13 @@ from no calibration at all. Out of domain the two forms tie (Hamlyn $-0.0013$ $[
 C3VD $+0.0038$ $[-0.0094, +0.0138]$). We therefore no longer claim that the spatial variation is
 what produces the gain."*
 
+**Note on what this table can and cannot contain.** The three cells above share the method's loss
+configuration (invariant loss at $\lambda_1=0.1$ and the highlight-aware photometric term) and
+differ only in the calibration, which is what makes the contrast clean. The polynomial-basis
+family was trained with the calibration alone ($\lambda_1=0$, monodepth2's photometric loss), so
+its rows belong in the capacity table of §7 rather than here; mixing the two would confound the
+calibration with two loss terms.
+
 ---
 
 ## 7. Section 4.x — the capacity sweep (Reviewer 2)
@@ -289,12 +296,58 @@ dense map         & 0.0517 & 0.1594 & 0.2669 & $-0.0260$ $[-0.0360, -0.0164]$, 7
 \end{table}
 ```
 
-**Text.** *"Repeating the sweep on a ResNet-18 backbone gives a different optimum: there the dense
-map is the single worst point on Hamlyn ($+0.0059$ $[+0.0034, +0.0083]$ against no calibration,
-better in only 15 of 58 blocks, $p<0.001$) while degree 1 beats both the global model
-($-0.0037$, $p=0.004$) and the dense map ($-0.0058$, $p<0.001$) there, and both on C3VD. The
-useful capacity is low and backbone-dependent, which we state as a finding rather than
-recommending a single degree."*
+### 7.1 Does a low-order field beat the global model?
+
+This is the comparison that decides whether spatial variation is worth anything at all, and the
+answer differs by backbone. Each cell is the paired difference (basis $-$ global) in Abs Rel per
+sequence, so a **negative** value means the polynomial field beats the global model.
+
+```latex
+\begin{table}[t]
+\centering
+\caption{Polynomial calibration field against the global model, on both backbones. The difference
+is (basis $-$ global) per sequence, so negative favours the spatially varying field. Bold marks
+intervals excluding zero. Both families are trained with the calibration alone, so the two rows of
+a backbone differ only in the degree of the field.}
+\label{tab:basis-vs-global}
+\small
+\begin{tabular}{llccc}
+\toprule
+Backbone & Field & SCARED ($n=7$) & Hamlyn ($n=58$) & C3VD ($n=7$) \\
+\midrule
+\multirow{2}{*}{Depth Anything}
+ & degree 1 & $-0.0003$ $[-0.0009, +0.0004]$ & $+0.0000$ $[-0.0024, +0.0027]$ &
+             $\mathbf{+0.0284}$ $[+0.0214, +0.0349]$, 0/7 \\
+ & degree 2 & $+0.0005$ $[-0.0004, +0.0016]$ & $-0.0011$ $[-0.0031, +0.0010]$ &
+             $\mathbf{+0.0198}$ $[+0.0128, +0.0258]$, 0/7 \\
+\midrule
+\multirow{2}{*}{ResNet-18}
+ & degree 1 & $-0.0004$ $[-0.0033, +0.0027]$ & $\mathbf{-0.0037}$ $[-0.0059, -0.0016]$ &
+             $\mathbf{-0.0123}$ $[-0.0172, -0.0068]$, \textbf{7/7} \\
+ & degree 2 & $+0.0007$ $[-0.0008, +0.0022]$ & $\mathbf{-0.0047}$ $[-0.0079, -0.0017]$ &
+             $-0.0018$ $[-0.0089, +0.0053]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+**Text.** *"On the ResNet-18 backbone a low-order field is the better calibration model: degree 1
+beats the global model on both generalisation sets, by $-0.0037$ $[-0.0059, -0.0016]$ on Hamlyn
+and $-0.0123$ $[-0.0172, -0.0068]$ on C3VD, where it wins all seven scenes, and degree 2 beats it
+on Hamlyn by $-0.0047$ $[-0.0079, -0.0017]$. It also beats the dense map there ($-0.0058$
+$[-0.0078, -0.0037]$, $p<0.001$), so on that backbone the capacity optimum lies strictly between
+the two extremes and the submission's free per-pixel parameterisation is the wrong end of the
+axis. On the foundation backbone the ordering does not carry over: neither degree improves on the
+global model, and on C3VD the global model is better in all seven scenes against both. In the
+training domain every comparison is a tie on both backbones. We therefore report the capacity
+axis as a property of the calibration that must be tuned per backbone, and we do not recommend a
+single degree."*
+
+**Text for the discussion.** *"The one claim that survives on both backbones is the negative one:
+the free per-pixel field of the original submission is never the best point of the axis. On
+ResNet-18 it is the worst point on Hamlyn; on Depth Anything it ties the global model in-domain
+while costing parameters. Whatever the calibration contributes, it is not contributed by the
+spatial degrees of freedom."*
 
 ---
 
