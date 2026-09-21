@@ -902,10 +902,23 @@ Anything by `da-lam-050` and on ResNet-18 by `bas-res-2`.
 - `evaluate_depth_all.py`: `--model_type monovit` now also accepts a checkpoint trained here
   (`depth_model.pth`), not only the official two-file layout.
 
-**The ImageNet MPViT-small weights have to be found, not downloaded.** The link both the MPViT
-and the MonoViT README give — `https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth` — is dead
-(checked 2026-09-15: Dropbox retired the `/s/` links and it answers with an HTML page; there is no
-Hugging Face mirror and the repo has no GitHub release). `ensure_mpvit_weights` therefore looks for
+**The ImageNet MPViT weights have to be found, not downloaded.** The links both the MPViT and the
+MonoViT README give are dead. **Corrected 2026-09-20:** the `/s/` link format was not retired —
+`https://dl.dropbox.com/s/.../mpvit_xsmall.pth` still answers 302 to
+`dl.dropboxusercontent.com`, and *that* returns **404**. The files were deleted from the authors'
+Dropbox account, so no URL variant (`?dl=1`, `dl.dropboxusercontent.com`, `/scl/fi/`) can work for
+either size; there is nothing behind the link to serve. There is no Hugging Face mirror and the
+repo has no GitHub release, so the only sources left are a copy already on a machine or the
+authors themselves.
+
+**The submission's MonoIIT row used MPViT-xsmall**, not the MPViT-small MonoViT is published with
+(user, 2026-09-20). `--mpvit_variant {small,xsmall}` now selects either; the two differ in channel
+width ([64,128,192,256,256] against [64,128,216,288,288]) and size (10.3M against 22.6M), so one
+checkpoint cannot be loaded into the other, and the decoder was hard-wired to small's widths
+before this change. Grid rows `MonoIIT` and `MonoViT-xs` reproduce the submission's pair;
+`MonoViT`/`MonoViT-II` remain MPViT-small and remain blocked. **Manuscript correction:** the paper
+describes MonoIIT on MonoViT without saying it is the xsmall encoder, less than half the
+parameters of published MonoViT. `ensure_mpvit_weights` therefore looks for
 a copy already on the machine before trying the download, starting with
 `/workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth` — **the path `models/monovit/mpvit.py`
 used to hard-code, so a copy very likely exists on the DGX** — then `./ckpt/mpvit_small.pth` and
