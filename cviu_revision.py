@@ -295,6 +295,18 @@ GRID = {
                          "--photometric standard"},
     "MonoViT-II": {"group": "B", "desc": "MonoViT + local calibration + II (lambda1=0.5)",
                    "flags": "--depth_backbone monovit --photometric standard --illumination_invariant 0.5"},
+    # The submission's MonoIIT row was trained on MPViT-**xsmall**, not the MPViT-small MonoViT is
+    # published with, so these two reproduce it. They mirror R2/R1 on ResNet-18 and E8/E3 on Depth
+    # Anything: MonoIIT carries the method's two components at the repo defaults (local calibration,
+    # II at lambda1 = 0.1, HADepth's photometric term) and MonoViT-xs is the same network with
+    # neither, so the pair isolates the components and the column isolates the architecture.
+    # They are NOT MonoViT as published -- that is `MonoViT`/`MonoViT-II` above, still blocked on
+    # the MPViT-small weights -- and the paper must say which encoder size it used.
+    "MonoViT-xs": {"group": "B", "desc": "MPViT-xsmall + HR decoder, standard loss (plain twin of MonoIIT)",
+                   "flags": "--depth_backbone monovit --mpvit_variant xsmall --illum_calib none "
+                            "--illumination_invariant 0 --photometric standard"},
+    "MonoIIT": {"group": "B", "desc": "MonoIIT: MPViT-xsmall + local calibration + II, repo defaults",
+                "flags": "--depth_backbone monovit --mpvit_variant xsmall"},
     # bas-res-2-ssim on the third backbone: whether the best C3VD point of the ResNet family
     # (0.3282, basis degree 2 + II at 0.5 with the paper's SSIM_II comparator) is a property of
     # that cell or of ResNet-18. Its twins are MonoViT-II (same weight, dense map, l2 comparator)
@@ -654,28 +666,33 @@ def ensure_da3_weights(cfg, download=True):
 # The link the MPViT and MonoViT READMEs both give. Checked 2026-09-15: Dropbox retired the
 # /s/<id>/ links and it now answers with an HTML page, so the download below will normally fail
 # and the file has to come from a copy that already exists somewhere.
-MPVIT_URL = "https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth"
+MPVIT_URL = {
+    "small": "https://dl.dropbox.com/s/y3dnmmy8h4npz7a/mpvit_small.pth",
+    "xsmall": "https://dl.dropbox.com/s/vvpq2m474g8tvyq/mpvit_xsmall.pth",
+}
+# <name> is filled with mpvit_small / mpvit_xsmall: MonoViT is published on small, the
+# submission's MonoIIT row was trained on xsmall, and the two encoders are not interchangeable.
 MPVIT_FALLBACKS = [
-    "/workspace/endo-manydepth/manydepth/mpvit/mpvit_small.pth",  # hard-coded in models/monovit/mpvit.py before this change
-    "./ckpt/mpvit_small.pth",                                     # where MonoViT's README puts it
-    "~/mpvit_small.pth",
+    "/workspace/endo-manydepth/manydepth/mpvit/{name}.pth",  # hard-coded in models/monovit/mpvit.py before this change
+    "./ckpt/{name}.pth",                                     # where MonoViT's README puts it
+    "~/{name}.pth",
 ]
 
 
-def mpvit_weights_path(cfg):
-    """ImageNet MPViT-small checkpoint, the initialisation MonoViT is published with."""
-    return os.path.join(cfg["pretrained_path"], "mpvit_small.pth")
+def mpvit_weights_path(cfg, variant="small"):
+    """ImageNet MPViT checkpoint for this encoder size."""
+    return os.path.join(cfg["pretrained_path"], "mpvit_{}.pth".format(variant))
 
 
-def ensure_mpvit_weights(cfg, download=True):
-    """True if the MPViT-small checkpoint is available, fetching it when missing.
+def ensure_mpvit_weights(cfg, download=True, variant="small"):
+    """True if the MPViT checkpoint of `variant` is available, fetching it when missing.
 
     Looked for in <pretrained_path>, then in cfg["mpvit_weights"] and the known local copies, then
     downloaded. Without it the MonoViT rows would train from random weights, which is a different
     experiment and would understate the baseline, so the B-grid runs are skipped rather than
     mislabelled.
     """
-    path = mpvit_weights_path(cfg)
+    path = mpvit_weights_path(cfg, variant)
 
     def valid(p):
         if torch is None:  # stats/report environments have no torch; size is the only check left
@@ -691,7 +708,9 @@ def ensure_mpvit_weights(cfg, download=True):
             return True
         print("[mpvit] {} is not a valid MPViT checkpoint (interrupted download?), fetching it again".format(path))
     ensure_dir(os.path.dirname(os.path.abspath(path)))
-    for cand in ([cfg.get("mpvit_weights")] if cfg.get("mpvit_weights") else []) + MPVIT_FALLBACKS:
+    cands = [cfg.get("mpvit_weights")] if cfg.get("mpvit_weights") else []
+    cands += [c.format(name="mpvit_{}".format(variant)) for c in MPVIT_FALLBACKS]
+    for cand in cands:
         cand = os.path.expanduser(cand)
         if os.path.exists(cand) and valid(cand):
             print("[mpvit] using the copy already on this machine: {}".format(cand))
@@ -700,10 +719,10 @@ def ensure_mpvit_weights(cfg, download=True):
     if not download:
         return False
     part = path + ".part"
-    print("[mpvit] downloading the ImageNet MPViT-small weights -> {}".format(path))
+    print("[mpvit] downloading the ImageNet MPViT-{} weights -> {}".format(variant, path))
     try:
         import urllib.request
-        urllib.request.urlretrieve(MPVIT_URL, part)
+        urllib.request.urlretrieve(MPVIT_URL[variant], part)
         if not valid(part):
             raise ValueError("downloaded file is not an MPViT checkpoint")
         os.replace(part, path)
@@ -713,9 +732,10 @@ def ensure_mpvit_weights(cfg, download=True):
             os.remove(part)
         print("[mpvit] download failed ({}).\n"
               "        The official link ({}) is dead: Dropbox retired the /s/ links, so it answers\n"
-              "        with an HTML page. Copy an existing mpvit_small.pth to {} (look for one in\n"
+              "        with an HTML page. Copy an existing mpvit_{}.pth to {} (look for one in\n"
               "        {}), or set mpvit_weights: <path> in the config."
-              .format(e, MPVIT_URL, path, ", ".join(MPVIT_FALLBACKS)))
+              .format(e, MPVIT_URL[variant], variant, path,
+                      ", ".join(c.format(name="mpvit_{}".format(variant)) for c in MPVIT_FALLBACKS)))
         return False
 
 
@@ -831,15 +851,18 @@ def stage_train(cfg, args):
         if not args.dry_run and not args.skip_preflight:
             print("[train] skipping {} for now".format(da3_runs))
             selected = [r for r in selected if r not in da3_runs]
-    # MonoViT rows need the ImageNet MPViT-small weights; without them the encoder would start
-    # from random init and the baseline would be understated.
-    mv_runs = [r for r in selected if "--depth_backbone monovit" in runs[r]["flags"]]
-    if mv_runs and not ensure_mpvit_weights(cfg, download=not args.dry_run):
-        print("[train] {} need the ImageNet MPViT-small weights at {} (see the message above)".format(
-            mv_runs, mpvit_weights_path(cfg)))
-        if not args.dry_run and not args.skip_preflight:
-            print("[train] skipping {} for now".format(mv_runs))
-            selected = [r for r in selected if r not in mv_runs]
+    # MonoViT rows need the ImageNet MPViT weights of their encoder size; without them the encoder
+    # would start from random init and the baseline would be understated.
+    for mv_variant in ("small", "xsmall"):
+        mv_runs = [r for r in selected
+                   if "--depth_backbone monovit" in runs[r]["flags"]
+                   and (_last_flag_value(runs[r]["flags"], "--mpvit_variant") or "small") == mv_variant]
+        if mv_runs and not ensure_mpvit_weights(cfg, download=not args.dry_run, variant=mv_variant):
+            print("[train] {} need the ImageNet MPViT-{} weights at {} (see the message above)".format(
+                mv_runs, mv_variant, mpvit_weights_path(cfg, mv_variant)))
+            if not args.dry_run and not args.skip_preflight:
+                print("[train] skipping {} for now".format(mv_runs))
+                selected = [r for r in selected if r not in mv_runs]
     alive = running_cviu_runs()   # e.g. jobs left running after their launcher died
     if alive:
         print("[train] still training from an earlier launch: {}".format(sorted(alive)))
@@ -1083,7 +1106,8 @@ def load_depth_model_from_run(cfg, run, seed, device):
     elif backbone == "monovit":
         from models.monovit_depth import MonoViTDepth
         # pretrained_weights=None: the checkpoint holds every weight, no need to reload MPViT
-        model = MonoViTDepth(scales=opt["scales"], pretrained_weights=None)
+        model = MonoViTDepth(scales=opt["scales"], pretrained_weights=None,
+                             variant=opt.get("mpvit_variant", "small"))
     else:
         import models.endodac as endodac
         # pretrained_path=None: the checkpoint holds every weight, no need to reload DA v1

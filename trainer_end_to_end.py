@@ -70,11 +70,12 @@ class Trainer:
         elif self.opt.depth_backbone == "monovit":
             # MonoViT (Zhao et al., 3DV'22): MPViT-small + the HR nested decoder, trained here
             # from scratch under the same recipe as every other backbone.
+            variant = getattr(self.opt, "mpvit_variant", "small")
             mpvit_weights = self.opt.mpvit_weights
             if mpvit_weights is None:
-                mpvit_weights = os.path.join(self.opt.pretrained_path, "mpvit_small.pth")
+                mpvit_weights = os.path.join(self.opt.pretrained_path, "mpvit_{}.pth".format(variant))
             self.models["depth_model"] = MonoViTDepth(
-                scales=self.opt.scales, pretrained_weights=mpvit_weights)
+                scales=self.opt.scales, pretrained_weights=mpvit_weights, variant=variant)
         else:
             # CVIU ablation control: the same losses on a ResNet-18 U-Net (monodepth2 architecture)
             self.models["depth_model"] = ResnetDepth(

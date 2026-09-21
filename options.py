@@ -320,6 +320,15 @@ class MonodepthOptions:
                                       "it in the single --learning_rate group with the pose and "
                                       "lighting heads. MonoViT's published recipe halves it for the "
                                       "MPViT encoder (5e-5 against 1e-4)")
+        self.parser.add_argument("--mpvit_variant",
+                                 type=str,
+                                 choices=["small", "xsmall"],
+                                 default="small",
+                                 help="MPViT encoder size for --depth_backbone monovit. MonoViT is "
+                                      "published on small (22.6M); the submission's MonoIIT row was "
+                                      "trained on xsmall (10.3M). They have different channel widths "
+                                      "([64,128,216,288,288] vs [64,128,192,256,256]), so the "
+                                      "checkpoint of one cannot be loaded into the other")
         self.parser.add_argument("--mpvit_weights",
                                  type=str,
                                  default=None,

@@ -376,7 +376,8 @@ class DepthModelFactory:
             # a MonoViT trained in this repo (--depth_backbone monovit) saves one depth_model.pth
             from models.monovit_depth import MonoViTDepth
             sd = torch.load(os.path.join(opt.load_weights_folder, "depth_model.pth"))
-            model = MonoViTDepth(pretrained_weights=None)
+            model = MonoViTDepth(pretrained_weights=None,
+                                 variant=getattr(opt, "mpvit_variant", "small"))
             md = model.state_dict()
             model.load_state_dict({k: v for k, v in sd.items() if k in md}, strict=False)
             model.cuda()
