@@ -208,18 +208,18 @@ This is the table that answers Q6 and it should sit immediately after Tables 4â€
 ```latex
 \begin{table}[t]
 \centering
-\caption{Uncertainty and paired comparisons with the video sequence as the unit of analysis, for
-the methods of Tables 4--6. Column 3 is each method's Abs Rel with a 95\% cluster bootstrap CI
-over sequences (10\,000 draws), the uncertainty estimate Question~6 asks for. Column 4 is the
-paired difference (method $-$ MonoIIF) per sequence, signed so that \textbf{positive means MonoIIF
-is better}, with its own bootstrap CI; $k/n$ counts the sequences in which MonoIIF is better.
-Exact two-sided Wilcoxon $p$ is given for the two datasets with $n=7$; its smallest attainable
-value there is $2/2^{7}=0.016$, so a family-wise correction across a table of this size cannot
-reach significance and these are reported as exploratory. In column 3 the best value per dataset
-is in bold and the second best underlined; in column 4 paired differences whose interval excludes
-zero are in bold. SCARED and C3VD use $n=7$ sequences; our copy of Hamlyn holds one
-rectified sequence, so $n=58$ contiguous blocks of 100 frames are the unit and the interval is
-slightly optimistic.}
+\caption{Uncertainty and paired comparisons for the methods of Tables~4--6, with the video
+sequence as the unit of analysis. Column~3 gives each method's Abs Rel with a 95\% cluster
+bootstrap confidence interval over sequences (10\,000 draws). Column~4 gives the paired difference
+(method $-$ MonoIIF) per sequence, signed so that a positive value means MonoIIF is better, with
+its own bootstrap interval; $k/n$ counts the sequences in which MonoIIF is better. The exact
+two-sided Wilcoxon signed-rank $p$ is given for the two datasets with $n=7$; its smallest
+attainable value there is $2/2^{7}=0.016$, so no family-wise correction across a table of this
+size can reach significance, and these comparisons are exploratory. In column~3 the best value per
+dataset is in bold and the second best underlined; in column~4 paired differences whose interval
+excludes zero are in bold. SCARED and C3VD use $n=7$ sequences; our copy of Hamlyn holds a single
+rectified sequence, so $n=58$ contiguous blocks of 100 frames are the unit there, and its
+intervals are slightly optimistic because blocks of one video remain correlated.}
 \label{tab:paired}
 \small
 \begin{tabular}{llcccc}
