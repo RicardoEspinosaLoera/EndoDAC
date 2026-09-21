@@ -343,6 +343,45 @@ training domain every comparison is a tie on both backbones. We therefore report
 axis as a property of the calibration that must be tuned per backbone, and we do not recommend a
 single degree."*
 
+### 7.2 The balance over the whole axis
+
+Of the eighteen paired contrasts among the calibration models (six contrasts on three datasets),
+only eight have intervals excluding zero, and they do not crown a single form.
+
+```latex
+\begin{table}[t]
+\centering
+\caption{Every calibration contrast whose 95\% interval excludes zero. All remaining contrasts,
+including the whole of SCARED except one, are ties. A form is named as the winner only where the
+interval separates it from its rival.}
+\label{tab:calib-balance}
+\small
+\begin{tabular}{lllc}
+\toprule
+Backbone & Dataset & Contrast & Winner \\
+\midrule
+Depth Anything & C3VD   & global vs no calibration & global, $-0.0256$, 7/7 \\
+Depth Anything & C3VD   & global vs degree 1       & global, $-0.0284$, 7/7 \\
+Depth Anything & C3VD   & global vs degree 2       & global, $-0.0198$, 7/7 \\
+Depth Anything & SCARED & global vs dense map      & global, $-0.0015$, 7/7 \\
+\midrule
+Depth Anything & Hamlyn & global vs no calibration & \textbf{no calibration}, $-0.0032$ \\
+ResNet-18      & Hamlyn & global vs no calibration & \textbf{no calibration}, $-0.0039$ \\
+ResNet-18      & Hamlyn & global vs degree 1       & degree 1, $-0.0037$ \\
+ResNet-18      & C3VD   & global vs degree 1       & degree 1, $-0.0123$, 7/7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+**Text.** *"Three patterns organise this. In the training domain nothing separates: every
+calibration model ties every other on SCARED, with the single exception of the global model
+against the dense map. On Hamlyn the best choice is not to calibrate at all, and this is the one
+result that repeats on both backbones with intervals excluding zero. On C3VD the winner reverses
+with the backbone --- the global model wins all seven scenes on Depth Anything, and the degree-1
+field wins all seven on ResNet-18 --- which is why we report the capacity axis rather than
+recommending a degree."*
+
 **Text for the discussion.** *"The one claim that survives on both backbones is the negative one:
 the free per-pixel field of the original submission is never the best point of the axis. On
 ResNet-18 it is the worst point on Hamlyn; on Depth Anything it ties the global model in-domain
