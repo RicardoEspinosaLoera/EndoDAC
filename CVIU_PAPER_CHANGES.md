@@ -78,13 +78,43 @@ Wilcoxon floor of 2/2⁷ = 0.0156, and the two pre-specified primary comparisons
 
 ---
 
-## 5. Tables 4–6 — recomputed at the sequence level
+## 5. Tables 4–6 — keep them, and add what Question 6 asks for
 
-Replace the three main tables. Values are means over sequences; `±` is the SD **across training
-seeds** and exists only for models trained here. The five external methods are the authors'
-released checkpoints (n = 1), which reproduce their published numbers under this protocol.
+The reviewer asks for *uncertainty estimates and paired statistical comparisons using video
+sequences*. That is an addition, not a replacement: the point estimates of Tables 4–6 are not what
+is being questioned and do not change. Aggregating by sequence instead of pooling frames moves
+every number by 0.0005–0.0006 — the seven SCARED sequences hold 71 to 87 frames each, so the two
+weightings almost coincide — which is not a difference worth rewriting a published table for.
 
-### 5.1 Table 4 — SCARED (n = 7 sequences)
+**5.0 — What actually changes in Tables 4–6.** Only two things:
+
+1. Add `±` to the rows of models trained here, the SD across the three training seeds. The
+   external rows are the authors' released checkpoints (n = 1) and get no `±`; say so in the
+   caption. Our reproduction of all five reproduces their published values (Monodepth2 0.0939 vs
+   0.094, AF-SfMLearner 0.0590 vs 0.059, MonoPCC 0.0513 vs 0.051, EndoDAC 0.0513 vs 0.051,
+   HADepth 0.0494 vs 0.049), which is worth one sentence because it validates the protocol.
+2. Stop bolding differences the data cannot resolve. On SCARED the four leading rows span 0.0489
+   to 0.0512 and every interval among them covers zero (§5.4).
+
+The new material goes in a companion table, §5.4, immediately after them.
+
+**Why the sequence-level analysis matters even though the means barely move.** The uncertainty
+changes by an order of magnitude. For MonoIIF on SCARED, treating the 551 frames as independent
+observations gives a 95% interval of [0.0507, 0.0528], width 0.0022; resampling the 7 sequences
+gives [0.0408, 0.0616], width 0.0208 — **9.5 times wider**. Frames within one video are nearly the
+same observation, so the frame-level interval is not an interval at all. Under the naive version
+HADepth [0.0478, 0.0511] and MonoIIF [0.0507, 0.0528] look almost disjoint; at the sequence level
+they overlap almost entirely. The reviewer's example resolves the moment the unit is right: the
+per-sequence differences between them are +0.0005, −0.0018, −0.0136, +0.0035, −0.0064, +0.0040,
+−0.0019, so MonoIIF is better in 3 of 7 sequences and nearly the whole aggregate gap comes from
+one sequence.
+
+### (optional) Sequence-level versions of Tables 4–6
+
+Only if the editor prefers the main tables recomputed rather than annotated. The values differ
+from the published ones by 0.0005–0.0006.
+
+#### 5.1 Table 4 — SCARED (n = 7 sequences)
 
 ```latex
 \begin{table}[t]
@@ -114,7 +144,7 @@ MonoIIF (ours)  & 0.051\,$\pm$\,0.001 & 0.381\,$\pm$\,0.025 & 4.619\,$\pm$\,0.14
 \end{table}
 ```
 
-### 5.2 Table 5 — Hamlyn (evaluation only, n = 58 blocks of 100 frames)
+#### 5.2 Table 5 — Hamlyn (evaluation only, n = 58 blocks of 100 frames)
 
 ```latex
 \begin{table}[t]
@@ -144,7 +174,7 @@ MonoIIF (ours)  & \textbf{0.161}\,$\pm$\,0.003 & 4.246\,$\pm$\,0.122 & 13.785\,$
 \end{table}
 ```
 
-### 5.3 Table 6 — C3VD (evaluation only, n = 7 scenes)
+#### 5.3 Table 6 — C3VD (evaluation only, n = 7 scenes)
 
 ```latex
 \begin{table}[t]
@@ -171,46 +201,53 @@ MonoIIF (ours)  & 0.268\,$\pm$\,0.011 & 3.908\,$\pm$\,0.217 & 13.892\,$\pm$\,0.3
 \end{table}
 ```
 
-### 5.4 New Table 7 — the paired comparisons the reviewer asked for
+### 5.4 New Table 7 — the uncertainty and paired comparisons Question 6 asks for
 
 This is the table that answers Q6 and it should sit immediately after Tables 4–6.
 
 ```latex
 \begin{table}[t]
 \centering
-\caption{Paired comparisons against MonoIIF with the video sequence as the unit of analysis.
-The difference is (method $-$ MonoIIF) in Abs Rel per sequence, so a \textbf{positive} value means
-MonoIIF is better; $[\,\cdot\,]$ is a 95\% cluster bootstrap CI over sequences (10\,000 draws) and
-$k/n$ counts the sequences in which MonoIIF is better. Exact two-sided Wilcoxon $p$ is reported
-for the datasets with $n=7$; with $n=7$ its smallest attainable value is $2/2^{7}=0.016$, so
-family-wise correction across a table of this size cannot reach significance and these are
-reported as exploratory. Rows whose interval excludes zero are in bold.}
+\caption{Uncertainty and paired comparisons with the video sequence as the unit of analysis, for
+the methods of Tables 4--6. Column 3 is each method's Abs Rel with a 95\% cluster bootstrap CI
+over sequences (10\,000 draws), the uncertainty estimate Question~6 asks for. Column 4 is the
+paired difference (method $-$ MonoIIF) per sequence, signed so that \textbf{positive means MonoIIF
+is better}, with its own bootstrap CI; $k/n$ counts the sequences in which MonoIIF is better.
+Exact two-sided Wilcoxon $p$ is given for the two datasets with $n=7$; its smallest attainable
+value there is $2/2^{7}=0.016$, so a family-wise correction across a table of this size cannot
+reach significance and these are reported as exploratory. Paired differences whose interval
+excludes zero are in bold. SCARED and C3VD use $n=7$ sequences; our copy of Hamlyn holds one
+rectified sequence, so $n=58$ contiguous blocks of 100 frames are the unit and the interval is
+slightly optimistic.}
 \label{tab:paired}
 \small
-\begin{tabular}{llccc}
+\begin{tabular}{llcccc}
 \toprule
-Dataset & Method & $\Delta$ Abs Rel [95\% CI] & $k/n$ & exact $p$ \\
+Dataset & Method & Abs Rel [95\% CI] & $\Delta$ vs MonoIIF [95\% CI] & $k/n$ & exact $p$ \\
 \midrule
-\multirow{5}{*}{SCARED}
- & HADepth       & $-0.0023$ $[-0.0068, +0.0016]$ & 3/7 & 0.578 \\
- & EndoDAC       & $-0.0004$ $[-0.0048, +0.0041]$ & 3/7 & 0.688 \\
- & MonoPCC       & $-0.0007$ $[-0.0073, +0.0053]$ & 4/7 & 0.938 \\
- & AF-SfMLearner & $\mathbf{+0.0072}$ $[+0.0011, +0.0137]$ & 5/7 & 0.109 \\
- & Monodepth2    & $\mathbf{+0.0421}$ $[+0.0266, +0.0587]$ & 7/7 & 0.016 \\
+\multirow{6}{*}{SCARED}
+ & HADepth       & 0.0489 $[0.0399, 0.0570]$ & $-0.0023$ $[-0.0068, +0.0016]$ & 3/7 & 0.578 \\
+ & MonoPCC       & 0.0505 $[0.0399, 0.0592]$ & $-0.0007$ $[-0.0073, +0.0053]$ & 4/7 & 0.938 \\
+ & EndoDAC       & 0.0507 $[0.0399, 0.0607]$ & $-0.0004$ $[-0.0048, +0.0041]$ & 3/7 & 0.688 \\
+ & \textbf{MonoIIF} & 0.0512 $[0.0407, 0.0616]$ & --- & --- & --- \\
+ & AF-SfMLearner & 0.0584 $[0.0442, 0.0727]$ & $\mathbf{+0.0072}$ $[+0.0011, +0.0137]$ & 5/7 & 0.109 \\
+ & Monodepth2    & 0.0933 $[0.0751, 0.1104]$ & $\mathbf{+0.0421}$ $[+0.0266, +0.0587]$ & 7/7 & 0.016 \\
 \midrule
-\multirow{5}{*}{Hamlyn}
- & EndoDAC       & $-0.0000$ $[-0.0037, +0.0036]$ & 31/58 & --- \\
- & HADepth       & $+0.0019$ $[-0.0002, +0.0040]$ & 38/58 & --- \\
- & MonoPCC       & $\mathbf{+0.0113}$ $[+0.0067, +0.0158]$ & 41/58 & --- \\
- & AF-SfMLearner & $\mathbf{+0.0220}$ $[+0.0151, +0.0296]$ & 47/58 & --- \\
- & Monodepth2    & $\mathbf{+0.0624}$ $[+0.0498, +0.0745]$ & 55/58 & --- \\
+\multirow{6}{*}{Hamlyn}
+ & EndoDAC       & 0.1608 $[0.1426, 0.1807]$ & $-0.0000$ $[-0.0037, +0.0036]$ & 31/58 & --- \\
+ & \textbf{MonoIIF} & 0.1608 $[0.1413, 0.1826]$ & --- & --- & --- \\
+ & HADepth       & 0.1627 $[0.1425, 0.1846]$ & $+0.0019$ $[-0.0002, +0.0040]$ & 38/58 & --- \\
+ & MonoPCC       & 0.1721 $[0.1499, 0.1957]$ & $\mathbf{+0.0113}$ $[+0.0067, +0.0158]$ & 41/58 & --- \\
+ & AF-SfMLearner & 0.1828 $[0.1583, 0.2089]$ & $\mathbf{+0.0220}$ $[+0.0151, +0.0296]$ & 47/58 & --- \\
+ & Monodepth2    & 0.2231 $[0.2034, 0.2438]$ & $\mathbf{+0.0624}$ $[+0.0498, +0.0745]$ & 55/58 & --- \\
 \midrule
-\multirow{5}{*}{C3VD}
- & HADepth       & $\mathbf{-0.0466}$ $[-0.0683, -0.0292]$ & 0/7 & 0.016 \\
- & EndoDAC       & $-0.0111$ $[-0.0405, +0.0141]$ & 3/7 & 0.813 \\
- & AF-SfMLearner & $\mathbf{+0.0678}$ $[+0.0207, +0.1126]$ & 5/7 & 0.078 \\
- & Monodepth2    & $\mathbf{+0.0740}$ $[+0.0410, +0.1016]$ & 6/7 & 0.031 \\
- & MonoPCC       & $\mathbf{+0.0889}$ $[+0.0621, +0.1116]$ & 7/7 & 0.016 \\
+\multirow{6}{*}{C3VD}
+ & HADepth       & 0.2213 $[0.2017, 0.2425]$ & $\mathbf{-0.0466}$ $[-0.0683, -0.0292]$ & 0/7 & 0.016 \\
+ & EndoDAC       & 0.2568 $[0.2216, 0.2926]$ & $-0.0111$ $[-0.0405, +0.0141]$ & 3/7 & 0.813 \\
+ & \textbf{MonoIIF} & 0.2679 $[0.2447, 0.2893]$ & --- & --- & --- \\
+ & AF-SfMLearner & 0.3356 $[0.2811, 0.3847]$ & $\mathbf{+0.0678}$ $[+0.0207, +0.1126]$ & 5/7 & 0.078 \\
+ & Monodepth2    & 0.3419 $[0.2942, 0.3778]$ & $\mathbf{+0.0740}$ $[+0.0410, +0.1016]$ & 6/7 & 0.031 \\
+ & MonoPCC       & 0.3568 $[0.3177, 0.3865]$ & $\mathbf{+0.0889}$ $[+0.0621, +0.1116]$ & 7/7 & 0.016 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -229,11 +266,74 @@ scenes with the interval excluding zero, while on SCARED and Hamlyn the two are 
 
 ## 6. Section 4.x — the calibration ablation (Reviewer 2)
 
-New table, replacing the ablation that compared the module only against nothing. The controlled
-comparison is run on the **ResNet-18 backbone**, where the full three-cell design fits in the
-compute budget at three seeds, and is then confirmed on the method's own backbone.
+New tables, replacing the ablation that compared the module only against nothing. The calibration
+is isolated three ways: on the method's own backbone with **nothing else switched on** (§6.1), on
+a second backbone within the MonoII loss configuration (§6.2), and inside the method's full loss
+configuration (§6.3).
 
-### 6.1 The controlled comparison, ResNet-18
+### 6.1 The calibration alone, on the method's backbone
+
+This is the cleanest form of the comparison the reviewer asks for: the invariant loss is switched
+off ($\lambda_1 = 0$) and the photometric loss is monodepth2's, so the **only** thing that differs
+across rows is the calibration model.
+
+```latex
+\begin{table}[t]
+\centering
+\caption{Photometric calibration models on the Depth Anything backbone with the
+illumination-invariant loss switched off ($\lambda_1=0$) and monodepth2's photometric loss, so
+that the rows differ only in the calibration. Three seeds. The lower block is the paired
+difference (variant $-$ no calibration) in Abs Rel per sequence, so a \textbf{negative} value
+means the calibration helps; bold marks intervals excluding zero.}
+\label{tab:calib-lam0}
+\small
+\begin{tabular}{lccc}
+\toprule
+Calibration model & SCARED & Hamlyn & C3VD \\
+\midrule
+no calibration                  & 0.0517\,$\pm$\,0.0009 & \textbf{0.1565\,$\pm$\,0.0043} & 0.2929\,$\pm$\,0.0136 \\
+global, one $(c,b)$ pair        & 0.0505\,$\pm$\,0.0020 & 0.1597\,$\pm$\,0.0030 & \textbf{0.2672\,$\pm$\,0.0170} \\
+linear field (degree 1)         & \textbf{0.0502} & 0.1597 & 0.2956 \\
+quadratic field (degree 2)      & 0.0510 & 0.1586 & 0.2870 \\
+dense map (original submission) & 0.0517\,$\pm$\,0.0193 & 0.1594 & \textbf{0.2669} \\
+\midrule
+\multicolumn{4}{l}{\emph{paired against no calibration}} \\
+global     & $-0.0012$ $[-0.0028, +0.0002]$ & $\mathbf{+0.0032}$ $[+0.0012, +0.0052]$ &
+             $\mathbf{-0.0256}$ $[-0.0296, -0.0222]$, \textbf{7/7} \\
+degree 1   & $\mathbf{-0.0015}$ $[-0.0024, -0.0004]$, 6/7, $p=0.047$ &
+             $\mathbf{+0.0033}$ $[+0.0020, +0.0046]$ & $+0.0028$ $[-0.0054, +0.0110]$ \\
+degree 2   & $-0.0006$ $[-0.0025, +0.0009]$ & $\mathbf{+0.0021}$ $[+0.0009, +0.0033]$ &
+             $-0.0059$ $[-0.0167, +0.0032]$ \\
+dense map  & $+0.0000$ $[-0.0018, +0.0022]$ & $\mathbf{+0.0029}$ $[+0.0014, +0.0045]$ &
+             $\mathbf{-0.0260}$ $[-0.0360, -0.0160]$, \textbf{7/7} \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+**Text.** *"With the invariant loss switched off, the calibration is isolated completely. Three
+things follow. In the training domain only the degree-1 field separates from no calibration
+($-0.0015$ $[-0.0024, -0.0004]$, better in 6 of 7 sequences); the other forms are ties. Under
+photometric shift with unchanged geometry (Hamlyn) every calibration model hurts, all four
+intervals excluding zero, which we report as a limitation. Under geometric shift (C3VD) the two
+\emph{ends} of the capacity axis are what work --- the global model and the dense map each beat no
+calibration by about 0.026 in all seven scenes, while the intermediate fields do not separate ---
+and the dense map also beats the degree-1 and degree-2 fields there ($+0.0288$ and $+0.0202$,
+0 of 7 scenes each). Intensity fall-off carries depth information in a tubular organ, and a
+calibration model either has to be coarse enough not to touch it or expressive enough to model it;
+the middle of the axis does neither."*
+
+The C3VD result is why the dense parameterisation is retained on this backbone despite §6.2: on
+ResNet-18 the optimum is in the middle of the axis, on Depth Anything it is at the ends, and the
+two backbones disagree with intervals excluding zero in both directions. §7.1 states this
+explicitly, and the paper must not present a single recommended capacity.
+
+**Missing cells.** The same $\lambda_1=0$ family on ResNet-18 exists only at two of the five
+points (no calibration, and degree 2). Completing it needs
+`--depth_backbone resnet18 --illum_calib global --illumination_invariant 0 --photometric standard`
+and the same with `--illum_calib local` — six jobs at three seeds, a few hours each.
+
+### 6.2 The same axis on a second backbone, ResNet-18
 
 ```latex
 \begin{table}[t]
