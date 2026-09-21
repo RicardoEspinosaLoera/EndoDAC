@@ -732,9 +732,11 @@ def ensure_mpvit_weights(cfg, download=True, variant="small"):
         if os.path.exists(part):
             os.remove(part)
         print("[mpvit] download failed ({}).\n"
-              "        The official link ({}) is dead: Dropbox retired the /s/ links, so it answers\n"
-              "        with an HTML page. Copy an existing mpvit_{}.pth to {} (look for one in\n"
-              "        {}), or set mpvit_weights: <path> in the config."
+              "        The official link ({}) is dead: it still redirects to\n"
+              "        dl.dropboxusercontent.com, but that returns 404 -- the files were deleted from the\n"
+              "        authors' account, so no URL variant can work. Copy an existing mpvit_{}.pth to {}\n"
+              "        (look for one in {}), or set mpvit_weights: <path> in the config.\n"
+              "        If the run is meant to start from random weights, pass --mpvit_weights random."
               .format(e, MPVIT_URL[variant], variant, path,
                       ", ".join(c.format(name="mpvit_{}".format(variant)) for c in MPVIT_FALLBACKS)))
         return False
@@ -857,9 +859,11 @@ def stage_train(cfg, args):
     for mv_variant in ("small", "xsmall"):
         mv_runs = [r for r in selected
                    if "--depth_backbone monovit" in runs[r]["flags"]
-                   and (_last_flag_value(runs[r]["flags"], "--mpvit_variant") or "small") == mv_variant
+                   # _last_flag_value takes a token list, not the raw flag string
+                   and (_last_flag_value(runs[r]["flags"].split(), "--mpvit_variant") or "small") == mv_variant
                    # rows that ask for random init need no checkpoint at all
-                   and _last_flag_value(runs[r]["flags"], "--mpvit_weights") not in ("random", "none", "scratch")]
+                   and _last_flag_value(runs[r]["flags"].split(), "--mpvit_weights")
+                   not in ("random", "none", "scratch")]
         if mv_runs and not ensure_mpvit_weights(cfg, download=not args.dry_run, variant=mv_variant):
             print("[train] {} need the ImageNet MPViT-{} weights at {} (see the message above)".format(
                 mv_runs, mv_variant, mpvit_weights_path(cfg, mv_variant)))
