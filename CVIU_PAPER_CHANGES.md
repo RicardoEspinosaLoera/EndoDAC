@@ -262,9 +262,10 @@ the variation between training runs of a single one of them, and we report these
 than ranking them. The ordering is also dataset-dependent: on C3VD HADepth is better in all seven
 scenes with the interval excluding zero, while on SCARED and Hamlyn the two are indistinguishable."*
 
+
 ### 5.5 The same comparison, one column per test sequence
 
-Table 7 summarises; these two show *where* each comparison is decided. They are the per-sequence values that Table 7's intervals and paired tests are computed from, so they carry the uncertainty estimate (the spread across columns and the mean's CI) and the paired comparison (the lower block) in the raw. Hamlyn is not tabulated this way: its unit is 58 blocks of one video, which does not fit a page; the per-block values are in `results/cviu/per_sequence.csv` and a dot plot is the right figure for it (§12.2). Needs `\usepackage{multirow}` and a `table*` environment.
+Table 7 summarises; these show *where* each comparison is decided. They are the per-sequence values that Table 7's intervals and paired tests are computed from, so they carry the uncertainty estimate (the spread across sequences and the mean's CI) and the paired comparison (the difference block) in the raw. SCARED and C3VD have seven units each and go one column per unit; Hamlyn's unit is a 100-frame block of its single sequence, 58 of them, so that table is transposed --- one row per block --- and is a full-page float for the supplement. Needs `\usepackage{multirow}` and the `table*` environment.
 
 ```latex
 \begin{table*}[t]
@@ -330,7 +331,85 @@ MonoPCC & $+0.1195$ & $+0.0835$ & $+0.0999$ & $+0.1174$ & $+0.0281$ & $+0.1216$ 
 \end{table*}
 ```
 
-**Text.** *"The per-sequence view shows that the aggregate gap between the leading methods on SCARED is not a consistent advantage: the sign of the difference between HADepth and MonoIIF changes from sequence to sequence, MonoIIF is better on three of the seven, and a single sequence (d3k4) contributes most of the aggregate. On C3VD, by contrast, HADepth is better on every scene, which is why that comparison resolves and the SCARED one does not."*
+```latex
+\begin{table*}[p]
+\centering
+\caption{Hamlyn, per block. Our copy of Hamlyn holds a single rectified sequence (\texttt{rectified14}), so the unit of analysis is a contiguous block of 100 frames, $n=58$, identical for every method. Left: Abs Rel of each method on each block, best per row in bold, with the mean over blocks and its 95\% cluster bootstrap CI at the foot --- the uncertainty estimate. Right: the paired difference (method $-$ MonoIIF) on the same block, signed so that \textbf{positive means MonoIIF is better}, with the mean, its CI and the count of blocks in which MonoIIF is better at the foot --- the paired comparison. Blocks of one video remain correlated, so the intervals are slightly optimistic. MonoIIF is the mean of three training seeds; the comparison methods are released checkpoints.}
+\label{tab:perseq-hamlyn}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lcccccc|ccccc}
+\toprule
+ & \multicolumn{6}{c|}{Abs Rel} & \multicolumn{5}{c}{$\Delta$ vs MonoIIF} \\
+block & EndoDAC & \textbf{MonoIIF} & HADepth & MonoPCC & AF-SfMLearner & Monodepth2 & EndoDAC & HADepth & MonoPCC & AF-SfMLearner & Monodepth2 \\
+\midrule
+b00 & 0.3719 & \textbf{0.3680} & 0.3825 & 0.4062 & 0.4215 & 0.3811 & $+0.0039$ & $+0.0145$ & $+0.0382$ & $+0.0535$ & $+0.0130$ \\
+b01 & 0.2092 & 0.2090 & 0.2092 & 0.2073 & 0.2137 & \textbf{0.2038} & $+0.0002$ & $+0.0002$ & $-0.0017$ & $+0.0048$ & $-0.0051$ \\
+b02 & \textbf{0.2044} & 0.2067 & 0.2212 & 0.2384 & 0.2693 & 0.2495 & $-0.0023$ & $+0.0145$ & $+0.0317$ & $+0.0626$ & $+0.0428$ \\
+b03 & \textbf{0.2337} & 0.2397 & 0.2622 & 0.2805 & 0.3366 & 0.2951 & $-0.0060$ & $+0.0225$ & $+0.0408$ & $+0.0969$ & $+0.0554$ \\
+b04 & 0.1057 & 0.1088 & 0.1113 & 0.1035 & \textbf{0.1007} & 0.1621 & $-0.0030$ & $+0.0025$ & $-0.0053$ & $-0.0081$ & $+0.0533$ \\
+b05 & \textbf{0.1287} & 0.1419 & 0.1354 & 0.1599 & 0.1637 & 0.2459 & $-0.0132$ & $-0.0066$ & $+0.0180$ & $+0.0217$ & $+0.1039$ \\
+b06 & \textbf{0.1948} & 0.2163 & 0.2211 & 0.2624 & 0.2692 & 0.3343 & $-0.0215$ & $+0.0048$ & $+0.0461$ & $+0.0529$ & $+0.1180$ \\
+b07 & \textbf{0.2177} & 0.2413 & 0.2515 & 0.2740 & 0.3278 & 0.3067 & $-0.0235$ & $+0.0103$ & $+0.0327$ & $+0.0865$ & $+0.0654$ \\
+b08 & \textbf{0.1765} & 0.1856 & 0.1850 & 0.1945 & 0.2228 & 0.2234 & $-0.0091$ & $-0.0006$ & $+0.0089$ & $+0.0372$ & $+0.0378$ \\
+b09 & 0.1200 & 0.1137 & 0.1236 & \textbf{0.1022} & 0.1211 & 0.1376 & $+0.0063$ & $+0.0099$ & $-0.0115$ & $+0.0074$ & $+0.0239$ \\
+b10 & 0.2232 & 0.2253 & 0.2290 & 0.2272 & \textbf{0.2165} & 0.2421 & $-0.0021$ & $+0.0037$ & $+0.0019$ & $-0.0088$ & $+0.0168$ \\
+b11 & 0.2381 & 0.2381 & 0.2427 & \textbf{0.2363} & 0.2378 & 0.2588 & $-0.0000$ & $+0.0046$ & $-0.0018$ & $-0.0003$ & $+0.0207$ \\
+b12 & 0.2282 & \textbf{0.2200} & 0.2212 & 0.2248 & 0.2334 & 0.2416 & $+0.0082$ & $+0.0012$ & $+0.0049$ & $+0.0134$ & $+0.0217$ \\
+b13 & 0.2145 & \textbf{0.2025} & 0.2044 & 0.2052 & 0.2157 & 0.2207 & $+0.0120$ & $+0.0020$ & $+0.0027$ & $+0.0133$ & $+0.0182$ \\
+b14 & 0.1957 & \textbf{0.1893} & 0.1968 & 0.1911 & 0.1984 & 0.2026 & $+0.0065$ & $+0.0076$ & $+0.0018$ & $+0.0091$ & $+0.0134$ \\
+b15 & 0.1824 & 0.1787 & 0.1888 & \textbf{0.1774} & 0.1874 & 0.1825 & $+0.0038$ & $+0.0101$ & $-0.0013$ & $+0.0088$ & $+0.0038$ \\
+b16 & 0.1789 & 0.1839 & 0.1869 & 0.1831 & \textbf{0.1772} & 0.1934 & $-0.0051$ & $+0.0030$ & $-0.0008$ & $-0.0067$ & $+0.0095$ \\
+b17 & \textbf{0.2896} & 0.3129 & 0.3144 & 0.3325 & 0.3407 & 0.3294 & $-0.0233$ & $+0.0015$ & $+0.0196$ & $+0.0278$ & $+0.0165$ \\
+b18 & \textbf{0.3904} & 0.4210 & 0.4301 & 0.4534 & 0.4961 & 0.4520 & $-0.0307$ & $+0.0091$ & $+0.0324$ & $+0.0751$ & $+0.0310$ \\
+b19 & \textbf{0.3561} & 0.3887 & 0.3989 & 0.4331 & 0.4744 & 0.4190 & $-0.0326$ & $+0.0102$ & $+0.0444$ & $+0.0857$ & $+0.0302$ \\
+b20 & \textbf{0.2547} & 0.2679 & 0.2765 & 0.3132 & 0.3417 & 0.3112 & $-0.0131$ & $+0.0087$ & $+0.0453$ & $+0.0739$ & $+0.0433$ \\
+b21 & \textbf{0.2601} & 0.2805 & 0.2819 & 0.3332 & 0.3830 & 0.3744 & $-0.0204$ & $+0.0014$ & $+0.0527$ & $+0.1025$ & $+0.0939$ \\
+b22 & 0.1264 & 0.1178 & 0.1295 & 0.1218 & 0.1399 & \textbf{0.0892} & $+0.0085$ & $+0.0117$ & $+0.0040$ & $+0.0221$ & $-0.0286$ \\
+b23 & 0.1705 & 0.1826 & \textbf{0.1693} & 0.2086 & 0.1998 & 0.3593 & $-0.0121$ & $-0.0133$ & $+0.0260$ & $+0.0171$ & $+0.1767$ \\
+b24 & 0.0677 & \textbf{0.0674} & 0.0918 & 0.0842 & 0.1105 & 0.0756 & $+0.0003$ & $+0.0244$ & $+0.0168$ & $+0.0431$ & $+0.0082$ \\
+b25 & \textbf{0.0907} & 0.0987 & 0.1025 & 0.1079 & 0.1342 & 0.1157 & $-0.0080$ & $+0.0038$ & $+0.0092$ & $+0.0355$ & $+0.0170$ \\
+b26 & \textbf{0.1935} & 0.2189 & 0.2082 & 0.2599 & 0.2799 & 0.3372 & $-0.0254$ & $-0.0107$ & $+0.0411$ & $+0.0611$ & $+0.1183$ \\
+b27 & \textbf{0.0940} & 0.1068 & 0.1028 & 0.1240 & 0.1198 & 0.2226 & $-0.0128$ & $-0.0040$ & $+0.0172$ & $+0.0130$ & $+0.1158$ \\
+b28 & \textbf{0.0787} & 0.0903 & 0.0913 & 0.1122 & 0.1084 & 0.2018 & $-0.0116$ & $+0.0010$ & $+0.0219$ & $+0.0181$ & $+0.1115$ \\
+b29 & \textbf{0.0721} & 0.0821 & 0.0829 & 0.1031 & 0.0989 & 0.1936 & $-0.0100$ & $+0.0008$ & $+0.0211$ & $+0.0169$ & $+0.1115$ \\
+b30 & 0.0951 & \textbf{0.0950} & 0.0961 & 0.1046 & 0.0971 & 0.1972 & $+0.0002$ & $+0.0011$ & $+0.0096$ & $+0.0021$ & $+0.1022$ \\
+b31 & 0.1109 & 0.1009 & \textbf{0.0880} & 0.0929 & 0.1038 & 0.1788 & $+0.0100$ & $-0.0129$ & $-0.0080$ & $+0.0029$ & $+0.0779$ \\
+b32 & 0.1339 & 0.1069 & 0.1039 & \textbf{0.0977} & 0.1226 & 0.1834 & $+0.0270$ & $-0.0030$ & $-0.0091$ & $+0.0157$ & $+0.0765$ \\
+b33 & 0.1532 & 0.1237 & \textbf{0.1153} & 0.1157 & 0.1409 & 0.2152 & $+0.0295$ & $-0.0084$ & $-0.0081$ & $+0.0172$ & $+0.0915$ \\
+b34 & 0.1792 & 0.1442 & \textbf{0.1321} & 0.1353 & 0.1456 & 0.2312 & $+0.0349$ & $-0.0122$ & $-0.0090$ & $+0.0013$ & $+0.0870$ \\
+b35 & 0.1389 & 0.1189 & \textbf{0.1178} & 0.1372 & 0.1447 & 0.2218 & $+0.0199$ & $-0.0011$ & $+0.0182$ & $+0.0257$ & $+0.1028$ \\
+b36 & 0.1255 & \textbf{0.1000} & 0.1082 & 0.1152 & 0.1250 & 0.1832 & $+0.0255$ & $+0.0082$ & $+0.0152$ & $+0.0250$ & $+0.0832$ \\
+b37 & 0.0943 & \textbf{0.0766} & 0.0834 & 0.0837 & 0.0983 & 0.1515 & $+0.0177$ & $+0.0068$ & $+0.0071$ & $+0.0217$ & $+0.0749$ \\
+b38 & 0.0836 & 0.0785 & 0.0801 & \textbf{0.0705} & 0.0797 & 0.1361 & $+0.0050$ & $+0.0016$ & $-0.0080$ & $+0.0012$ & $+0.0576$ \\
+b39 & 0.0777 & 0.0734 & 0.0722 & \textbf{0.0642} & 0.0697 & 0.1268 & $+0.0043$ & $-0.0012$ & $-0.0092$ & $-0.0037$ & $+0.0534$ \\
+b40 & 0.1011 & \textbf{0.0900} & 0.1008 & 0.1090 & 0.1223 & 0.1789 & $+0.0111$ & $+0.0108$ & $+0.0190$ & $+0.0323$ & $+0.0889$ \\
+b41 & 0.1415 & \textbf{0.1293} & 0.1308 & 0.1358 & 0.1558 & 0.2457 & $+0.0122$ & $+0.0014$ & $+0.0064$ & $+0.0265$ & $+0.1164$ \\
+b42 & 0.1377 & 0.1226 & 0.1213 & \textbf{0.1208} & 0.1412 & 0.2513 & $+0.0150$ & $-0.0014$ & $-0.0019$ & $+0.0186$ & $+0.1287$ \\
+b43 & 0.1215 & 0.1026 & 0.1037 & \textbf{0.0957} & 0.1087 & 0.1950 & $+0.0189$ & $+0.0010$ & $-0.0070$ & $+0.0061$ & $+0.0923$ \\
+b44 & 0.1396 & \textbf{0.1351} & 0.1382 & 0.1480 & 0.1428 & 0.2252 & $+0.0045$ & $+0.0032$ & $+0.0129$ & $+0.0077$ & $+0.0901$ \\
+b45 & 0.1780 & 0.1678 & 0.1675 & \textbf{0.1656} & 0.1665 & 0.2036 & $+0.0103$ & $-0.0003$ & $-0.0022$ & $-0.0012$ & $+0.0359$ \\
+b46 & 0.0710 & 0.0709 & \textbf{0.0655} & 0.0980 & 0.0979 & 0.1541 & $+0.0001$ & $-0.0054$ & $+0.0272$ & $+0.0270$ & $+0.0832$ \\
+b47 & 0.0778 & 0.0780 & \textbf{0.0743} & 0.0998 & 0.0957 & 0.1541 & $-0.0001$ & $-0.0037$ & $+0.0218$ & $+0.0177$ & $+0.0761$ \\
+b48 & 0.0769 & 0.0768 & \textbf{0.0731} & 0.0938 & 0.0769 & 0.1526 & $+0.0001$ & $-0.0037$ & $+0.0170$ & $+0.0001$ & $+0.0758$ \\
+b49 & 0.1015 & \textbf{0.0988} & 0.1023 & 0.1137 & 0.0988 & 0.1633 & $+0.0028$ & $+0.0035$ & $+0.0149$ & $+0.0001$ & $+0.0645$ \\
+b50 & 0.1100 & 0.1097 & 0.1134 & 0.1205 & \textbf{0.1065} & 0.1580 & $+0.0003$ & $+0.0037$ & $+0.0108$ & $-0.0032$ & $+0.0483$ \\
+b51 & 0.1551 & \textbf{0.1524} & 0.1560 & 0.1639 & 0.1612 & 0.1970 & $+0.0027$ & $+0.0036$ & $+0.0116$ & $+0.0088$ & $+0.0446$ \\
+b52 & 0.2008 & 0.1951 & 0.1934 & \textbf{0.1749} & 0.1831 & 0.2247 & $+0.0057$ & $-0.0017$ & $-0.0202$ & $-0.0120$ & $+0.0297$ \\
+b53 & 0.1090 & 0.1106 & 0.0978 & 0.1155 & \textbf{0.0905} & 0.1793 & $-0.0016$ & $-0.0128$ & $+0.0049$ & $-0.0201$ & $+0.0687$ \\
+b54 & 0.1144 & 0.1192 & 0.1145 & 0.1221 & \textbf{0.1135} & 0.2309 & $-0.0047$ & $-0.0047$ & $+0.0029$ & $-0.0057$ & $+0.1118$ \\
+b55 & \textbf{0.1124} & 0.1138 & 0.1197 & 0.1191 & 0.1316 & 0.2641 & $-0.0015$ & $+0.0059$ & $+0.0052$ & $+0.0178$ & $+0.1503$ \\
+b56 & \textbf{0.1154} & 0.1160 & 0.1195 & 0.1207 & 0.1284 & 0.2510 & $-0.0006$ & $+0.0035$ & $+0.0047$ & $+0.0125$ & $+0.1351$ \\
+b57 & 0.1999 & 0.2150 & 0.1967 & 0.1846 & 0.2127 & \textbf{0.1261} & $-0.0151$ & $-0.0183$ & $-0.0304$ & $-0.0023$ & $-0.0888$ \\
+\midrule
+mean & 0.1608 & 0.1608 & 0.1627 & 0.1721 & 0.1828 & 0.2231 & $-0.0000$ & $+0.0019$ & $\mathbf{+0.0113}$ & $\mathbf{+0.0220}$ & $\mathbf{+0.0624}$ \\
+95\% CI / $k/n$ & $[0.1426, 0.1801]$ & $[0.1409, 0.1827]$ & $[0.1423, 0.1856]$ & $[0.1493, 0.1962]$ & $[0.1581, 0.2095]$ & $[0.2032, 0.2436]$ & 31/58 & 38/58 & 41/58 & 47/58 & 55/58 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+```
+
+**Text.** *"The per-sequence view shows that the aggregate gap between the leading methods on SCARED is not a consistent advantage: the sign of the difference between HADepth and MonoIIF changes from sequence to sequence, MonoIIF is better on three of the seven, and a single sequence (d3k4) contributes most of the aggregate. On C3VD, by contrast, HADepth is better on every scene, which is why that comparison resolves and the SCARED one does not. On Hamlyn the picture is the SCARED one again at larger $n$: EndoDAC and MonoIIF split the 58 blocks almost evenly and HADepth's edge is within the interval, while the three older methods lose on most blocks."*
 
 ---
 
