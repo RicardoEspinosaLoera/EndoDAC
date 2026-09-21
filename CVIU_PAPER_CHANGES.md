@@ -238,40 +238,52 @@ compute budget at three seeds, and is then confirmed on the method's own backbon
 ```latex
 \begin{table}[t]
 \centering
-\caption{Photometric calibration models on the ResNet-18 backbone under an otherwise identical
-recipe: monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$, three
-seeds. Only the calibration changes across rows. The paired difference is (variant $-$ local) in
-Abs Rel per sequence, so a \textbf{negative} value means the variant beats the dense map of the
-original submission; bold marks intervals excluding zero.}
+\caption{Photometric calibration models on the ResNet-18 backbone. All five rows share one recipe
+--- monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$, three seeds ---
+and differ \emph{only} in how the affine field $(c,b)$ is parameterised, from a single pair per
+image to a free per-pixel map. The lower block is the paired difference (variant $-$ degree 1) in
+Abs Rel per sequence, so a \textbf{positive} value means the degree-1 field is better; bold marks
+intervals excluding zero.}
 \label{tab:calib-resnet}
 \small
 \begin{tabular}{lccc}
 \toprule
 Calibration model & SCARED & Hamlyn & C3VD \\
 \midrule
-no lighting model        & \textbf{0.0599}\,$\pm$\,0.0016 & \textbf{0.1698}\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
-global, one $(c,b)$ pair & 0.0600\,$\pm$\,0.0009 & 0.1758\,$\pm$\,0.0065 & \textbf{0.3290}\,$\pm$\,0.0072 \\
-local, dense map (ours)  & 0.0608\,$\pm$\,0.0007 & 0.1757\,$\pm$\,0.0021 & 0.3379\,$\pm$\,0.0057 \\
+no lighting model             & 0.0599\,$\pm$\,0.0016 & 0.1698\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
+global, one $(c,b)$ pair      & 0.0600\,$\pm$\,0.0009 & 0.1758\,$\pm$\,0.0065 & 0.3290\,$\pm$\,0.0072 \\
+\textbf{linear field (degree 1)} & \textbf{0.0596\,$\pm$\,0.0002} & 0.1700\,$\pm$\,0.0014 & \textbf{0.3278\,$\pm$\,0.0101} \\
+quadratic field (degree 2)    & 0.0608\,$\pm$\,0.0008 & \textbf{0.1690\,$\pm$\,0.0010} & 0.3383\,$\pm$\,0.0040 \\
+dense map (original submission) & 0.0608\,$\pm$\,0.0007 & 0.1757\,$\pm$\,0.0021 & 0.3379\,$\pm$\,0.0057 \\
 \midrule
-\multicolumn{4}{l}{\emph{paired against the local model}} \\
-no lighting model        & $-0.0009$ $[-0.0044, +0.0031]$ &
-                           $\mathbf{-0.0059}$ $[-0.0083, -0.0034]$, 43/58 &
-                           $-0.0016$ $[-0.0066, +0.0028]$ \\
-global, one $(c,b)$ pair & $-0.0008$ $[-0.0023, +0.0006]$ &
-                           $+0.0001$ $[-0.0025, +0.0025]$ &
-                           $\mathbf{-0.0090}$ $[-0.0164, -0.0011]$, 5/7 \\
+\multicolumn{4}{l}{\emph{paired against the degree-1 field}} \\
+no lighting model  & $+0.0002$ $[-0.0037, +0.0047]$ & $-0.0001$ $[-0.0017, +0.0015]$ &
+                     $\mathbf{+0.0085}$ $[+0.0009, +0.0153]$, 6/7 \\
+global             & $+0.0004$ $[-0.0023, +0.0030]$ & $\mathbf{+0.0058}$ $[+0.0036, +0.0081]$, 43/58 &
+                     $+0.0012$ $[-0.0066, +0.0101]$ \\
+degree 2           & $+0.0012$ $[-0.0024, +0.0049]$ & $-0.0009$ $[-0.0027, +0.0007]$ &
+                     $\mathbf{+0.0105}$ $[+0.0035, +0.0171]$, 6/7 \\
+dense map          & $+0.0012$ $[-0.0011, +0.0037]$ & $\mathbf{+0.0058}$ $[+0.0037, +0.0078]$, 47/58 &
+                     $\mathbf{+0.0101}$ $[+0.0016, +0.0167]$, 6/7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 ```
 
-**Text.** *"In the training domain the three calibration models are indistinguishable: the
-intervals of both alternatives against the dense map cover zero and the three means lie within
-0.001 of one another. Out of domain the dense map is beaten on both datasets, by a different
-alternative each time --- on Hamlyn by not calibrating at all ($-0.0059$ $[-0.0083, -0.0034]$,
-better in 43 of 58 blocks) and on C3VD by the global two-parameter model ($-0.0090$ $[-0.0164,
--0.0011]$, better in 5 of 7 scenes). The free per-pixel parameterisation is therefore never the
-best of the three, which is the result that motivates the capacity analysis below."*
+**Text.** *"The spatially varying affine model is validated, but at low capacity. A linear field
+--- six coefficients against the two of the global model and the $2HW$ of a dense map --- is the
+best of the five on two of the three datasets and is never beaten with an interval excluding zero.
+It beats the global model of Ozyoruk et al.\ on Hamlyn ($+0.0058$ $[+0.0036, +0.0081]$, better in
+43 of 58 blocks), the free per-pixel map of the original submission on Hamlyn ($+0.0058$, 47/58)
+and on C3VD ($+0.0101$ $[+0.0016, +0.0167]$, 6 of 7 scenes), and not calibrating at all on C3VD
+($+0.0085$, 6/7). In the training domain the five are indistinguishable, with all means inside
+0.0012 of one another. The capacity of the field, not the presence of spatial variation, is what
+decides whether the calibration helps: the two ends of the axis --- a single global pair and a
+free per-pixel map --- are both worse than a linear gradient."*
+
+This is the positive answer to Reviewer 2: five comparisons in favour of the low-order field with
+intervals excluding zero, none against it, and the two forms the reviewer named are both on the
+axis as special cases.
 
 ### 6.2 Confirmation on the method's own backbone
 
