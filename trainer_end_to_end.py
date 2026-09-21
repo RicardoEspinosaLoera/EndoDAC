@@ -72,7 +72,11 @@ class Trainer:
             # from scratch under the same recipe as every other backbone.
             variant = getattr(self.opt, "mpvit_variant", "small")
             mpvit_weights = self.opt.mpvit_weights
-            if mpvit_weights is None:
+            if mpvit_weights in ("random", "none", "scratch"):
+                # deliberate random init: what the submission's MonoIIT row was trained with, since
+                # its mpvit_small() takes no `pretrained` argument and loads no checkpoint
+                mpvit_weights = None
+            elif mpvit_weights is None:
                 mpvit_weights = os.path.join(self.opt.pretrained_path, "mpvit_{}.pth".format(variant))
             self.models["depth_model"] = MonoViTDepth(
                 scales=self.opt.scales, pretrained_weights=mpvit_weights, variant=variant)

@@ -295,18 +295,19 @@ GRID = {
                          "--photometric standard"},
     "MonoViT-II": {"group": "B", "desc": "MonoViT + local calibration + II (lambda1=0.5)",
                    "flags": "--depth_backbone monovit --photometric standard --illumination_invariant 0.5"},
-    # The submission's MonoIIT row was trained on MPViT-**xsmall**, not the MPViT-small MonoViT is
-    # published with, so these two reproduce it. They mirror R2/R1 on ResNet-18 and E8/E3 on Depth
-    # Anything: MonoIIT carries the method's two components at the repo defaults (local calibration,
-    # II at lambda1 = 0.1, HADepth's photometric term) and MonoViT-xs is the same network with
-    # neither, so the pair isolates the components and the column isolates the architecture.
-    # They are NOT MonoViT as published -- that is `MonoViT`/`MonoViT-II` above, still blocked on
-    # the MPViT-small weights -- and the paper must say which encoder size it used.
-    "MonoViT-xs": {"group": "B", "desc": "MPViT-xsmall + HR decoder, standard loss (plain twin of MonoIIT)",
-                   "flags": "--depth_backbone monovit --mpvit_variant xsmall --illum_calib none "
-                            "--illumination_invariant 0 --photometric standard"},
-    "MonoIIT": {"group": "B", "desc": "MonoIIT: MPViT-xsmall + local calibration + II, repo defaults",
-                "flags": "--depth_backbone monovit --mpvit_variant xsmall"},
+    # MonoIIT as the submission actually trained it (Consuk/monodepth2_monovit @ a7a05dc, read
+    # 2026-09-20): MPViT-**small** from **random init** -- that repo's mpvit_small() takes no
+    # `pretrained` argument, loads no checkpoint and prints "Using random init (no pretrained)" --
+    # with monodepth2's photometric loss and **neither** of the method's two components, since its
+    # options.py has no illumination flag at all. So the published MonoIIT row is not MonoViT (no
+    # ImageNet init) and is not "II" anything (no calibration, no II loss). `MonoIIT-repro`
+    # reproduces it; `MonoIIT-components` is the same network with the two components added, which
+    # is what the paper's text describes and what the architecture column needs.
+    "MonoIIT-repro": {"group": "B", "desc": "the submission's MonoIIT: MPViT-small, random init, no components",
+                      "flags": "--depth_backbone monovit --mpvit_weights random --illum_calib none "
+                               "--illumination_invariant 0 --photometric standard"},
+    "MonoIIT-components": {"group": "B", "desc": "MPViT-small random init + local calibration + II, repo defaults",
+                           "flags": "--depth_backbone monovit --mpvit_weights random"},
     # bas-res-2-ssim on the third backbone: whether the best C3VD point of the ResNet family
     # (0.3282, basis degree 2 + II at 0.5 with the paper's SSIM_II comparator) is a property of
     # that cell or of ResNet-18. Its twins are MonoViT-II (same weight, dense map, l2 comparator)
@@ -856,7 +857,9 @@ def stage_train(cfg, args):
     for mv_variant in ("small", "xsmall"):
         mv_runs = [r for r in selected
                    if "--depth_backbone monovit" in runs[r]["flags"]
-                   and (_last_flag_value(runs[r]["flags"], "--mpvit_variant") or "small") == mv_variant]
+                   and (_last_flag_value(runs[r]["flags"], "--mpvit_variant") or "small") == mv_variant
+                   # rows that ask for random init need no checkpoint at all
+                   and _last_flag_value(runs[r]["flags"], "--mpvit_weights") not in ("random", "none", "scratch")]
         if mv_runs and not ensure_mpvit_weights(cfg, download=not args.dry_run, variant=mv_variant):
             print("[train] {} need the ImageNet MPViT-{} weights at {} (see the message above)".format(
                 mv_runs, mv_variant, mpvit_weights_path(cfg, mv_variant)))
