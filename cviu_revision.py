@@ -99,6 +99,8 @@ DEFAULT_CONFIG = {
                   "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                   "MonoII-ssim", "bas-res-2-ssim",
                   "lam-ssim-010", "lam-ssim-025", "lam-ssim-100", "lam-ssim-200",
+                  "MonoIIT-repro", "MonoIIT-base", "MonoIIT-components",
+                  "cal0-glob", "cal0-deg1", "cal0-local",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -526,8 +528,16 @@ def all_runs(cfg):
 
 
 def run_seeds(cfg, run):
+    """Seeds of a run: the configured list, plus any seed that already has a weights folder on
+    disk. The union matters for predict/stats: a run trained with `train --seeds 314 1 2` but not
+    listed in multi_seed_runs used to be evaluated at seed 314 only, silently."""
     t = cfg["train"]
-    return list(t["multi_seeds"] if run in t["multi_seed_runs"] else t["seeds"])
+    seeds = list(t["multi_seeds"] if run in t["multi_seed_runs"] else t["seeds"])
+    for d in glob.glob(os.path.join(cfg["log_dir"], run_name(run, "*"), "models")):
+        tail = os.path.basename(os.path.dirname(d)).rsplit("_s", 1)[-1]
+        if tail.isdigit() and int(tail) not in seeds:
+            seeds.append(int(tail))
+    return seeds
 
 
 def run_name(run, seed):
