@@ -459,11 +459,7 @@ mean & \textbf{0.1608} & \underline{0.1608} & 0.1627 & 0.1721 & 0.1828 & 0.2231 
 
 ## 6. Section 4.x — the calibration ablation (Reviewer 2)
 
-New tables, replacing the ablation that compared the module only against nothing. The calibration
-is isolated three ways: on the method's own backbone with **nothing else switched on** (§6.1), on
-a second backbone within the MonoII loss configuration (§6.2), and inside the method's full loss
-configuration (§6.3).
-
+New tables, replacing the ablation that compared the module only against nothing. Both use the illumination-invariant loss **switched off**, so that the calibration is the only thing that changes between rows: §6.1 on the method's own backbone, §6.2 on ResNet-18, where the reviewer's three models --- none, global, local --- are compared directly, and §6.3 names the best ResNet-18 model of the study.
 ### 6.1 The calibration alone, on the method's backbone
 
 This is the cleanest form of the comparison the reviewer asks for: the invariant loss is switched
@@ -526,117 +522,74 @@ points (no calibration, and degree 2). Completing it needs
 `--depth_backbone resnet18 --illum_calib global --illumination_invariant 0 --photometric standard`
 and the same with `--illum_calib local` — six jobs at three seeds, a few hours each.
 
-### 6.2 The same axis on a second backbone, ResNet-18
+### 6.2 None, global or local? ResNet-18 with the invariant loss switched off
+
+The reviewer's question in its plainest form, on the backbone where the full design fits the compute budget. Every row has $\lambda_1 = 0$ and monodepth2's photometric loss, so the only thing that changes is the calibration model; the two polynomial fields are the intermediate points of the same axis. Status: `cal0-glob`, `cal0-deg1` and `cal0-local` are still at **one seed**; rerun `calib_resnet_lam0.py` when their seeds 1 and 2 are predicted.
 
 ```latex
 \begin{table}[t]
 \centering
-\caption{Photometric calibration models on the ResNet-18 backbone. The five calibration rows share
-one recipe --- monodepth2's photometric loss, illumination-invariant loss at $\lambda_1=0.5$,
-three seeds --- and differ \emph{only} in how the affine field $(c,b)$ is parameterised, from a
-single pair per image to a free per-pixel map. The first row is a reference outside that family:
-it has \emph{neither} of the method's components and is therefore the Monodepth2 architecture
-under our recipe, which is why its number differs from the released Monodepth2 checkpoint of
-Table~\ref{tab:scared} (0.0933); that checkpoint was trained by its authors, not here. The lower
-block is the paired difference (variant $-$ degree 1) in Abs Rel per sequence, so a
-\textbf{positive} value means the degree-1 field is better; bold marks intervals excluding zero.}
-\label{tab:calib-resnet}
-\small
-\begin{tabular}{lccc}
-\toprule
-Calibration model & SCARED & Hamlyn & C3VD \\
-\midrule
-\emph{neither component} ($=$ Monodepth2, our recipe) & 0.0593\,$\pm$\,0.0015 & 0.1764\,$\pm$\,0.0070 & 0.3280\,$\pm$\,0.0117 \\
-\midrule
-no calibration, invariant loss kept & 0.0599\,$\pm$\,0.0016 & 0.1698\,$\pm$\,0.0041 & 0.3363\,$\pm$\,0.0116 \\
-global, one $(c,b)$ pair      & 0.0600\,$\pm$\,0.0009 & 0.1758\,$\pm$\,0.0065 & 0.3290\,$\pm$\,0.0072 \\
-\textbf{linear field (degree 1)} & \textbf{0.0596\,$\pm$\,0.0002} & 0.1700\,$\pm$\,0.0014 & \textbf{0.3278\,$\pm$\,0.0101} \\
-quadratic field (degree 2)    & 0.0608\,$\pm$\,0.0008 & \textbf{0.1690\,$\pm$\,0.0010} & 0.3383\,$\pm$\,0.0040 \\
-dense map (original submission) & 0.0608\,$\pm$\,0.0007 & 0.1757\,$\pm$\,0.0021 & 0.3379\,$\pm$\,0.0057 \\
-\midrule
-\multicolumn{4}{l}{\emph{paired against the degree-1 field}} \\
-neither component  & $-0.0003$ $[-0.0041, +0.0038]$ & $\mathbf{+0.0064}$ $[+0.0034, +0.0097]$, 40/58 &
-                     $+0.0002$ $[-0.0089, +0.0081]$ \\
-no calibration     & $+0.0002$ $[-0.0037, +0.0047]$ & $-0.0001$ $[-0.0017, +0.0015]$ &
-                     $\mathbf{+0.0085}$ $[+0.0009, +0.0153]$, 6/7 \\
-global             & $+0.0004$ $[-0.0023, +0.0030]$ & $\mathbf{+0.0058}$ $[+0.0036, +0.0081]$, 43/58 &
-                     $+0.0012$ $[-0.0066, +0.0101]$ \\
-degree 2           & $+0.0012$ $[-0.0024, +0.0049]$ & $-0.0009$ $[-0.0027, +0.0007]$ &
-                     $\mathbf{+0.0105}$ $[+0.0035, +0.0171]$, 6/7 \\
-dense map          & $+0.0012$ $[-0.0011, +0.0037]$ & $\mathbf{+0.0058}$ $[+0.0037, +0.0078]$, 47/58 &
-                     $\mathbf{+0.0101}$ $[+0.0016, +0.0167]$, 6/7 \\
-\bottomrule
-\end{tabular}
-\end{table}
-```
-
-**Text.** *"The spatially varying affine model is validated, but at low capacity. A linear field
---- six coefficients against the two of the global model and the $2HW$ of a dense map --- is the
-best of the five on two of the three datasets and is never beaten with an interval excluding zero.
-It beats the global model of Ozyoruk et al.\ on Hamlyn ($+0.0058$ $[+0.0036, +0.0081]$, better in
-43 of 58 blocks), the free per-pixel map of the original submission on Hamlyn ($+0.0058$, 47/58)
-and on C3VD ($+0.0101$ $[+0.0016, +0.0167]$, 6 of 7 scenes), and not calibrating at all on C3VD
-($+0.0085$, 6/7). In the training domain the five are indistinguishable, with all means inside
-0.0012 of one another. The capacity of the field, not the presence of spatial variation, is what
-decides whether the calibration helps: the two ends of the axis --- a single global pair and a
-free per-pixel map --- are both worse than a linear gradient."*
-
-This is the positive answer to Reviewer 2: five comparisons in favour of the low-order field with
-intervals excluding zero, none against it, and the two forms the reviewer named are both on the
-axis as special cases.
-
-**Three rows that are easy to confuse, and must be distinguished in the caption.** *Neither
-component* (0.0593) is the Monodepth2 architecture with no calibration and no invariant loss.
-*No calibration* (0.0599) keeps the invariant loss at $\lambda_1=0.5$ and removes only the
-lighting model — it is the control for the calibration, not a baseline. And the *Monodepth2* row
-of Table~\ref{tab:scared} (0.0933) is the checkpoint released by its authors, trained elsewhere.
-The gap between the first and the third is the training recipe, not the architecture; the gap
-between the first and the second is the invariant loss alone, which is a tie in-domain
-($+0.0006$ $[-0.0021, +0.0037]$) and costs 0.0066 on Hamlyn.
-
-### 6.2 Confirmation on the method's own backbone
-
-Same three-cell design on Depth Anything, where the method's loss configuration is used
-($\lambda_1 = 0.1$ with the highlight-aware term). Within each table the contrast is clean; across
-the two tables the loss configurations differ, so they corroborate rather than pool.
-
-```latex
-\begin{table}[t]
-\centering
-\caption{Photometric calibration models under an otherwise identical recipe. \textbf{All three rows
-are the full method on the Depth Anything backbone and keep the illumination-invariant loss at
-$\lambda_1=0.1$ and the highlight-aware photometric term}; only the calibration changes, which is
-what makes the contrast attributable to it. The first row is therefore \emph{not} a plain
-baseline: the model without any of the three components is EndoDAC, at 0.0517 (Table~\ref{tab:ladder}).
-The paired difference is (variant $-$ local) in Abs Rel per sequence on SCARED, so a negative value
-means the variant is better than the dense map of the original submission.}
-\label{tab:calib-da}
+\caption{Photometric calibration models on the ResNet-18 backbone with the illumination-invariant loss switched off ($\lambda_1=0$) and monodepth2's photometric loss, so that the rows differ only in the calibration model. Upper block: Abs Rel, mean over training seeds ($\pm$ SD across seeds where more than one), best per column in bold and second best underlined. Lower block: paired differences per sequence, signed as (first $-$ second) so that a \textbf{negative} value favours the first; $k/n$ counts the sequences in which the first is better; exact Wilcoxon $p$ for $n=7$; bold marks intervals excluding zero.}
+\label{tab:calib-resnet-lam0}
 \small
 \begin{tabular}{lcccc}
 \toprule
-Calibration model & SCARED & Hamlyn & C3VD & paired vs local (SCARED) \\
+Calibration model & SCARED & Hamlyn & C3VD & seeds \\
 \midrule
-no lighting model        & 0.0518\,$\pm$\,0.0029 & 0.1593 & 0.2658 & $+0.0007$ $[-0.0010, +0.0028]$, 3/7 \\
-global, one $(c,b)$ pair & \textbf{0.0497\,$\pm$\,0.0021} & \textbf{0.1595} & 0.2717 &
-                           $\mathbf{-0.0015}$ $[-0.0032, -0.0005]$, \textbf{0/7}, $p=0.016$ \\
-local, dense map (ours)  & 0.0512\,$\pm$\,0.0014 & 0.1608 & \textbf{0.2679} & --- \\
+no calibration & 0.0593\,$\pm$\,0.0015 & 0.1764\,$\pm$\,0.0070 & 0.3280\,$\pm$\,0.0117 & 3 \\
+global, one $(c,b)$ pair & 0.0609 & \textbf{0.1656} & \underline{0.3277} & 1 \\
+linear field (degree 1) & 0.0587 & 0.1705 & \textbf{0.3246} & 1 \\
+quadratic field (degree 2) & \textbf{0.0576\,$\pm$\,0.0010} & 0.1706\,$\pm$\,0.0066 & 0.3381\,$\pm$\,0.0077 & 3 \\
+dense map (original submission) & \underline{0.0583} & \underline{0.1691} & 0.3493 & 1 \\
+\midrule
+\multicolumn{5}{l}{\emph{paired differences}} \\
+global $-$ none & $+0.0016$ $[-0.0007, +0.0043]$, 2/7, $p=0.375$ & $\mathbf{-0.0108}$ $[-0.0139, -0.0078]$, 49/58 & $-0.0002$ $[-0.0114, +0.0086]$, 3/7, $p=0.688$ & \\
+dense $-$ none & $-0.0010$ $[-0.0043, +0.0024]$, 4/7, $p=0.688$ & $\mathbf{-0.0073}$ $[-0.0099, -0.0048]$, 45/58 & $\mathbf{+0.0214}$ $[+0.0142, +0.0291]$, 0/7, $p=0.016$ & \\
+global $-$ dense & $+0.0026$ $[-0.0014, +0.0068]$, 2/7, $p=0.375$ & $\mathbf{-0.0035}$ $[-0.0055, -0.0015]$, 40/58 & $\mathbf{-0.0216}$ $[-0.0331, -0.0114]$, 7/7, $p=0.016$ & \\
+degree 1 $-$ none & $-0.0006$ $[-0.0033, +0.0020]$, 3/7, $p=0.812$ & $\mathbf{-0.0059}$ $[-0.0075, -0.0043]$, 48/58 & $-0.0034$ $[-0.0169, +0.0082]$, 3/7, $p=1.000$ & \\
+degree 2 $-$ none & $-0.0017$ $[-0.0047, +0.0013]$, 4/7, $p=0.469$ & $\mathbf{-0.0058}$ $[-0.0072, -0.0045]$, 53/58 & $\mathbf{+0.0102}$ $[+0.0052, +0.0158]$, 0/7, $p=0.016$ & \\
 \bottomrule
 \end{tabular}
 \end{table}
 ```
 
-**Text.** *"In the training domain the global two-parameter model is better than the dense map in
-all seven sequences with the interval excluding zero, while the dense map is not distinguishable
-from no calibration at all. Out of domain the two forms tie (Hamlyn $-0.0013$ $[-0.0030, +0.0004]$,
-C3VD $+0.0038$ $[-0.0094, +0.0138]$). We therefore no longer claim that the spatial variation is
-what produces the gain."*
+**Text.** *"With the invariant loss switched off, the three calibration models are indistinguishable in the training domain. Under photometric shift (Hamlyn) calibrating helps in either form --- the global pair by $-0.0108$ $[-0.0139, -0.0078]$ (better in 49 of 58 blocks) and the dense map by $-0.0073$ $[-0.0099, -0.0048]$ (45 of 58) --- and the global form is the better of the two. Under geometric shift (C3VD) the dense map costs $+0.0214$ $[+0.0142, +0.0291]$ against no calibration, worse in every scene, while the global pair is neutral; the global form beats the dense one by $-0.0216$ $[-0.0332, -0.0112]$, 7 of 7 scenes. The ordering is therefore global $>$ none $>$ dense: the global model is the only one of the three that is never worse than the others with an interval excluding zero, and the free per-pixel parameterisation of the original submission is never the best. The linear field behaves like the global one (Hamlyn $-0.0059$ $[-0.0076, -0.0042]$ against no calibration, C3VD a tie), which locates the useful capacity at the low end of the axis."*
 
-**Note on what this table can and cannot contain.** The three cells above share the method's loss
-configuration (invariant loss at $\lambda_1=0.1$ and the highlight-aware photometric term) and
-differ only in the calibration, which is what makes the contrast clean. The polynomial-basis
-family was trained with the calibration alone ($\lambda_1=0$, monodepth2's photometric loss), so
-its rows belong in the capacity table of §7 rather than here; mixing the two would confound the
-calibration with two loss terms.
+### 6.3 The best ResNet-18 model
+
+```latex
+\begin{table}[t]
+\centering
+\caption{Candidates for the best ResNet-18 model of the study. Upper block: Abs Rel, mean over seeds ($\pm$ SD across seeds), best per column in bold and second best underlined. Lower block: paired difference against the plain network (candidate $-$ plain) per sequence, negative meaning the candidate is better; bold marks intervals excluding zero.}
+\label{tab:best-resnet}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Model & SCARED & Hamlyn & C3VD & seeds \\
+\midrule
+plain (Monodepth2 architecture, our recipe) & 0.0593\,$\pm$\,0.0015 & 0.1764\,$\pm$\,0.0070 & 0.3280\,$\pm$\,0.0117 & 3 \\
+MonoII: dense calibration $+$ II ($\lambda_1=0.1$) $+$ highlight term & 0.0593\,$\pm$\,0.0015 & 0.1709\,$\pm$\,0.0087 & \textbf{0.3123\,$\pm$\,0.0168} & 3 \\
+quadratic field, $\lambda_1=0$ & \textbf{0.0576\,$\pm$\,0.0010} & 0.1706\,$\pm$\,0.0066 & 0.3381\,$\pm$\,0.0077 & 3 \\
+linear field, $\lambda_1=0$ & \underline{0.0587} & \underline{0.1705} & \underline{0.3246} & 1 \\
+linear field, $\lambda_1=0.5$ & 0.0596\,$\pm$\,0.0002 & \textbf{0.1700\,$\pm$\,0.0014} & 0.3278\,$\pm$\,0.0101 & 3 \\
+\midrule
+\multicolumn{5}{l}{\emph{paired difference against the plain network}} \\
+MonoII & $-0.0000$ $[-0.0028, +0.0026]$, 4/7, $p=0.938$ & $\mathbf{-0.0055}$ $[-0.0074, -0.0036]$, 42/58 & $\mathbf{-0.0156}$ $[-0.0212, -0.0106]$, 7/7, $p=0.016$ & \\
+quadratic field & $-0.0017$ $[-0.0048, +0.0014]$, 4/7, $p=0.469$ & $\mathbf{-0.0058}$ $[-0.0072, -0.0046]$, 53/58 & $\mathbf{+0.0102}$ $[+0.0053, +0.0156]$, 0/7, $p=0.016$ & \\
+linear field & $-0.0006$ $[-0.0032, +0.0019]$, 3/7, $p=0.812$ & $\mathbf{-0.0059}$ $[-0.0076, -0.0042]$, 48/58 & $-0.0034$ $[-0.0170, +0.0082]$, 3/7, $p=1.000$ & \\
+linear field & $+0.0003$ $[-0.0040, +0.0041]$, 3/7, $p=0.812$ & $\mathbf{-0.0064}$ $[-0.0097, -0.0033]$, 40/58 & $-0.0002$ $[-0.0082, +0.0085]$, 4/7, $p=0.938$ & \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+**Which one is "best" depends on the criterion, and the paper should say which it uses.**
+
+- *Pre-registered rule (in-domain Abs Rel, three seeds):* **`lam-bas-000`**, the quadratic field with no invariant loss, at 0.0576 --- below the 0.058 the submission reports for MonoII. It beats the plain network on Hamlyn ($-0.0058$ $[-0.0071, -0.0045]$, 53/58) but **loses to it on C3VD** ($+0.0102$ $[+0.0053, +0.0157]$, 0/7), so it is the best in-domain model and a worse generaliser.
+- *Never worse than plain, anywhere:* **`R2`**, which is MonoII exactly as the repo trains it (dense calibration, $\lambda_1=0.1$, highlight-aware term). It ties the plain network in-domain ($-0.0000$ $[-0.0027, +0.0026]$) and beats it on both generalisation sets, Hamlyn $-0.0055$ $[-0.0073, -0.0036]$ (42/58) and C3VD $-0.0156$ $[-0.0214, -0.0107]$ (7/7); its C3VD value, 0.3123, is the best of every ResNet-18 run in the study. This is the row to call MonoII in the three-backbone table.
+- *Best calibration-only model:* the linear field (`cal0-deg1`, `bas-res-1`) is the only calibration that never loses to the plain network with an interval excluding zero, in either loss configuration.
+
+The tension between the first two is the study's recurring finding: what wins in-domain (low-capacity polynomial calibration, no invariant loss) is not what wins under geometric shift (the full component set), and the in-domain differences are all inside 0.002.
 
 ---
 
