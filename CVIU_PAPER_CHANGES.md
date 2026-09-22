@@ -524,36 +524,32 @@ and the same with `--illum_calib local` — six jobs at three seeds, a few hours
 
 ### 6.2 None, global or local? ResNet-18 with the invariant loss switched off
 
-The reviewer's question in its plainest form, on the backbone where the full design fits the compute budget. Every row has $\lambda_1 = 0$ and monodepth2's photometric loss, so the only thing that changes is the calibration model; the two polynomial fields are the intermediate points of the same axis. Status: `cal0-glob`, `cal0-deg1` and `cal0-local` are still at **one seed**; rerun `calib_resnet_lam0.py` when their seeds 1 and 2 are predicted.
+The reviewer's question in its plainest form, on the backbone where the full design fits the compute budget, in the format of the submission's Table~2 (SCARED, five metrics). Every row has $\lambda_1 = 0$ and monodepth2's photometric loss, so the only thing that changes is the correction model. "Local" is the best spatially varying variant in-domain, the quadratic polynomial field (`lam-bas-000`, three seeds); the dense per-pixel map of the submission (`cal0-local`) and the linear field (`cal0-deg1`) are within 0.001 of it on SCARED. Status: `cal0-glob`, `cal0-deg1` and `cal0-local` are still at **one seed**; rerun `calib_resnet_lam0.py` when their seeds 1 and 2 are predicted.
 
 ```latex
 \begin{table}[t]
 \centering
-\caption{Photometric calibration models on the ResNet-18 backbone with the illumination-invariant loss switched off ($\lambda_1=0$) and monodepth2's photometric loss, so that the rows differ only in the calibration model. Upper block: Abs Rel, mean over training seeds ($\pm$ SD across seeds where more than one), best per column in bold and second best underlined. Lower block: paired differences per sequence, signed as (first $-$ second) so that a \textbf{negative} value favours the first; $k/n$ counts the sequences in which the first is better; exact Wilcoxon $p$ for $n=7$; bold marks intervals excluding zero.}
+\caption{Illumination correction model on the ResNet-18 backbone, SCARED. All three rows are trained with $\lambda_1=0$ (no illumination-invariant loss) and monodepth2's photometric loss, so they differ only in how $\mathcal{L}_\textrm{PML}$ synthesizes the target image: without correction, with one global affine pair $(c,b)$ per image, or with a spatially varying affine field (the quadratic polynomial field, the best in-domain of the local variants). Metrics are averaged within each of the seven test sequences, then across sequences and training seeds; best in bold, second best underlined. The lower block gives the paired difference in Abs Rel per sequence (first $-$ second, negative favours the first) with its 95\% bootstrap interval, the sequences in which the first is better, and the exact Wilcoxon $p$.}
 \label{tab:calib-resnet-lam0}
 \small
-\begin{tabular}{lcccc}
+\begin{tabular}{lcccccc}
 \toprule
-Calibration model & SCARED & Hamlyn & C3VD & seeds \\
+Correction & $\varepsilon_\textrm{AbsRel}$ ($\downarrow$) & $\varepsilon_\textrm{SqRel}$ ($\downarrow$) & $\varepsilon_\textrm{RMSE}$ ($\downarrow$) & $\varepsilon_\textrm{RMSELog}$ ($\downarrow$) & $\delta_{1.25}$ ($\uparrow$) & seeds \\
 \midrule
-no calibration & 0.0593\,$\pm$\,0.0015 & 0.1764\,$\pm$\,0.0070 & 0.3280\,$\pm$\,0.0117 & 3 \\
-global, one $(c,b)$ pair & 0.0609 & \textbf{0.1656} & \underline{0.3277} & 1 \\
-linear field (degree 1) & 0.0587 & 0.1705 & \textbf{0.3246} & 1 \\
-quadratic field (degree 2) & \textbf{0.0576\,$\pm$\,0.0010} & 0.1706\,$\pm$\,0.0066 & 0.3381\,$\pm$\,0.0077 & 3 \\
-dense map (original submission) & \underline{0.0583} & \underline{0.1691} & 0.3493 & 1 \\
+none & \underline{0.059} & 0.485 & 5.158 & \underline{0.084} & \underline{0.967} & 3 \\
+global & 0.061 & \underline{0.483} & \underline{5.112} & 0.085 & 0.966 & 1 \\
+local (quadratic field) & \textbf{0.058} & \textbf{0.481} & \textbf{5.100} & \textbf{0.083} & \textbf{0.969} & 3 \\
 \midrule
-\multicolumn{5}{l}{\emph{paired differences}} \\
-global $-$ none & $+0.0016$ $[-0.0007, +0.0043]$, 2/7, $p=0.375$ & $\mathbf{-0.0108}$ $[-0.0139, -0.0078]$, 49/58 & $-0.0002$ $[-0.0114, +0.0086]$, 3/7, $p=0.688$ & \\
-dense $-$ none & $-0.0010$ $[-0.0043, +0.0024]$, 4/7, $p=0.688$ & $\mathbf{-0.0073}$ $[-0.0099, -0.0048]$, 45/58 & $\mathbf{+0.0214}$ $[+0.0142, +0.0291]$, 0/7, $p=0.016$ & \\
-global $-$ dense & $+0.0026$ $[-0.0014, +0.0068]$, 2/7, $p=0.375$ & $\mathbf{-0.0035}$ $[-0.0055, -0.0015]$, 40/58 & $\mathbf{-0.0216}$ $[-0.0331, -0.0114]$, 7/7, $p=0.016$ & \\
-degree 1 $-$ none & $-0.0006$ $[-0.0033, +0.0020]$, 3/7, $p=0.812$ & $\mathbf{-0.0059}$ $[-0.0075, -0.0043]$, 48/58 & $-0.0034$ $[-0.0169, +0.0082]$, 3/7, $p=1.000$ & \\
-degree 2 $-$ none & $-0.0017$ $[-0.0047, +0.0013]$, 4/7, $p=0.469$ & $\mathbf{-0.0058}$ $[-0.0072, -0.0045]$, 53/58 & $\mathbf{+0.0102}$ $[+0.0052, +0.0158]$, 0/7, $p=0.016$ & \\
+\multicolumn{7}{l}{\emph{paired difference in Abs Rel, per sequence}} \\
+global $-$ none & \multicolumn{5}{l}{$+0.0016$ $[-0.0007, +0.0043]$, 2/7, $p=0.375$} & \\
+local $-$ none & \multicolumn{5}{l}{$-0.0017$ $[-0.0048, +0.0014]$, 4/7, $p=0.469$} & \\
+global $-$ local & \multicolumn{5}{l}{$+0.0033$ $[-0.0004, +0.0077]$, 3/7, $p=0.219$} & \\
 \bottomrule
 \end{tabular}
 \end{table}
 ```
 
-**Text.** *"With the invariant loss switched off, the three calibration models are indistinguishable in the training domain. Under photometric shift (Hamlyn) calibrating helps in either form --- the global pair by $-0.0108$ $[-0.0139, -0.0078]$ (better in 49 of 58 blocks) and the dense map by $-0.0073$ $[-0.0099, -0.0048]$ (45 of 58) --- and the global form is the better of the two. Under geometric shift (C3VD) the dense map costs $+0.0214$ $[+0.0142, +0.0291]$ against no calibration, worse in every scene, while the global pair is neutral; the global form beats the dense one by $-0.0216$ $[-0.0332, -0.0112]$, 7 of 7 scenes. The ordering is therefore global $>$ none $>$ dense: the global model is the only one of the three that is never worse than the others with an interval excluding zero, and the free per-pixel parameterisation of the original submission is never the best. The linear field behaves like the global one (Hamlyn $-0.0059$ $[-0.0076, -0.0042]$ against no calibration, C3VD a tie), which locates the useful capacity at the low end of the axis."*
+**Text.** *"In the training domain the three correction models cannot be told apart: the paired differences against no correction are $+0.0016$ $[-0.0007, +0.0043]$ for the global pair and $-0.0017$ $[-0.0048, +0.0013]$ for the spatially varying field, and $+0.0033$ $[-0.0004, +0.0077]$ between the two; every interval covers zero and the three means lie within 0.003 of one another. The calibration is therefore not an in-domain accuracy mechanism on this backbone. Where the three separate is under domain shift, reported in Section~7: the global pair is the only one never worse than the others with an interval excluding zero, and the dense per-pixel map of the original submission is the worst under geometric shift."*
 
 ### 6.3 The best ResNet-18 model
 
@@ -574,10 +570,10 @@ linear field, $\lambda_1=0$ & \underline{0.0587} & \underline{0.1705} & \underli
 linear field, $\lambda_1=0.5$ & 0.0596\,$\pm$\,0.0002 & \textbf{0.1700\,$\pm$\,0.0014} & 0.3278\,$\pm$\,0.0101 & 3 \\
 \midrule
 \multicolumn{5}{l}{\emph{paired difference against the plain network}} \\
-MonoII & $-0.0000$ $[-0.0028, +0.0026]$, 4/7, $p=0.938$ & $\mathbf{-0.0055}$ $[-0.0074, -0.0036]$, 42/58 & $\mathbf{-0.0156}$ $[-0.0212, -0.0106]$, 7/7, $p=0.016$ & \\
-quadratic field, $\lambda_1=0$ & $-0.0017$ $[-0.0048, +0.0014]$, 4/7, $p=0.469$ & $\mathbf{-0.0058}$ $[-0.0072, -0.0046]$, 53/58 & $\mathbf{+0.0102}$ $[+0.0053, +0.0156]$, 0/7, $p=0.016$ & \\
-linear field, $\lambda_1=0$ & $-0.0006$ $[-0.0032, +0.0019]$, 3/7, $p=0.812$ & $\mathbf{-0.0059}$ $[-0.0076, -0.0042]$, 48/58 & $-0.0034$ $[-0.0170, +0.0082]$, 3/7, $p=1.000$ & \\
-linear field, $\lambda_1=0.5$ & $+0.0003$ $[-0.0040, +0.0041]$, 3/7, $p=0.812$ & $\mathbf{-0.0064}$ $[-0.0097, -0.0033]$, 40/58 & $-0.0002$ $[-0.0082, +0.0085]$, 4/7, $p=0.938$ & \\
+MonoII & $-0.0000$ $[-0.0027, +0.0026]$, 4/7, $p=0.938$ & $\mathbf{-0.0055}$ $[-0.0073, -0.0036]$, 42/58 & $\mathbf{-0.0156}$ $[-0.0212, -0.0106]$, 7/7, $p=0.016$ & \\
+quadratic field, $\lambda_1=0$ & $-0.0017$ $[-0.0047, +0.0013]$, 4/7, $p=0.469$ & $\mathbf{-0.0058}$ $[-0.0071, -0.0046]$, 53/58 & $\mathbf{+0.0102}$ $[+0.0052, +0.0158]$, 0/7, $p=0.016$ & \\
+linear field, $\lambda_1=0$ & $-0.0006$ $[-0.0032, +0.0019]$, 3/7, $p=0.812$ & $\mathbf{-0.0059}$ $[-0.0076, -0.0043]$, 48/58 & $-0.0034$ $[-0.0169, +0.0084]$, 3/7, $p=1.000$ & \\
+linear field, $\lambda_1=0.5$ & $+0.0003$ $[-0.0039, +0.0041]$, 3/7, $p=0.812$ & $\mathbf{-0.0064}$ $[-0.0098, -0.0033]$, 40/58 & $-0.0002$ $[-0.0079, +0.0086]$, 4/7, $p=0.938$ & \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -585,8 +581,8 @@ linear field, $\lambda_1=0.5$ & $+0.0003$ $[-0.0040, +0.0041]$, 3/7, $p=0.812$ &
 
 **Which one is "best" depends on the criterion, and the paper should say which it uses.**
 
-- *Pre-registered rule (in-domain Abs Rel, three seeds):* **`lam-bas-000`**, the quadratic field with no invariant loss, at 0.0576 --- below the 0.058 the submission reports for MonoII. It beats the plain network on Hamlyn ($-0.0058$ $[-0.0071, -0.0045]$, 53/58) but **loses to it on C3VD** ($+0.0102$ $[+0.0053, +0.0157]$, 0/7), so it is the best in-domain model and a worse generaliser.
-- *Never worse than plain, anywhere:* **`R2`**, which is MonoII exactly as the repo trains it (dense calibration, $\lambda_1=0.1$, highlight-aware term). It ties the plain network in-domain ($-0.0000$ $[-0.0027, +0.0026]$) and beats it on both generalisation sets, Hamlyn $-0.0055$ $[-0.0073, -0.0036]$ (42/58) and C3VD $-0.0156$ $[-0.0214, -0.0107]$ (7/7); its C3VD value, 0.3123, is the best of every ResNet-18 run in the study. This is the row to call MonoII in the three-backbone table.
+- *Pre-registered rule (in-domain Abs Rel, three seeds):* **`lam-bas-000`**, the quadratic field with no invariant loss, at 0.0576 --- below the 0.058 the submission reports for MonoII. It beats the plain network on Hamlyn ($-0.0058$ $[-0.0071, -0.0045]$, 53/58) but **loses to it on C3VD** ($+0.0102$ $[+0.0053, +0.0158]$, 0/7), so it is the best in-domain model and a worse generaliser.
+- *Never worse than plain, anywhere:* **`R2`**, which is MonoII exactly as the repo trains it (dense calibration, $\lambda_1=0.1$, highlight-aware term). It ties the plain network in-domain ($-0.0000$ $[-0.0026, +0.0026]$) and beats it on both generalisation sets, Hamlyn $-0.0055$ $[-0.0073, -0.0036]$ (42/58) and C3VD $-0.0156$ $[-0.0212, -0.0106]$ (7/7); its C3VD value, 0.3123, is the best of every ResNet-18 run in the study. This is the row to call MonoII in the three-backbone table.
 - *Best calibration-only model:* the linear field (`cal0-deg1`, `bas-res-1`) is the only calibration that never loses to the plain network with an interval excluding zero, in either loss configuration.
 
 The tension between the first two is the study's recurring finding: what wins in-domain (low-capacity polynomial calibration, no invariant loss) is not what wins under geometric shift (the full component set), and the in-domain differences are all inside 0.002.
