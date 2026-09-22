@@ -32,8 +32,17 @@ where MonoIIF beats a retrained EndoDAC by 0.0250 in 7 of 7 C3VD scenes.
 
 ## 2. §2.1.3 — the illumination-invariant descriptor
 
-**2.1 — "eight Robinson kernels" → "four".** The remaining four are the exact negatives of the
-first four and add no information; the code uses four.
+**2.1 — Eight Robinson kernels: keep the text, the code now matches it.** During the revision the
+descriptor was reduced to four kernels, since kernels 5–8 are the exact negatives of 1–4; it has
+been restored to the eight directions the paper describes (`utils/layers.py`,
+`get_illumination_invariant_features`). The two are loss-equivalent under the L2 comparator: the
+eight-direction descriptor equals $[u_4, -u_4]/\sqrt{2}$, so $\|u_p - u_t\|^2$ is identical
+(verified to $10^{-7}$), and every trained model in the study optimised the same objective. Under
+the SSIM comparator of Eqs.~(14)–(15) the per-channel scaling changes the loss value slightly
+(−2.4\% in a synthetic check, because SSIM's constants are fixed); this touches only the SSIM
+ablation rows and is well inside the weight sensitivity measured in §9. Add one sentence to
+§2.1.3 saying that the responses come in opposite pairs and the descriptor is normalised over all
+eight, so the L2 distance is that of the four independent directions.
 
 **2.2 — Delete the promised comparison.** The sentence *"a quantitative comparison under an
 identical training framework is given in Section 3.4"* (Robinson vs Sobel, Scharr, Census) refers

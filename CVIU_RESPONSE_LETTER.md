@@ -253,8 +253,12 @@ because a reader checking our released code would find them.
   This is the component worth 47% of the improvement in the R3 table, so the attribution matters.
 - **λ₁ = 0.1, not 0.5.** The text describes λ₁ = 0.5; the released code defaults to 0.1 and the
   published numbers were produced with 0.1.
-- **The invariant loss uses four Robinson kernels, not eight.** The remaining four are the exact
-  negatives of the first four and carry no additional information.
+- **The eight Robinson kernels come in opposite pairs.** Kernels 5–8 are the negatives of 1–4, so
+  the descriptor holds each direction twice and, normalised over the eight, equals the
+  four-direction descriptor scaled by $1/\sqrt{2}$ in each half; the L2 distance between two
+  descriptors is therefore that of the four independent directions. The released code keeps the
+  eight directions the paper describes; the two forms optimise the same objective (verified to
+  $10^{-7}$), and we state the pairing in §2.1.3 rather than leave the redundancy implicit.
 - **The descriptor comparator is L2, not SSIM.** Every number in the paper was produced with the
   L2 comparator; the SSIM form of Eqs. (14)–(15) is reported as an ablation, which ties in-domain.
 - **The MonoIIT row does not contain the method.** The MonoViT-based variant was trained in a

@@ -551,20 +551,23 @@ def get_texu_mask(non_rigid, rigid):
     return texu_mask
 
 def get_illumination_invariant_features(img, eps=1e-4):
-    """Illumination-invariant descriptor: unit-norm Robinson compass responses.
+    """Illumination-invariant descriptor: unit-norm responses of the eight Robinson compass kernels.
 
-    Only four of the eight Robinson kernels are used -- the other four are
-    their exact negatives and carry no extra information. The norm uses an
-    additive floor (not a clamp) so the descriptor decays smoothly to zero on
-    textureless pixels instead of amplifying noise to unit length.
+    Kernels 5-8 are the negatives of kernels 1-4, so the eight responses hold each
+    direction twice and the descriptor is [u, -u] / sqrt(2) of the four-direction
+    one. With the L2 comparator of get_illumination_invariant_l2() the two give
+    the *same* loss, so the eight directions the paper describes are kept here
+    without changing what any trained model optimised. The norm uses an additive
+    floor (not a clamp) so the descriptor decays smoothly to zero on textureless
+    pixels instead of amplifying noise to unit length.
 
     Args:
         img : (B,C,H,W) image; converted to grayscale if C != 1
-        eps : additive floor on the squared norm; gates pixels whose gradient
-              energy is below ~sqrt(eps)
+        eps : additive floor on the squared norm of the four independent
+              directions; gates pixels whose gradient energy is below ~sqrt(eps)
 
     Returns:
-        u : (B,4,H,W) descriptor, ||u|| -> 1 on texture, -> 0 on flat regions.
+        u : (B,8,H,W) descriptor, ||u|| -> 1 on texture, -> 0 on flat regions.
             Invariant to I -> c*I + b (c > 0) exactly, and to smooth
             spatially-varying / monotone tone changes to first order.
     """
@@ -575,17 +578,23 @@ def get_illumination_invariant_features(img, eps=1e-4):
     else:
         img_gray = img
 
-    # Robinson compass kernels; each sums to zero (additive invariance)
+    # Robinson compass kernels, the eight directions; each sums to zero (additive invariance)
     K = torch.tensor([
         [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
         [[0, 1, 2], [-1, 0, 1], [-2, -1, 0]],
         [[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
         [[2, 1, 0], [1, 0, -1], [0, -1, -2]],
-    ], dtype=img_gray.dtype, device=img_gray.device).unsqueeze(1)  # (4,1,3,3)
+        [[1, 0, -1], [2, 0, -2], [1, 0, -1]],
+        [[0, -1, -2], [1, 0, -1], [2, 1, 0]],
+        [[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
+        [[-2, -1, 0], [-1, 0, 1], [0, 1, 2]],
+    ], dtype=img_gray.dtype, device=img_gray.device).unsqueeze(1)  # (8,1,3,3)
 
     # replicate-pad (not zero-pad) so a flat image gives exactly zero at the border
-    r = F.conv2d(F.pad(img_gray, (1, 1, 1, 1), mode="replicate"), K)  # (B,4,H,W)
-    norm = torch.sqrt((r * r).sum(1, keepdim=True) + eps)  # multiplicative invariance
+    r = F.conv2d(F.pad(img_gray, (1, 1, 1, 1), mode="replicate"), K)  # (B,8,H,W)
+    # the eight responses carry twice the energy of the four independent directions, so the
+    # floor is doubled: same texture gate as before, and u8 == [u4, -u4] / sqrt(2) exactly
+    norm = torch.sqrt((r * r).sum(1, keepdim=True) + 2.0 * eps)  # multiplicative invariance
     return r / norm
 
 
