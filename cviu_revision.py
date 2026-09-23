@@ -1231,6 +1231,7 @@ def stage_predict(cfg, args):
             print("[predict] cannot load {}: {}".format(method, e))
             continue
         for ds in todo:
+            cap = args.max_depth if args.max_depth is not None else MAX_DEPTH[ds]
             rows, disps, n_skipped = [], [], 0
             for i, color, seq, frame, gt in iterate_dataset(cfg, ds):
                 t0 = time.time()
@@ -1242,7 +1243,7 @@ def stage_predict(cfg, args):
                 ms = (time.time() - t0) * 1000.0
                 if cfg["save_pred"] and pred[0] != "npy":
                     disps.append(p.astype(np.float16))
-                m, ratio = evaluate_prediction(p, pred[2], pred[3], gt, MAX_DEPTH[ds])
+                m, ratio = evaluate_prediction(p, pred[2], pred[3], gt, cap)
                 if m is None:
                     n_skipped += 1
                     continue
@@ -1250,6 +1251,13 @@ def stage_predict(cfg, args):
                        "ratio": ratio, "infer_ms": ms, "git": g}
                 row.update(m)
                 rows.append(row)
+            if args.max_depth is not None:  # diagnostic run: report, write nothing
+                mean = {k: float(np.mean([r[k] for r in rows])) for k in METRICS} if rows else {}
+                print("[predict] {:<20} {:<7} cap={:g}  frames={:<5} abs_rel={:.4f} rmse={:.3f} a1={:.4f}"
+                      " (NOT written to per_frame.csv)".format(
+                          method, ds, cap, len(rows), mean.get("abs_rel", float("nan")),
+                          mean.get("rmse", float("nan")), mean.get("a1", float("nan"))))
+                continue
             if args.force:  # drop stale rows of this (method, seed, dataset) before appending
                 keep = [r for r in read_csv(per_frame)
                         if not (r["method"] == method and r["seed"] == str(seed) and r["dataset"] == ds)]
@@ -2658,6 +2666,10 @@ def main():
     ap.add_argument("--skip_preflight", action="store_true", help="train: launch even if the pre-flight checks fail")
     ap.add_argument("--use_busy_gpus", action="store_true", help="train: also use GPUs that already hold memory")
     ap.add_argument("--force", action="store_true", help="redo work whose outputs exist")
+    ap.add_argument("--max_depth", type=float, default=None,
+                    help="predict: override the evaluation depth cap of the selected datasets. "
+                         "Diagnostic only -- the metrics are printed and nothing is written to "
+                         "per_frame.csv, so the stored results keep the caps of MAX_DEPTH")
     ap.add_argument("--all_seeds", action="store_true", help="illum-params: every seed of the run")
     ap.add_argument("--cpu", action="store_true")
     args = ap.parse_args()
