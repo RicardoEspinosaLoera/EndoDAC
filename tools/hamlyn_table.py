@@ -130,7 +130,7 @@ def main():
         heads = [u.replace("trans_", "").replace("dataset", "d").replace("/keyframe", "k") for u in units]
         print(r"\begin{tabular}{l%sc}" % ("c" * len(units)))
         print(r"\toprule")
-        print("Method & " + " & ".join(heads) + r" & mean \\\\")
+        print("Method & " + " & ".join(heads) + " & mean \\\\")
         print(r"\midrule")
         cols = []
         for u in units:
