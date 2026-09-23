@@ -75,8 +75,23 @@ class HamlynDataset(data.Dataset):
         
         self.long_rectified_files = ["rectified14", "rectified14", "rectified14", "rectified14"]
         self.scans = []
-        self.rectified_files = [os.path.join(self.data_path, file) for file in os.listdir(self.data_path)]
-        self.rectified_files.sort()
+        # Only directories: a stray archive (e.g. rectified14.zip) sitting next to the sequences
+        # used to enter this list, and int(path[-2:]) on it would raise. Some sequences are
+        # extracted one level deeper (rectified06/rectified06/image01/...), so descend when
+        # image01 is not directly inside; without this they hold no scan and vanish silently.
+        self.rectified_files = []
+        for entry in sorted(os.listdir(self.data_path)):
+            d = os.path.join(self.data_path, entry)
+            if not os.path.isdir(d):
+                continue
+            if not os.path.isdir(os.path.join(d, "image01")):
+                nested = os.path.join(d, entry)
+                if os.path.isdir(os.path.join(nested, "image01")):
+                    d = nested
+                else:
+                    print("[hamlyn] {} has no image01 directory, skipped".format(entry))
+                    continue
+            self.rectified_files.append(d)
         self.long_rectified_files = self.rectified_files[7:]
         self.sequence_len = np.zeros([len(self.rectified_files)])
         for i, rectified_file in enumerate(self.rectified_files):
