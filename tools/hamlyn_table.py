@@ -68,12 +68,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default="results/cviu/per_frame.csv")
     ap.add_argument("--ref", default="C1", help="run standing for MonoIIF")
+    ap.add_argument("--dataset", default="hamlyn", choices=["hamlyn", "c3vd", "scared"])
+    ap.add_argument("--per_sequence", action="store_true",
+                    help="also print one column per unit (sequence or block) for every method")
     ap.add_argument("--block", type=int, default=100)
     ap.add_argument("--boot", type=int, default=10000)
     a = ap.parse_args()
 
     wanted = {a.ref} | {m for m, _ in METHODS}
-    by, unit, nseq = per_unit(load(a.csv, "hamlyn", wanted), a.block)
+    by, unit, nseq = per_unit(load(a.csv, a.dataset, wanted), a.block)
+    label = {"hamlyn": "Hamlyn", "c3vd": "C3VD", "scared": "SCARED"}[a.dataset]
     missing = [m for m in wanted if m not in by]
     if missing:
         print("%% missing from the csv, skipped: " + ", ".join(sorted(missing)))
@@ -108,14 +112,36 @@ def main():
     rows.sort(key=lambda t: t[0])
 
     n = len(next(iter(by.values())))
-    print("%% Hamlyn: %d sequence(s), unit = %s, n = %d, reference = %s" % (nseq, unit, n, a.ref))
-    print(r"\multirow{%d}{*}{Hamlyn}" % len(rows))
+    print("%% %s: %d sequence(s), unit = %s, n = %d, reference = %s" % (label, nseq, unit, n, a.ref))
+    print(r"\multirow{%d}{*}{%s}" % (len(rows), label))
     for i, (_, lab, val, ci, pair, kn, p) in enumerate(rows):
         val = (r"\textbf{%s}" % val) if i == 0 else ((r"\underline{%s}" % val) if i == 1 else val)
         if pair is None:
             print(" & %-18s & %-37s & %-39s & %-5s & %-5s \\\\" % (lab, val + " " + ci, "---", "---", "---"))
         else:
             print(" & %-18s & %-37s & %-39s & %-5s & %-5s \\\\" % (lab, val + " " + ci, pair, kn, p))
+
+    if a.per_sequence:
+        units = sorted(ref)
+        order = [(a.ref, "MonoIIF (proposed)")] + [(m, lab) for m, lab in METHODS if m in by]
+        order.sort(key=lambda t: np.mean([by[t[0]][u] for u in units if u in by[t[0]]]))
+        print()
+        print("%% per-unit Abs Rel (best per column in bold, second underlined)")
+        heads = [u.replace("trans_", "").replace("dataset", "d").replace("/keyframe", "k") for u in units]
+        print(r"\begin{tabular}{l%sc}" % ("c" * len(units)))
+        print(r"\toprule")
+        print("Method & " + " & ".join(heads) + r" & mean \\\\")
+        print(r"\midrule")
+        cols = []
+        for u in units:
+            vals = [by[m][u] for m, _ in order]
+            o = np.argsort(vals)
+            cols.append({int(o[0]): r"\textbf{%s}", int(o[1]): r"\underline{%s}"})
+        for i, (m, lab) in enumerate(order):
+            cells = [cols[j].get(i, "%s") % ("%.4f" % by[m][u]) for j, u in enumerate(units)]
+            print("%s & %s & %.4f \\\\" % (lab, " & ".join(cells), np.mean([by[m][u] for u in units])))
+        print(r"\bottomrule")
+        print(r"\end{tabular}")
 
 
 if __name__ == "__main__":
