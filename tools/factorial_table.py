@@ -21,13 +21,18 @@ from hamlyn_table import load, per_unit, wilcoxon  # noqa: E402
 
 # (C, I, H) -> run
 DESIGNS = {
-    "deg2": {(0, 0, 0): "E3", (0, 0, 1): "E6", (0, 1, 0): "f8-ii", (0, 1, 1): "f8-ii-hl",
-             (1, 0, 0): "da-bas-2", (1, 0, 1): "f8-cal-hl", (1, 1, 0): "f8-cal-ii", (1, 1, 1): "f8-full"},
+    # all eight cells trained from scratch in one launch, the II cells with eight directions
+    "deg2": {(0, 0, 0): "f8-base", (0, 0, 1): "f8-hl", (0, 1, 0): "f8-ii", (0, 1, 1): "f8-ii-hl",
+             (1, 0, 0): "f8-cal", (1, 0, 1): "f8-cal-hl", (1, 1, 0): "f8-cal-ii", (1, 1, 1): "f8-full"},
+    # the same design reusing the older lambda1 = 0 runs
+    "deg2-reuse": {(0, 0, 0): "E3", (0, 0, 1): "E6", (0, 1, 0): "f8-ii", (0, 1, 1): "f8-ii-hl",
+                   (1, 0, 0): "da-bas-2", (1, 0, 1): "f8-cal-hl", (1, 1, 0): "f8-cal-ii", (1, 1, 1): "f8-full"},
     "local": {(0, 0, 0): "E3", (0, 0, 1): "E6", (0, 1, 0): "E5", (0, 1, 1): "C0",
               (1, 0, 0): "E4", (1, 0, 1): "E8-IIF", (1, 1, 0): "E7", (1, 1, 1): "E8"},
 }
-CALIB = {"deg2": "basis, degree 2", "local": "dense map"}
-DIRECTIONS = {"deg2": "eight", "local": "four"}  # Robinson directions the II cells were trained with
+CALIB = {"deg2": "basis, degree 2", "deg2-reuse": "basis, degree 2", "local": "dense map"}
+# Robinson directions the II cells were trained with
+DIRECTIONS = {"deg2": "eight", "deg2-reuse": "eight", "local": "four"}
 REFS = [("E3", "EndoDAC (retrained)"), ("C1", "global calib. + II + highlight"),
         ("E8-IIF", "dense calib. + highlight, no II"), ("HADepth", "HADepth"),
         ("EndoDAC_MICCAI", "EndoDAC (released)")]

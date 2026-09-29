@@ -105,6 +105,7 @@ DEFAULT_CONFIG = {
                   "MonoIIT-repro", "MonoIIT-base", "MonoIIT-components",
                   "cal0-glob", "cal0-deg1", "cal0-local",
                   "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
+                  "f8-base", "f8-hl", "f8-cal",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -322,6 +323,14 @@ GRID = {
                   "flags": "--illum_calib basis --illum_basis_degree 2 --photometric standard"},
     "f8-full": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 + II loss (0.1, 8 dir.) + highlight",
                 "flags": "--illum_calib basis --illum_basis_degree 2"},
+    # the three lambda1 = 0 cells, retrained so that all eight cells come from one commit and one
+    # launch (E3, E6 and da-bas-2 are the same recipes, trained weeks earlier with older code)
+    "f8-base": {"group": "f8", "desc": "EndoDAC: no calibration, no II loss, standard photometric (= E3)",
+                "flags": "--illum_calib none --illumination_invariant 0 --photometric standard"},
+    "f8-hl": {"group": "f8", "desc": "EndoDAC + highlight term only (= E6)",
+              "flags": "--illum_calib none --illumination_invariant 0"},
+    "f8-cal": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 only (= da-bas-2)",
+               "flags": "--illum_calib basis --illum_basis_degree 2 --illumination_invariant 0 --photometric standard"},
     # optional: the full cell at the batch size the paper states (12, against the grid's 8), the most
     # likely reason the submitted checkpoint reaches 0.0499 on SCARED while the retrains stay above
     "f8-full-b12": {"group": "f8", "desc": "f8-full at batch size 12",
