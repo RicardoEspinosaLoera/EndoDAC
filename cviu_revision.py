@@ -59,7 +59,10 @@ METRICS = ["abs_rel", "sq_rel", "rmse", "rmse_log", "a1", "a2", "a3"]
 LOWER_IS_BETTER = {"abs_rel": True, "sq_rel": True, "rmse": True, "rmse_log": True,
                    "a1": False, "a2": False, "a3": False}
 MIN_DEPTH = 1e-3
-MAX_DEPTH = {"scared": 150.0, "hamlyn": 150.0, "c3vd": 100.0}
+# Hamlyn at 200 mm: with all four sequences loaded, 150 mm discarded 20.7% of rectified06's valid
+# ground truth (median 120 mm) while clipping <0.2% of the other three. C3VD's ground truth is
+# clamped to 100 mm by the dataset itself, so its cap removes nothing.
+MAX_DEPTH = {"scared": 150.0, "hamlyn": 200.0, "c3vd": 100.0}
 H, W = 256, 320            # training / evaluation resolution of the repo
 DEPTH_RANGE = (0.1, 150.0)  # --min_depth / --max_depth defaults of options.py
 
@@ -101,6 +104,7 @@ DEFAULT_CONFIG = {
                   "lam-ssim-010", "lam-ssim-025", "lam-ssim-100", "lam-ssim-200",
                   "MonoIIT-repro", "MonoIIT-base", "MonoIIT-components",
                   "cal0-glob", "cal0-deg1", "cal0-local",
+                  "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -302,6 +306,26 @@ GRID = {
     "cal0-local": {"group": "cal0", "desc": "ResNet-18, dense local calibration only (lambda1=0)",
                    "flags": "--depth_backbone resnet18 --photometric standard "
                             "--illumination_invariant 0 --illum_calib local"},
+    # 2x2x2 factorial on the EndoDAC backbone (DA v1 + DV-LoRA + neck): calibration {none, basis
+    # degree 2} x II loss {0, 0.1} x photometric {standard, highlight}. Every cell with the II loss
+    # is trained here with the eight-direction Robinson descriptor restored on 2026-09-22, so that
+    # the paper's "eight directions" is literally true of the numbers (f8-ii and f8-ii-hl retrain
+    # E5 and C0, which used four; the two are L2-equivalent, so they double as a check of that).
+    # The lambda1 = 0 cells never compute the II loss, so E3, E6 and da-bas-2 are reused as they are.
+    "f8-ii": {"group": "f8", "desc": "EndoDAC + II loss (0.1, 8 dir.), no calibration, standard photometric",
+              "flags": "--illum_calib none --photometric standard"},
+    "f8-ii-hl": {"group": "f8", "desc": "EndoDAC + II loss (0.1, 8 dir.) + highlight, no calibration",
+                 "flags": "--illum_calib none"},
+    "f8-cal-hl": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 + highlight, no II loss",
+                  "flags": "--illum_calib basis --illum_basis_degree 2 --illumination_invariant 0"},
+    "f8-cal-ii": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 + II loss (0.1, 8 dir.), standard photometric",
+                  "flags": "--illum_calib basis --illum_basis_degree 2 --photometric standard"},
+    "f8-full": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 + II loss (0.1, 8 dir.) + highlight",
+                "flags": "--illum_calib basis --illum_basis_degree 2"},
+    # optional: the full cell at the batch size the paper states (12, against the grid's 8), the most
+    # likely reason the submitted checkpoint reaches 0.0499 on SCARED while the retrains stay above
+    "f8-full-b12": {"group": "f8", "desc": "f8-full at batch size 12",
+                    "flags": "--illum_calib basis --illum_basis_degree 2 --batch_size 12"},
     "cal0-deg1": {"group": "cal0", "desc": "ResNet-18, degree-1 basis calibration only (lambda1=0)",
                   "flags": "--depth_backbone resnet18 --photometric standard "
                            "--illumination_invariant 0 --illum_calib basis --illum_basis_degree 1"},
@@ -525,6 +549,32 @@ def all_runs(cfg):
     for name in cfg["train"].get("skip_runs") or []:
         runs.pop(name, None)
     return runs
+
+
+class _csv_lock(object):
+    """Exclusive lock on <path>.lock for the read-modify-write of a results csv. Two predict stages
+    running at once used to read the csv, drop their own stale rows and write it back from a stale
+    copy, deleting each other's rows. POSIX only; a no-op where fcntl is missing (Windows)."""
+
+    def __init__(self, path):
+        self.path = path + ".lock"
+        self.f = None
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:
+            return self
+        self.f = open(self.path, "w")
+        fcntl.flock(self.f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        if self.f is not None:
+            import fcntl
+            fcntl.flock(self.f, fcntl.LOCK_UN)
+            self.f.close()
+        return False
 
 
 def run_seeds(cfg, run):
@@ -1258,11 +1308,12 @@ def stage_predict(cfg, args):
                           method, ds, cap, len(rows), mean.get("abs_rel", float("nan")),
                           mean.get("rmse", float("nan")), mean.get("a1", float("nan"))))
                 continue
-            if args.force:  # drop stale rows of this (method, seed, dataset) before appending
-                keep = [r for r in read_csv(per_frame)
-                        if not (r["method"] == method and r["seed"] == str(seed) and r["dataset"] == ds)]
-                write_csv(per_frame, keep, fields)
-            append_rows(per_frame, rows, fields)
+            with _csv_lock(per_frame):  # concurrent predicts on different methods no longer clobber each other
+                if args.force:  # drop stale rows of this (method, seed, dataset) before appending
+                    keep = [r for r in read_csv(per_frame)
+                            if not (r["method"] == method and r["seed"] == str(seed) and r["dataset"] == ds)]
+                    write_csv(per_frame, keep, fields)
+                append_rows(per_frame, rows, fields)
             if disps:
                 np.save(out_path(cfg, "pred", "{}_s{}_{}.npy".format(method, seed, ds)), np.stack(disps))
             mean = {k: float(np.mean([r[k] for r in rows])) for k in METRICS} if rows else {k: float("nan") for k in METRICS}
