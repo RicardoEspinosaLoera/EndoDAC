@@ -27,6 +27,7 @@ DESIGNS = {
               (1, 0, 0): "E4", (1, 0, 1): "E8-IIF", (1, 1, 0): "E7", (1, 1, 1): "E8"},
 }
 CALIB = {"deg2": "basis, degree 2", "local": "dense map"}
+DIRECTIONS = {"deg2": "eight", "local": "four"}  # Robinson directions the II cells were trained with
 REFS = [("E3", "EndoDAC (retrained)"), ("C1", "global calib. + II + highlight"),
         ("E8-IIF", "dense calib. + highlight, no II"), ("HADepth", "HADepth"),
         ("EndoDAC_MICCAI", "EndoDAC (released)")]
@@ -92,10 +93,10 @@ def main():
     print(r"\centering")
     print(r"\caption{Factorial ablation of the photometric components on the EndoDAC backbone "
           r"(Depth~Anything v1 $+$ DV-LoRA $+$ convolutional neck): illumination calibration (%s), "
-          r"illumination-invariant loss $\mathcal{L}_\textrm{II}$ ($\lambda_1=0.1$, eight Robinson "
+          r"illumination-invariant loss $\mathcal{L}_\textrm{II}$ ($\lambda_1=0.1$, %s Robinson "
           r"directions) and the highlight-aware photometric term. Abs Rel averaged within each test "
           r"sequence, then across sequences and training seeds; best per column in bold, second "
-          r"underlined.}" % CALIB[a.design])
+          r"underlined.}" % (CALIB[a.design], DIRECTIONS[a.design]))
     print(r"\label{tab:factorial-%s}" % a.design)
     print(r"\small")
     print(r"\begin{tabular}{ccc%sc}" % ("c" * len(results)))
@@ -179,11 +180,14 @@ def main():
                 cols.append("n/a")
                 continue
             u = [x for x in units if x in by[m]]
+            if len(u) < len(units):
+                cols.append("n/a (reference evaluated on %d of %d units)" % (len(u), len(units)))
+                continue
             full = np.array([by[cells[(1, 1, 1)]][x] for x in u])
             ref = np.array([by[m][x] for x in u])
             cols.append(fmt(full - ref, len(u)))
         print("%%   vs %-34s %s" % (lab, "  |  ".join(cols)))
-    print("%% units: " + "; ".join("%s = %s, n = %d" % (results[d]["label"], results[d]["unit"], results[d]["n"])
+    print("% units: " + "; ".join("%s = %s, n = %d" % (results[d]["label"], results[d]["unit"], results[d]["n"])
                                    for d in results))
 
 
