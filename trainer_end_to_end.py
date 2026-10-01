@@ -396,20 +396,34 @@ class Trainer:
             self.models["intrinsics_head"].eval()
 
 
+    def _iif_descriptors(self, img):
+        """Descriptors of img at every pooling factor of --iif_scales (a list, one per scale)."""
+        out = []
+        for k in getattr(self.opt, "iif_scales", [1]):
+            x = img if k == 1 else F.avg_pool2d(img, k)
+            out.append(get_illumination_invariant_features(x, eps=self.opt.iif_eps))
+        return out
+
     def get_illumination_invariant_loss(self, pred, target=None, features_t=None):
         """Illumination-invariant loss on Robinson descriptors, (B,1,H,W) in [0,1].
 
-        `features_t` lets the caller pass a precomputed target descriptor so it
-        is not recomputed for every scale / frame.
+        `features_t` lets the caller pass the precomputed target descriptors (the list returned
+        by _iif_descriptors) so they are not recomputed for every scale / frame. With several
+        --iif_scales the per-scale loss maps are upsampled to full resolution and averaged.
         """
-        features_p = get_illumination_invariant_features(pred, eps=self.opt.iif_eps)
         if features_t is None:
-            features_t = get_illumination_invariant_features(target, eps=self.opt.iif_eps)
-
-        if self.opt.iif_loss == "l2":
-            return get_illumination_invariant_l2(features_p, features_t)
-        # "ssim": kept as an ablation; its ratio form is concave in the descriptor error
-        return self.iif_ssim(features_p, features_t).mean(1, True)
+            features_t = self._iif_descriptors(target)
+        features_p = self._iif_descriptors(pred)
+        total = 0
+        for fp, ft in zip(features_p, features_t):
+            if self.opt.iif_loss == "l2":
+                d = get_illumination_invariant_l2(fp, ft)
+            else:  # "ssim": kept as an ablation; its ratio form is concave in the descriptor error
+                d = self.iif_ssim(fp, ft).mean(1, True)
+            if d.shape[-2:] != pred.shape[-2:]:
+                d = F.interpolate(d, size=pred.shape[-2:], mode="bilinear", align_corners=False)
+            total = total + d
+        return total / len(features_p)
 
     def get_highlight_mask(self, image):
         """
@@ -716,8 +730,11 @@ class Trainer:
 
         use_iif = self.opt.illumination_invariant > 0
         # target is the same for every scale / frame: compute its descriptor once
-        features_t = get_illumination_invariant_features(
-            inputs[("color", 0, 0)], eps=self.opt.iif_eps) if use_iif else None
+        features_t = self._iif_descriptors(inputs[("color", 0, 0)]) if use_iif else None
+        # weight of the photometric term: 1 during the warm-up, --photometric_weight afterwards
+        w_photo = getattr(self.opt, "photometric_weight", 1.0)
+        if self.epoch < getattr(self.opt, "photometric_warmup_epochs", 0):
+            w_photo = 1.0
 
 
         for scale in self.opt.scales:
@@ -780,7 +797,7 @@ class Trainer:
                         blur=getattr(light, "_gaussian_blur_depthwise", None))
  
             
-            loss += loss_reprojection / 2.0
+            loss += w_photo * loss_reprojection / 2.0
             loss += self.opt.illumination_invariant * loss_ilumination_invariant / 2.0
             if self.opt.calib_supervision > 0:
                 loss += self.opt.calib_supervision * loss_calib / 2.0

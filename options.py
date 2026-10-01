@@ -274,6 +274,25 @@ class MonodepthOptions:
                                  type=float,
                                  help="additive floor on the descriptor norm; gates textureless pixels",
                                  default=1e-4)
+        self.parser.add_argument("--iif_scales",
+                                 nargs="+",
+                                 type=int,
+                                 default=[1],
+                                 help="pooling factors at which the illumination invariant descriptor "
+                                      "is computed; [1] is the single-scale 3x3 descriptor, [1, 2, 4] "
+                                      "adds effective supports of 6 and 12 px, which widens the basin "
+                                      "of convergence when the II loss has to supervise on its own")
+        self.parser.add_argument("--photometric_weight",
+                                 type=float,
+                                 default=1.0,
+                                 help="weight of the photometric loss L_PML; 0 trains on the "
+                                      "illumination invariant loss alone (the automask is still "
+                                      "computed from the photometric error, without gradient)")
+        self.parser.add_argument("--photometric_warmup_epochs",
+                                 type=int,
+                                 default=0,
+                                 help="epochs trained with photometric weight 1 before "
+                                      "--photometric_weight applies")
 
         # EVALUATION options
         self.parser.add_argument("--save_recon",

@@ -106,6 +106,7 @@ DEFAULT_CONFIG = {
                   "cal0-glob", "cal0-deg1", "cal0-local",
                   "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
                   "f8-base", "f8-hl", "f8-cal",
+                  "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -331,6 +332,22 @@ GRID = {
               "flags": "--illum_calib none --illumination_invariant 0"},
     "f8-cal": {"group": "f8", "desc": "EndoDAC + basis calibration deg 2 only (= da-bas-2)",
                "flags": "--illum_calib basis --illum_basis_degree 2 --illumination_invariant 0 --photometric standard"},
+    # Can the II loss replace the photometric loss? EndoDAC backbone, no calibration, standard
+    # photometric term; the reference with the photometric loss alone is f8-base. `ii-only` drops
+    # L_PML altogether (ablation line 1 of the submission, there on ResNet-18 at lambda1 = 1);
+    # `-ms` computes the descriptor at pooling factors 1, 2, 4 to widen its basin of convergence;
+    # `-warm` trains the first 5 epochs with L_PML and then switches it off.
+    "ii-only": {"group": "ii-only", "desc": "EndoDAC, II loss alone (lambda1=1, 8 dir.), no photometric loss",
+                "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
+                         "--photometric_weight 0"},
+    "ii-only-ms": {"group": "ii-only", "desc": "II loss alone, descriptor at scales 1/2/4",
+                   "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
+                            "--photometric_weight 0 --iif_scales 1 2 4"},
+    "ii-only-ms-warm": {"group": "ii-only", "desc": "II loss alone at scales 1/2/4 after 5 photometric epochs",
+                        "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
+                                 "--photometric_weight 0 --iif_scales 1 2 4 --photometric_warmup_epochs 5"},
+    "ii-ms": {"group": "ii-only", "desc": "photometric + multi-scale II loss (0.1)",
+              "flags": "--illum_calib none --photometric standard --iif_scales 1 2 4"},
     # optional: the full cell at the batch size the paper states (12, against the grid's 8), the most
     # likely reason the submitted checkpoint reaches 0.0499 on SCARED while the retrains stay above
     "f8-full-b12": {"group": "f8", "desc": "f8-full at batch size 12",
