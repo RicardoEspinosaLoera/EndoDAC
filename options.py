@@ -287,7 +287,15 @@ class MonodepthOptions:
                                  default=1.0,
                                  help="weight of the photometric loss L_PML; 0 trains on the "
                                       "illumination invariant loss alone (the automask is still "
-                                      "computed from the photometric error, without gradient)")
+                                      "computed from the photometric error, without gradient, unless --automask iif)")
+        self.parser.add_argument("--automask",
+                                 type=str,
+                                 default="photometric",
+                                 choices=["photometric", "iif"],
+                                 help="error the automask compares between the warped and the unwarped "
+                                      "source: the photometric error (monodepth2) or the illumination "
+                                      "invariant descriptor distance, which makes training with "
+                                      "--photometric_weight 0 free of any photometric quantity")
         self.parser.add_argument("--photometric_warmup_epochs",
                                  type=int,
                                  default=0,

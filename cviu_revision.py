@@ -106,7 +106,7 @@ DEFAULT_CONFIG = {
                   "cal0-glob", "cal0-deg1", "cal0-local",
                   "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
                   "f8-base", "f8-hl", "f8-cal",
-                  "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms",
+                  "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms", "ii-pure", "ii-pure-ms",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -346,6 +346,13 @@ GRID = {
     "ii-only-ms-warm": {"group": "ii-only", "desc": "II loss alone at scales 1/2/4 after 5 photometric epochs",
                         "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
                                  "--photometric_weight 0 --iif_scales 1 2 4 --photometric_warmup_epochs 5"},
+    # the same without any photometric quantity: the automask too compares descriptor distances
+    "ii-pure": {"group": "ii-only", "desc": "II loss alone, automask on the descriptors",
+                "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
+                         "--photometric_weight 0 --automask iif"},
+    "ii-pure-ms": {"group": "ii-only", "desc": "II loss alone at scales 1/2/4, automask on the descriptors",
+                   "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
+                            "--photometric_weight 0 --iif_scales 1 2 4 --automask iif"},
     "ii-ms": {"group": "ii-only", "desc": "photometric + multi-scale II loss (0.1)",
               "flags": "--illum_calib none --photometric standard --iif_scales 1 2 4"},
     # optional: the full cell at the batch size the paper states (12, against the grid's 8), the most

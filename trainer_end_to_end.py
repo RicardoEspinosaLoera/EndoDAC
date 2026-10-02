@@ -732,6 +732,7 @@ class Trainer:
         # target is the same for every scale / frame: compute its descriptor once
         features_t = self._iif_descriptors(inputs[("color", 0, 0)]) if use_iif else None
         # weight of the photometric term: 1 during the warm-up, --photometric_weight afterwards
+        iif_automask = use_iif and getattr(self.opt, "automask", "photometric") == "iif"
         w_photo = getattr(self.opt, "photometric_weight", 1.0)
         if self.epoch < getattr(self.opt, "photometric_warmup_epochs", 0):
             w_photo = 1.0
@@ -757,11 +758,19 @@ class Trainer:
                 target = inputs[("color", 0, 0)]
                 pred = outputs[("color", frame_id, scale)]                
 
-                rep = self.compute_reprojection_loss(pred, target)
+                if iif_automask:
+                    # automask on the descriptor distance: a pixel is kept when warping the
+                    # source brings its descriptor closer to the target's than leaving it in place
+                    with torch.no_grad():
+                        rep = self.get_illumination_invariant_loss(pred, features_t=features_t)
+                        rep_identity = self.get_illumination_invariant_loss(
+                            inputs[("color", frame_id, source_scale)], features_t=features_t)
+                else:
+                    rep = self.compute_reprojection_loss(pred, target)
 
-                pred = inputs[("color", frame_id, source_scale)]
-                rep_identity = self.compute_reprojection_loss(pred, target)
-                
+                    pred = inputs[("color", frame_id, source_scale)]
+                    rep_identity = self.compute_reprojection_loss(pred, target)
+
                 reprojection_loss_mask = self.compute_loss_masks(rep,rep_identity,target)
 
                 # Photometric loss on the illumination-corrected warp, averaged over the
