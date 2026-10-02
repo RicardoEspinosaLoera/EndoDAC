@@ -107,6 +107,7 @@ DEFAULT_CONFIG = {
                   "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
                   "f8-base", "f8-hl", "f8-cal",
                   "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms", "ii-pure", "ii-pure-ms",
+                  "ii-sm-lo", "ii-sm-hi", "ii-ms8", "ii-eps-lo", "f8-full-ms", "f8-full-ms-iimask",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -353,6 +354,22 @@ GRID = {
     "ii-pure-ms": {"group": "ii-only", "desc": "II loss alone at scales 1/2/4, automask on the descriptors",
                    "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 "
                             "--photometric_weight 0 --iif_scales 1 2 4 --automask iif"},
+    # single-factor variations of ii-only-ms (the reference of each): the smoothness weight, which was
+    # left at the value tuned for the photometric loss; one more descriptor scale; a lower norm floor,
+    # which lets the descriptor supervise weaker texture
+    "ii-sm-lo": {"group": "ii-only", "desc": "ii-only-ms, disparity smoothness 1e-4 (default 1e-3)",
+                 "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --disparity_smoothness 1e-4"},
+    "ii-sm-hi": {"group": "ii-only", "desc": "ii-only-ms, disparity smoothness 1e-2 (default 1e-3)",
+                 "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --disparity_smoothness 1e-2"},
+    "ii-ms8": {"group": "ii-only", "desc": "II loss alone, descriptor at scales 1/2/4/8",
+               "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 8"},
+    "ii-eps-lo": {"group": "ii-only", "desc": "ii-only-ms, descriptor norm floor 1e-5 (default 1e-4)",
+                  "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --iif_eps 1e-5"},
+    # the full model (f8-full) with the multi-scale II loss, and with the descriptor automask too
+    "f8-full-ms": {"group": "f8", "desc": "f8-full with the II loss at scales 1/2/4",
+                   "flags": "--illum_calib basis --illum_basis_degree 2 --iif_scales 1 2 4"},
+    "f8-full-ms-iimask": {"group": "f8", "desc": "f8-full, II loss at scales 1/2/4, automask on the descriptors",
+                          "flags": "--illum_calib basis --illum_basis_degree 2 --iif_scales 1 2 4 --automask iif"},
     "ii-ms": {"group": "ii-only", "desc": "photometric + multi-scale II loss (0.1)",
               "flags": "--illum_calib none --photometric standard --iif_scales 1 2 4"},
     # optional: the full cell at the batch size the paper states (12, against the grid's 8), the most
