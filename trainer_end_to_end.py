@@ -401,7 +401,9 @@ class Trainer:
         out = []
         for k in getattr(self.opt, "iif_scales", [1]):
             x = img if k == 1 else F.avg_pool2d(img, k)
-            out.append(get_illumination_invariant_features(x, eps=self.opt.iif_eps))
+            out.append(get_multichannel_invariant_features(
+                x, eps=self.opt.iif_eps, channels=getattr(self.opt, "iif_channels", ["gray"]),
+                chroma_delta=getattr(self.opt, "iif_chroma_delta", 0.02)))
         return out
 
     def get_illumination_invariant_loss(self, pred, target=None, features_t=None):

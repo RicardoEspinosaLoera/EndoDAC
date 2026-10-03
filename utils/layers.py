@@ -598,6 +598,38 @@ def get_illumination_invariant_features(img, eps=1e-4):
     return r / norm
 
 
+def get_log_chromaticity(img, delta=0.02):
+    """(B,3,H,W) RGB in [0, 1] -> (B,2,H,W) log(R/G), log(B/G).
+
+    A multiplicative shading s(x) scales the three channels alike, so it cancels in the
+    ratios even when it varies from pixel to pixel (fall-off with distance, the cosine of
+    the surface): the chromaticity keeps the colour texture of the tissue (vessels,
+    perfusion) and drops the shading. `delta` keeps dark pixels, where the ratios are
+    dominated by noise, from producing large spurious gradients.
+    """
+    l = torch.log(img.clamp(min=0) + delta)
+    return torch.cat([l[:, 0:1] - l[:, 1:2], l[:, 2:3] - l[:, 1:2]], 1)
+
+
+def get_multichannel_invariant_features(img, eps=1e-4, channels=("gray",), chroma_delta=0.02):
+    """Robinson descriptors of the grayscale image and/or of the two log-chromaticity channels.
+
+    Each group is a unit-norm descriptor as in get_illumination_invariant_features(); the
+    groups are concatenated and scaled by 1/sqrt(n_groups), so the L2 comparator returns the
+    mean of the per-group distances and stays in [0, 1]. channels=("gray",) is exactly the
+    single-group descriptor.
+    """
+    feats = []
+    if "gray" in channels:
+        feats.append(get_illumination_invariant_features(img, eps=eps))
+    if "chroma" in channels:
+        c = get_log_chromaticity(img, chroma_delta)
+        feats += [get_illumination_invariant_features(c[:, i:i + 1], eps=eps) for i in range(2)]
+    if len(feats) == 1:
+        return feats[0]
+    return torch.cat(feats, 1) / math.sqrt(len(feats))
+
+
 def get_illumination_invariant_l2(u_p, u_t, window=3):
     """Distance between two unit-norm descriptors, in [0, 1].
 

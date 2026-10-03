@@ -282,6 +282,18 @@ class MonodepthOptions:
                                       "is computed; [1] is the single-scale 3x3 descriptor, [1, 2, 4] "
                                       "adds effective supports of 6 and 12 px, which widens the basin "
                                       "of convergence when the II loss has to supervise on its own")
+        self.parser.add_argument("--iif_channels",
+                                 nargs="+",
+                                 default=["gray"],
+                                 choices=["gray", "chroma"],
+                                 help="images the descriptor is computed on: the grayscale image and/or "
+                                      "the log-chromaticity channels log(R/G), log(B/G), which are "
+                                      "invariant to spatially varying multiplicative shading and keep "
+                                      "the colour texture that smooth regions show in no other way")
+        self.parser.add_argument("--iif_chroma_delta",
+                                 type=float,
+                                 default=0.02,
+                                 help="offset added to R, G, B before the log ratios; damps dark-pixel noise")
         self.parser.add_argument("--photometric_weight",
                                  type=float,
                                  default=1.0,
