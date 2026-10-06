@@ -107,7 +107,7 @@ DEFAULT_CONFIG = {
                   "E5", "E6", "f8-ii", "f8-ii-hl", "f8-cal-hl", "f8-cal-ii", "f8-full", "f8-full-b12",
                   "f8-base", "f8-hl", "f8-cal",
                   "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms", "ii-pure", "ii-pure-ms",
-                  "ii-sm-lo", "ii-sm-hi", "ii-ms8", "ii-eps-lo", "f8-full-ms", "f8-full-ms-iimask", "ii-chroma", "ii-chroma-only",
+                  "ii-sm-lo", "ii-sm-hi", "ii-ms8", "ii-eps-lo", "f8-full-ms", "f8-full-ms-iimask", "ii-chroma", "ii-chroma-only", "ii-only-ms-hl", "ii-pure-ms-hl",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -370,6 +370,12 @@ GRID = {
                   "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --iif_channels gray chroma"},
     "ii-chroma-only": {"group": "ii-only", "desc": "II loss alone at scales 1/2/4, log-chromaticity descriptor only",
                        "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --iif_channels chroma"},
+    # II loss alone with the specular highlights masked out of it: --photometric highlight only
+    # supplies the highlight mask here, the photometric term itself has weight 0
+    "ii-only-ms-hl": {"group": "ii-only", "desc": "ii-only-ms with specular pixels masked out of the II loss",
+                      "flags": "--illum_calib none --photometric highlight --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4"},
+    "ii-pure-ms-hl": {"group": "ii-only", "desc": "ii-pure-ms with specular pixels masked out of the II loss",
+                      "flags": "--illum_calib none --photometric highlight --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --automask iif"},
     # the full model (f8-full) with the multi-scale II loss, and with the descriptor automask too
     "f8-full-ms": {"group": "f8", "desc": "f8-full with the II loss at scales 1/2/4",
                    "flags": "--illum_calib basis --illum_basis_degree 2 --iif_scales 1 2 4"},
