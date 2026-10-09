@@ -71,8 +71,8 @@ class MonodepthOptions:
                                  default="endodac_model")
         self.parser.add_argument("--split",
                                  type=str,
-                                 help="which training split to use",
-                                 choices=["endovis"],
+                                 help="which training split to use: a folder of splits/ holding "
+                                      "train_files.txt and val_files.txt (endovis, hamlyn_fA, ...)",
                                  default="endovis")
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -83,7 +83,7 @@ class MonodepthOptions:
                                  type=str,
                                  help="dataset to train on",
                                  default="endovis",
-                                 choices=["endovis"])
+                                 choices=["endovis", "hamlyn"])
         self.parser.add_argument("--png",
                                  help="if set, trains from raw KITTI png files (instead of jpgs)",
                                  action="store_true")

@@ -203,3 +203,49 @@ class HamlynDataset(data.Dataset):
 #     ds = HamlynDataset(data_path='/mnt/data-hdd2/Beilei/Dataset/Hamlyn', height=256, width=320, frame_idxs=[0, -1, 1], num_scales=4, is_train=True)
     
 #     test = ds[0]
+
+
+from .mono_dataset import MonoDataset
+
+
+class HamlynTrainDataset(MonoDataset):
+    """Hamlyn for self-supervised training, in the split-file format of the SCARED loader.
+
+    A line of the split file is "<sequence folder> <frame index> l", e.g. "rectified08 1234 l";
+    the frame is <data_path>/rectified08[/rectified08]/image01/0000001234.jpg (left view) and its
+    temporal neighbours are frame index +-1 (tools/make_hamlyn_splits.py only lists frames that
+    have both). Sequences above 13 are cropped to the endoscope's field of view, as at test time.
+    The intrinsics below are a placeholder: the grid trains with --learn_intrinsics True.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(HamlynTrainDataset, self).__init__(*args, **kwargs)
+        self.K = np.array([[0.82, 0, 0.5, 0],
+                           [0, 1.02, 0.5, 0],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]], dtype=np.float32)
+        self.box = (180, 0, 590, 288)
+        self._dirs = {}
+
+    def check_depth(self):
+        return False
+
+    def sequence_dir(self, folder):
+        if folder not in self._dirs:
+            d = os.path.join(self.data_path, folder)
+            if not os.path.isdir(os.path.join(d, "image01")):
+                d = os.path.join(d, folder)     # extracted one level deeper
+            self._dirs[folder] = d
+        return self._dirs[folder]
+
+    def get_image_path(self, folder, frame_index, side):
+        return os.path.join(self.sequence_dir(folder), "image01",
+                            "{:010d}{}".format(frame_index, self.img_ext))
+
+    def get_color(self, folder, frame_index, side, do_flip):
+        color = self.loader(self.get_image_path(folder, frame_index, side))
+        if int(folder[-2:]) > 13:
+            color = color.crop(self.box)
+        if do_flip:
+            color = color.transpose(Image.FLIP_LEFT_RIGHT)
+        return color

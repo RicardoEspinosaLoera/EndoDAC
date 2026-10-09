@@ -201,13 +201,17 @@ class Trainer:
         print("Training is using:\n  ", self.device)
 
         # data
-        datasets_dict = {"endovis": SCAREDRAWDataset}
+        from datasets.hamlyn_dataset import HamlynTrainDataset
+        datasets_dict = {"endovis": SCAREDRAWDataset, "hamlyn": HamlynTrainDataset}
         self.dataset = datasets_dict[self.opt.dataset]
+        # The end-of-epoch evaluation runs on the SCARED test split with its exported ground
+        # truth. Other training sets have neither, so they skip it and keep weights_last only.
+        self.epoch_eval = self.opt.dataset == "endovis"
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
         train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
-        test_filenames = readlines(fpath.format("test"))
+        test_filenames = readlines(fpath.format("test")) if self.epoch_eval else []
         img_ext = '.jpg'  
 
         num_train_samples = len(train_filenames)
@@ -227,12 +231,14 @@ class Trainer:
         self.val_loader = DataLoader(
             val_dataset, self.opt.batch_size, False,
             num_workers=1, pin_memory=True, drop_last=True)
-        test_dataset = self.dataset(
-            self.opt.data_path, test_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
-        self.test_loader = DataLoader(
-            test_dataset, 1, False,
-            num_workers=1, pin_memory=True, drop_last=True)
+        test_dataset = []
+        if self.epoch_eval:
+            test_dataset = self.dataset(
+                self.opt.data_path, test_filenames, self.opt.height, self.opt.width,
+                self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
+            self.test_loader = DataLoader(
+                test_dataset, 1, False,
+                num_workers=1, pin_memory=True, drop_last=True)
         self.val_iter = iter(self.val_loader)
 
         self.writers = {}
@@ -277,8 +283,9 @@ class Trainer:
         self.depth_metric_names = [
             "de/abs_rel", "de/sq_rel", "de/rmse", "de/log_rmse", "da/a1", "da/a2", "da/a3"]
 
-        gt_path = os.path.join(splits_dir, self.opt.eval_split, "gt_depths.npz")
-        self.gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+        if self.epoch_eval:
+            gt_path = os.path.join(splits_dir, self.opt.eval_split, "gt_depths.npz")
+            self.gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
         
         print("Using split:\n  ", self.opt.split)
         print("There are {:d} training items, {:d} validation items and {:d} testing items\n".format(
@@ -515,7 +522,9 @@ class Trainer:
         self.start_time = time.time()
         for self.epoch in range(self.opt.num_epochs):
             self.run_epoch()
-            if self.epoch == 0:
+            if not self.epoch_eval:
+                pass
+            elif self.epoch == 0:
                 rmse, a1 = self.run_epoch_eval()
                 self.save_model(mode='epoch')
             else:

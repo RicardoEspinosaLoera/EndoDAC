@@ -108,6 +108,7 @@ DEFAULT_CONFIG = {
                   "f8-base", "f8-hl", "f8-cal",
                   "ii-only", "ii-only-ms", "ii-only-ms-warm", "ii-ms", "ii-pure", "ii-pure-ms",
                   "ii-sm-lo", "ii-sm-hi", "ii-ms8", "ii-eps-lo", "f8-full-ms", "f8-full-ms-iimask", "ii-chroma", "ii-chroma-only", "ii-only-ms-hl", "ii-pure-ms-hl", "ii-chroma-hl",
+                  "ham-fA-photo", "ham-fA-ii", "ham-fB-photo", "ham-fB-ii",
                             "bas-res-0", "bas-res-1", "bas-res-2", "bas-res-3",
                             "lam-bas-000", "lam-bas-010", "lam-bas-025", "lam-bas-100", "lam-bas-200",
                             "MonoII-ssim", "bas-res-2-ssim",
@@ -381,6 +382,22 @@ GRID = {
     "ii-chroma-hl": {"group": "ii-only", "desc": "ii-chroma with specular pixels masked out of the II loss",
                      "flags": "--illum_calib none --photometric highlight --illumination_invariant 1.0 "
                               "--photometric_weight 0 --iif_scales 1 2 4 --iif_channels gray chroma"},
+    # Trained on Hamlyn instead of SCARED, two folds over its four sequences: fold A trains on
+    # rectified08 + 11 and is tested on 06 + 14, fold B the reverse (tools/make_hamlyn_splits.py,
+    # tools/hamlyn_cv.py). Photometric loss alone (the recipe of f8-base) against the II loss
+    # alone (the recipe of ii-chroma).
+    "ham-fA-photo": {"group": "hamlyn-train", "data": "hamlyn",
+                    "desc": "trained on Hamlyn fold A, photometric loss alone",
+                    "flags": "--illum_calib none --illumination_invariant 0 --photometric standard --dataset hamlyn --split hamlyn_fA"},
+    "ham-fA-ii": {"group": "hamlyn-train", "data": "hamlyn",
+                    "desc": "trained on Hamlyn fold A, II loss alone (gray + chroma, scales 1/2/4)",
+                    "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --iif_channels gray chroma --dataset hamlyn --split hamlyn_fA"},
+    "ham-fB-photo": {"group": "hamlyn-train", "data": "hamlyn",
+                    "desc": "trained on Hamlyn fold B, photometric loss alone",
+                    "flags": "--illum_calib none --illumination_invariant 0 --photometric standard --dataset hamlyn --split hamlyn_fB"},
+    "ham-fB-ii": {"group": "hamlyn-train", "data": "hamlyn",
+                    "desc": "trained on Hamlyn fold B, II loss alone (gray + chroma, scales 1/2/4)",
+                    "flags": "--illum_calib none --photometric standard --illumination_invariant 1.0 --photometric_weight 0 --iif_scales 1 2 4 --iif_channels gray chroma --dataset hamlyn --split hamlyn_fB"},
     # the full model (f8-full) with the multi-scale II loss, and with the descriptor automask too
     "f8-full-ms": {"group": "f8", "desc": "f8-full with the II loss at scales 1/2/4",
                    "flags": "--illum_calib basis --illum_basis_degree 2 --iif_scales 1 2 4"},
@@ -1031,7 +1048,7 @@ def stage_train(cfg, args):
         for seed in run_seeds(cfg, run):
             name = run_name(run, seed)
             cmd = [cfg["python"], os.path.join(ROOT, "train_end_to_end.py"),
-                   "--data_path", cfg["data"]["scared"], "--log_dir", cfg["log_dir"],
+                   "--data_path", cfg["data"][spec.get("data", "scared")], "--log_dir", cfg["log_dir"],
                    "--pretrained_path", cfg["pretrained_path"],
                    "--model_name", name, "--seed", str(seed)]
             cmd += shlex.split(cfg["train"]["common_flags"]) + shlex.split(spec["flags"])
