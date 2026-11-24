@@ -20,6 +20,13 @@ EXTRA="$*"
 
 test -f cviu_revision.py || { echo "run this from the repository root"; exit 1; }
 
+# everything printed below is also written to a log file next to the results
+STAMP=$(date +%Y%m%d_%H%M%S)
+LOG="$OUT/crossdomain_$STAMP.log"
+mkdir -p "$OUT"
+exec > >(tee "$LOG") 2>&1
+echo "log: $LOG"
+
 # --- 0. what is on disk -----------------------------------------------------------------
 HAM=$($PY - <<'EOF'
 import yaml
@@ -38,7 +45,6 @@ done
 echo
 
 # --- 1. backup --------------------------------------------------------------------------
-STAMP=$(date +%Y%m%d_%H%M%S)
 cp "$OUT/per_frame.csv" "$OUT/per_frame.backup_$STAMP.csv"
 echo "backup: $OUT/per_frame.backup_$STAMP.csv"
 
@@ -54,6 +60,6 @@ echo
 cat cviu_r2/v6_text/components_crossdomain_v6.tex
 
 # --- 4. what to bring back ----------------------------------------------------------------
-tar czf cviu_r2_crossdomain_$STAMP.tgz "$OUT/per_frame.csv" cviu_r2/v6_text/components_crossdomain_v6.tex
+tar czf cviu_r2_crossdomain_$STAMP.tgz "$OUT/per_frame.csv" "$LOG" cviu_r2/v6_text/components_crossdomain_v6.tex
 echo
 echo "bring back: cviu_r2_crossdomain_$STAMP.tgz"
