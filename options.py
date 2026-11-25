@@ -406,13 +406,14 @@ class MonodepthOptions:
                                  help="patch size of that least-squares fit")
         self.parser.add_argument("--color_aug_consistent",
                                  type=str2bool,
-                                 default=False,
-                                 help="apply the SAME colour jitter to every frame of an item. "
-                                      "The default False reproduces the codebase the grid was "
-                                      "trained with, where transforms.ColorJitter re-samples per "
-                                      "call and each frame gets a different jitter, which turns "
-                                      "the photometric relation the pose and lighting heads read "
-                                      "into noise (see datasets/mono_dataset.py)")
+                                 default=True,
+                                 help="apply the SAME colour jitter to every frame of an item "
+                                      "(default since 2026-11-25). False reproduces the codebase "
+                                      "every run trained before that date used, where "
+                                      "transforms.ColorJitter re-samples per call and each frame "
+                                      "gets a different jitter, which turns the photometric "
+                                      "relation the pose and lighting heads read into noise (see "
+                                      "datasets/mono_dataset.py)")
         self.parser.add_argument("--seed",
                                  type=int,
                                  help="random seed for training",

@@ -5,6 +5,7 @@ difference run - reference (negative = the run is better), its 95% bootstrap int
 sequences, the number of sequences where the run wins and the exact Wilcoxon p.
 
     python tools/paired.py --ref ii-only-ms --runs ii-chroma ii-chroma-only ii-pure-ms
+    python tools/paired.py --csv results/cviu/strata.csv --metric abs_rel_highlight --ref t9-da-base --runs t9-da-full
 """
 import argparse
 import os
@@ -19,6 +20,8 @@ from hamlyn_table import load, per_unit, wilcoxon  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", default="results/cviu/per_frame.csv")
+    ap.add_argument("--metric", default="abs_rel",
+                    help="column to compare, e.g. abs_rel_highlight or slope_v of results/cviu/strata.csv")
     ap.add_argument("--ref", required=True)
     ap.add_argument("--runs", nargs="+", required=True)
     ap.add_argument("--datasets", nargs="+", default=["scared", "hamlyn", "c3vd"])
@@ -27,7 +30,7 @@ def main():
     a = ap.parse_args()
     rng = np.random.default_rng(0)
     for ds in a.datasets:
-        acc = load(a.csv, ds, set(a.runs) | {a.ref})
+        acc = load(a.csv, ds, set(a.runs) | {a.ref}, a.metric)
         seeds = {}
         for (m, s, _, _) in acc:
             seeds.setdefault(m, set()).add(s)

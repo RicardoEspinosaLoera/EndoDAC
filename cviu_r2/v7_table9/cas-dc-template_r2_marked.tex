@@ -1,0 +1,1198 @@
+%% 
+%% Copyright 2019-2020 Elsevier Ltd
+%% 
+%% This file is part of the 'CAS Bundle'.
+%% --------------------------------------
+%%
+%% It may be distributed under the conditions of the LaTeX Project Public
+%% License, either version 1.2 of this license or (at your option) any
+%% later version.  The latest version of this license is in
+%%    http://www.latex-project.org/lppl.txt
+%% and version 1.2 or later is part of all distributions of LaTeX
+%% version 1999/12/01 or later.
+%%
+%% The list of all files belonging to the 'CAS Bundle' is
+%% given in the file `manifest.txt'.
+%% 
+%% Template article for cas-dc documentclass for 
+%% double column output.
+%\documentclass[a4paper,fleqn,longmktitle]{cas-dc}
+\documentclass[a4paper,fleqn]{cas-dc}
+%
+%\usepackage[numbers]{natbib}
+%\usepackage[authoryear]{natbib}
+%
+\usepackage[compress]{natbib}
+\usepackage{caption}
+\usepackage{subfig}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{svg}
+\usepackage{dashrule}
+\usepackage{xcolor}
+\usepackage{cancel}
+\usepackage{wrapfig}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage{algpseudocode}
+\usepackage{newunicodechar}
+\newunicodechar{≥}{\ensuremath{\ge}}
+\usepackage{pifont}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%Author definitions
+\def\tsc#1{\csdef{#1}{\textsc{\lowercase{#1}}\xspace}}
+\tsc{WGM}
+\tsc{QE}
+\tsc{EP}
+\tsc{PMS}
+\tsc{BEC}
+\tsc{DE}
+%%%
+
+% Uncomment and use as if needed
+%\newtheorem{theorem}{Theorem}
+%\newtheorem{lemma}[theorem]{Lemma}
+%\newdefinition{rmk}{Remark}
+%\newproof{pf}{Proof}
+%\newproof{pot}{Proof of Theorem \ref{thm}}
+
+\newcommand{\rev}{\color{red}}   % clean version: \newcommand{\rev}{}
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+% Short title
+\shorttitle{Illumination-Invariant Foundation Model Adaptation for Monocular Depth Estimation in Endoscopy}
+% Short author
+\shortauthors{D. Espinosa-Loera et~al.}
+
+% Main title of the paper
+\title [mode = title]{\textcolor{black}{Illumination-Invariant Foundation Model Adaptation for 
+Self-Supervised Monocular Depth Estimation in Endoscopy}}    
+
+\author[inst1,inst3]{Ricardo Espinosa}
+\author[inst2]{Gilberto Ochoa-Ruiz}
+\author[inst3]{Christian Daul*}[orcid=0000-0002-6149-7132]
+
+\cortext[cor]{Corresponding author: christian.daul@univ-lorraine.fr}
+
+\affiliation[inst1]{organization={Universidad Panamericana, Facultad de Ingenieria},%Department and Organization
+            city={Aguascalientes},
+            postcode={20290}, 
+            state={Aguascalientes},
+            country={Mexico}}
+
+\affiliation[inst2]{organization={Escuela de Ingenieria y Ciencias, Tecnologico de Monterrey},%Department and Organization
+            city={Monterrey},
+            postcode={64849}, 
+            state={N.L.},
+            country={Mexico}}
+
+\affiliation[inst3]{organization={Université de Lorraine, CNRS, CRAN (UMR 7039)},%Department and Organization
+            addressline={F-54518 Vand{\oe}uvre-l\`es-Nancy}, 
+            country={France}}
+
+
+\maketitle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+%
+Endoscopy of hollow organs and laparoscopy are complex examinations 
+in which diagnosis and minimally invasive surgery are performed by observing small field-of-view videos acquired under difficult-to-control camera poses and drastic viewpoint-dependent illumination changes.  Constructing accurate three-dimensional (3D) mosaics from these sequences requires precise depth maps estimated under the complex illumination changes inherent to endoscopic imaging.  Existing self-supervised depth estimation methods fail to address adequately this challenge due to their reliance on a brightness constancy assumption that is fundamentally violated in endoscopy. \textcolor{black}{This work proposes a unified self-supervised framework that integrates two complementary photometric robustness mechanisms: a per-pixel lighting calibration module and an illumination-invariant loss derived from Robinson kernel-based descriptors. These components are combined with three depth encoders: a CNN backbone (MonoII), a hybrid CNN--transformer backbone (MonoIIT), and a Depth~Anything foundation model encoder adapted through domain-specific low-rank adaptation (MonoIIF). All three variants are trained end-to-end in a single run, without auxiliary pretrained subnetworks such as optical flow networks. On the SCARED benchmark, \textcolor{red}{no significant difference in $\varepsilon_\textrm{AbsRel}$ is detected between MonoIIF and} the strongest foundation-model baselines, HADepth and EndoDAC, \textcolor{red}{the observed differences being} smaller than the seed-to-seed variability, \textcolor{red}{while MonoIIF requires} less than half of their training time (12h\,8m vs.\ more than 25h). On the Hamlyn and C3VD generalization datasets, \textcolor{red}{a paired analysis detects no significant difference between MonoIIF and HADepth or EndoDAC on Hamlyn, nor between MonoIIF and EndoDAC on C3VD, where HADepth is more accurate; MonoIIF is more accurate than the remaining methods on both datasets. With four to seven test sequences, the absence of a significant difference does not establish equivalence.} \textcolor{red}{A component-wise analysis on Hamlyn and C3VD shows that the lighting calibration improves the transfer to C3VD but not to Hamlyn, and that the illumination-invariant loss brings no measurable cross-domain benefit with the foundation encoder.} \textcolor{red}{Qualitative surface reconstruction and 3D mosaicing examples on the Hamlyn dataset illustrate the use of the depth maps for 3D cartography: in these examples, the textured surfaces obtained with MonoIIF are visually coherent and show fewer geometric discontinuities than those obtained with HADepth.} \textcolor{blue}{I believe you are giving too mnay details in the abstract about validation, the red part should be more concise and try to defend better the simplicity of the model and the less time required for training}}
+\end{abstract}
+
+\begin{comment}
+On the SCARED benchmark, MonoIIF 
+achieves $\varepsilon_\text{AbsRel} = 0.050$, 
+$\varepsilon_\text{SqRel} = 0.341$, $\varepsilon_\text{RMSE} = 4.327$, 
+$\varepsilon_\text{RMSELog} = 0.070$, and $\delta_{1.25} = 0.982$, 
+outperforming EndoDAC across all error metrics and matching HADepth on 
+$\varepsilon_\text{RMSELog}$, while requiring less than half the training 
+time ($12$h\,$8$m vs.\ $>25$h). On the Hamlyn and C3VD generalization 
+datasets MonoIIF achieves the best performance across all evaluated metrics, surpassing HADepth on $\varepsilon_\text{AbsRel}$ on Hamlyn ($0.159$ vs.\ $0.162$), demonstrating that illumination-invariant supervision enhances the cross-domain transferability of foundation model representations. The practical value of the proposed framework is further confirmed through 3D surface mosaicing experiments on the Hamlyn dataset, where the depth maps produced by MonoIIT yield substantially more geometrically coherent reconstructions than competing methods.
+\end{comment}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Keywords
+% Each keyword is separated by \sep
+\begin{keywords}
+Endoscopy \sep Unsupervised depth prediction \sep Illumination invariant loss function \sep 3D mosaicing
+\end{keywords}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\linenumbers
+%
+%% main text
+\section{Introduction \label{sec:introduction}}
+%
+\subsection{Medical context \label{sec:medicalContext}}
+Endoscopy is a reference clinical examination in which high-resolution images of the inner walls of hollow organs (e.g., the colon, stomach, esophagus, or bladder) are displayed on a screen. Endoscopy is the only imaging modality that allows a natural rendering of the colors and textures (e.g., from tumors, lesions, polyps, or chronic inflammations) required to diagnose lesions  located in the inner epithelium of hollow organs. It is also a minimally invasive technique that allows experts to collect biopsies and to resect lesions.  
+
+Nevertheless, the displayed endoscopic image sequences have inherent limitations: on the one hand, the viewpoints of the endoscope are difficult to control, and on the other hand, the field of view (FoV) of the endoscope is small, as the instrument's distal tip is usually maintained close to the epithelial wall to acquire high-resolution images. All endoscopic examinations suffer from these limitations. For example, in colonoscopy, gastroenterologists can miss lesions since due to the small FoV it is difficult to know whether colon surface parts were completely scanned or not. In gastroscopy,  chronic stomach inflammations are often only partially seen in a single view, whereas the severity assessment of these lesions requires a more global (extended) view. In cystoscopy, this small FoV makes it difficult to locate the endoscope with respect to anatomical landmarks (for example, the ureters, urethra, or air bubbles), which complicates the urologist’s mental representation of the bladder in three dimensions for a correct navigation.  
+
+Therefore, extending the limited FoV  in this medical context is an active area of research. Cartography (or mosaicing) algorithms have been widely explored, as they offer several capabilities for image-based interventions: i) they facilitate the diagnosis (lesions can be completely seen in a single panoramic image), ii) they enable the localization of lesions with respect to anatomical landmarks, iii) the mosaics (or extended views) represent a solution for data archiving and examination documentation (videos are most often not archived since they are difficult to interpret without guiding the endoscope), iv) they make a second diagnosis possible (by the same expert clinician or a different one in a subsequent examination); and v) the generated maps are an important step towards an improved patient follow-up solution that is currently unavailable in endoscopy examinations (comparing two panoramic images determined for a patient allows for the assessment of a lesion evolution). 
+
+However, designing and implementing algorithms for the construction of extended FoVs  is quite challenging due to the complex scene and acquisition conditions. Indeed, during an examination, it is difficult for an expert to precisely control the endoscope viewpoints, while  the acquired small FoV images often correspond to quasi-planar surface parts that carry poor geometric information about the global organ shape. Moreover, endoscopic scenes are characterized by strong illumination changes \citep{Weibel_ICPR_2012} between images acquired from different viewpoints. Furthermore, the images include either textures whose aspect can substantially change from one frame to another (e.g., as in cystoscopy or colonoscopy), or very poorly contrasted texturesn e.g., as in gastroscopy \citep{Phan_GRETSI_2019}. These issues complicate the use of conventional cartography methods, which largely rely on rich and contrasted texture information.
+
+Efficient two-dimensional (2D) cartography approaches have been proposed for cystoscopy \citep{Miranda_TBME_2008, Behrens_CSRD_2011, Ali_PR_2016} and even for the highly challenging gastroscopic images \citep{Trinh_ICIP_2018, Zenteno_CBM_2022}. However, such algorithms can only reconstruct panoramas of a limited extent, given that larger mosaics are affected by strong geometrical distortions (i.e., due to the representation of 3D organ parts by 2D mosaics). Therefore, 3D cartography methods must be used to reconstruct large organ parts which allow for a high-quality representation of the textures present on the epithelial surfaces.     
+
+\subsection{Depth and surface estimation in endoscopy}
+%
+\textbf{Active vision 3D endoscopy.} The first attempts to build extended 3D views (3D maps or mosaics) of the inner surfaces of hollow organs were based on active vision systems \citep{Penne_MICCAI_2009, BenHammadou_CVIU_2013}. For instance, in the case of cystoscopy \citep{ BenHammadou_3DResearch_2016}, a structured light-based approach led to a proof-of-concept solution, which demonstrated that the reconstruction of the inner wall of realistic bladder phantoms is possible. The aforementioned 3D reconstruction approach was successfully implemented in a rigid cystoscope, but led to significant hardware modifications. As current 2D endoscopes remain commercially attractive, the  endoscope manufacturer's strategy is not directed toward the development of ``3D monocular endoscopes'' in the foreseeable future. Consequently, methods for recovering 3D-depth information to reconstruct extended surfaces in endoscopy should only rely on 2D-images acquired during  standard endoscopic examinations.
+
+\textbf{Passive vision 3D endoscopy.} Shape from shading (SfS), structure from motion (SfM), or simultaneous localization and mapping (SLAM) are classical\footnote{The term ''classical'' refers to methods based solely on optimization techniques, i.e., they do not make use of deep learning predictions.} techniques based on radiometric or geometric models for recovering surface information. In endoscopy, SfS, SfM and SLAM approaches have been respectively used to reconstruct the shape of bone structures \citep{Wu_IJCV_2010}, build 3D maps of the inner bladder wall \citep{Lurie_BOE_2017, Groenius_IJCARS_2023} and recover 3D information in the abdominal cavity for laparoscopic hernioplasty \citep{Grasa_TMI_2014}. However, these methods are either very sensitive to strong illumination changes (as those present in colonoscopy), or inappropriate when applied to images with very weak textures (as in gastroscopy). In the specific case of gastroscopy, the authors in \citep{Phan_ICIP_2019} used a SfM approach guided by an illumination invariant optical flow technique \citep{Trinh_CVIU_2019} making the 3D cartography of the inner stomach wall possible even for poorly textured white light images acquired under strong illumination changes. However, even if such an approach can provide accurate 3D maps built offline (i.e., after the gastroscopy), it is very computation-intensive, making its use impractical for real-time reconstruction during the endoscopy. In recent years, it has been shown that Deep-learning (DL) approaches can be used to speed up SfM or SLAM techniques \citep{chen_CMPB_2018}. Depth prediction plays a central role in these SfM and SLAM approaches aiming to perform a 3D cartography. 
+
+%
+\textbf{Supervised DL-based depth prediction in endoscopy.}
+%
+The authors in \citep{Widya_JTEHM_2019} used a classical SfM technique to reconstruct the complete inner stomach wall with images acquired in a chromo-endoscopy (CE) modality, in which an indigo carmine dye is spread over the mucosa. This imaging modality, which reveals more pronounced textures, is rarely adopted by hospitals (white light is the reference modality in gastroscopy) and lengthens the examinations. Based on this observation, the same authors \citep{Widya_JTEHM_2021} used a CycleGAN network (based on cycle-consistent image-to-image translation, see \citep{Zhu_ICCV_2017} to transform color images into virtual CE images. The latter were then used to construct 3D maps using the SfM method, taking the red channel of the virtual CE images as input. Three CycleGANS were trained in a supervised manner using white-light and real CE image sequences. Although the results of this approach are convincing, it cannot lead to real-time 3D cartography since the SfM method itself remains unchanged.   
+
+The RNNSLAM method described in \citep{Ma_MICCAI_2019, Ma_MIA_2021} exploits a recurrent neural network-guided SLAM used to reconstruct small parts of the inner colon surface in real-time. Briefly, images of the colon are used to predict the depth map and the camera pose of each image. Certain camera poses with minimal displacement between them are selected, and jointly used in a bundle adjustment method to build small parts of the growing colon chunk.   
+The training data required for the supervised prediction are obtained using a SfM method, which is exploited to reconstruct 3D colon parts (i.e., images can be paired with depth maps and the pose of the endoscope). Although the obtained results are promising, the maximum lenght of colon fragments  that can be accurately reconstructed are very limited  (the diameter of the colon chunks quickly becomes too inaccurate). This is probably due to the low accuracy of the SfM reconstructed data used as ground truth. 
+
+Mahmood et al. \citep{MAHMOOD_MIA_2018} propose a fully supervised method for depth prediction in endoscopic examinations. Their approach integrates a deep convolutional neural network (CNN) with a conditional random field (CRF) in a CNN-CRF framework. The model is trained on 2,000 images of a geometrically realistic synthetic colon, and validated using endoscopic images captured from a porcine colon. To bridge the domain gap, the endoscopic dataset is adapted to a synthetic-like domain through adversarial training, utilizing ground truth depth data derived from registered computed tomography (CT) measurements. The predicted depth maps are subsequently employed to reconstruct the mucosal surface. However, the reliance on synthetic data limits the method’s robustness, particularly in the presence of specularities, strong illumination changes, and organ movements or deformations commonly encountered during colonoscopy. 
+
+Given the difficulty of obtaining in vivo ground truth data, as well as the limited realism of synthetic data have naturally led to attempts to use unsupervised DL-methods to estimate depth maps. 
+
+\textbf{Self-supervised DL-based depth prediction in endoscopy.}
+%
+\begin{figure}[]
+    \centering
+    \includegraphics[scale=.3]{Samples.png}
+    \caption{Qualitative comparison of depth map predictions on an image from the SCARED dataset. The two square sub-regions delineated by yellow boxes contain areas with challenging lighting conditions: the upper sub-region contains an underexposed area, while the lower sub-region includes an overexposed area with specular reflections. A visual comparison of these sub-images with their corresponding depth maps (shown on the right) reveals that the Monodepth2 approach produces ``over-smoothed'' maps, failing to capture fine depth details. In contrast, the proposed method (MonoIIT) generates depth maps with sharper edges which accurately reflect depth changes in appropriate locations.
+    } \label{samples}
+\end{figure}
+%
+%The main principle for self-supervision of these methods relies on brightness constancy assumption 
+%%%%%%%%%%%%%%%
+%\citep{horn_AI_1981}  This is an old optical flow reference : Ricardo, cite rather one or two self-supervision papers for depth in urban scenes or other scenes !
+%%%%%%%%%%%%
+%which presupposes that the intensity of brightness between frames is constant or without sudden changes, a condition that is assumed to be true in natural images and urban conditions.
+%
+Brightness constancy (i.e., the assumption that the color intensities remain comparable everywhere in two images) is a prerequisite of numerous self-supervision depth prediction methods, as the ones proposed for instance for urban scenes \citep{Godard_ICCV_2019,Zhou_CVPR_2017} or indoor robotic navigation scenes \citep{Diamantas_ICIST_2010}. However, brightness constancy is an unrealistic assumption in endoscopic imaging due to the changing acquisition conditions (see  Section \ref{sec:medicalContext} and organ shapes: simple models as brightness constancy or gradient constancy (i.e., the assumption that the color intensity variations remain globally comparable) between two images acquired from two (hardly controllable) viewpoints of an endoscope are inappropriate. Indeed, strong local intensity variations may occur either due to the change of local surface orientations with respect to the camera pose, or due to the small (but changing) distance between the endoscope distal tip and the organ surface.    
+%
+Moreover, endoscopic images are often affected by under- or overexposed regions or are degraded by specular reflections. All these effects can lead to inaccurate depth prediction maps, as shown in Fig. \ref{samples}.
+
+In the field of monocular endoscopy, the authors in \citep{Li_IEEETII_2021} proposed an unsupervised learning approach for depth and motion estimation that was tested on the SCARED \citep{Allan_SCARED_2021} dataset (laparoscopic images of a porc's abdominal cavity paired with depth maps obtained with a structured light sensor). In this study, a long short-term memory (LSTM) layer is incorporated in the pose estimation network (EgoMotion) to improve the camera pose estimation using temporal information. Although this method was designed to enhance the assessment of endoscope motion and depth maps, it was not conceived to address significant local illumination changes between images (i.e. under- or overexposures frames), which are common challenges in endoscopy that adversely affect the prediction of the camera motion, due to the inappropriateness of the brightness constancy assumption.
+
+The work on self-supervised depth estimation in endoscopy described in \citep{Liu_IEEETMI_2019} is based on novel loss functions that exploit re-projection information to enforce geometric consistency between depth predictions from different viewpoints.  
+Instead of relying on a photometric loss based on an illumination change model, the approach uses two subsequenly calculated losses, namely i) a "Sparse Flow Loss" which measures errors of motion fields (the 2D projected movement of the sparse reconstruction of surface points built from consecutive frames), and ii) a "Depth Consistency Loss", which ensures geometric consistency across viewpoints. This design can deal with scenarios with changing illumination between images.
+%
+Nevertheless, training this model requires a sparse motion flow obtained from a reliable sparse reconstruction (through the SfM algorithm). Obtaining such a sparse motion field represents an additional computational step. This dependency on the sparse reconstructions not only increases the overall computational cost, but also limits the method scalability to large datasets.
+%
+The self-supervised learning approach proposed by \citep{Ozyoruk_MIA_2021} makes a depth prediction by exploiting an affine relationship between the intensities of homologous pixels in consecutive frames. This linear relationship helps the model to manage illumination variations during training on an unsupervised manner. Additionally, the ego-motion model, responsible for pose estimation, incorporates an attention mechanism that significantly improves the robustness and accuracy of the predicted poses.
+%
+However, in the context of endoscopy, a global affine transformation model is not well-suited for establishing the geometrical relationship between homologous pixels of consecutive frames. Illumination across homologous regions can vary significantly depending on the surface orientation and the pose of the endoscope. Consequently, employing a single global transformation model to represent all intensity variations from one image to another fails to adequately account for these local differences.
+%
+The contribution in \citep{Shao_MIA_2022} introduces a self-supervised method that utilizes appearance flow predictions to manage illumination variations in monocular endoscopic videos. This approach incorporates optical flow predictions to model geometric transformations between consecutive frames, which enables the model to handle significant illumination changes across different image regions. These changes often result from the combined effects of the endoscope light movements and the non-Lambertian properties of the observed surfaces. By leveraging these predictions, the method can identify homologous pixels in various regions of an image that are affected by strong illumination variations.
+%
+Although this approach is advantageous for addressing illumination changes and improving the robustness of depth and motion estimation under challenging lighting conditions, its dependence on accurate optical flow predictions increases the computational complexity. Additionally, the effectiveness of the method could be limited in scenarios where the camera motion is too large, resulting in errors in optical flow prediction.
+
+\textbf{Foundation model-based approaches.}  
+Recent advan\-ces in large-scale visual pretraining have also influenced depth estimation. Foundation-model-based depth predictors such as \emph{Depth Anything V2} \citep{DepthAnythingV2_2024} have demonstrated remarkable generalization from natural images to previously unseen domains by leveraging massive-scale training and universal geometric priors. These models provide robust monocular depth priors that can serve as initialization or auxiliary supervision for downstream medical tasks. However, in their native form, such models are not tailored to address the severe photometric effects (e.g., specular reflections or overexposures) that are classical in endoscopic imaging.
+
+%
+Motivated by this progress, endoscopy-oriented adaptations of foundation depth models have recently been introduced. For instance, \emph{EndoDAC} \citep{EndoDAC_MICCAI_2024} extends a depth-anything backbone with domain adaptation and contrastive strategies specifically designed for endoscopic videos, significantly improving cross-domain depth generalization. Similarly, \emph{HADepth} \citep{HAdepth_2025} proposes a hierarchical attention mechanism that refines depth estimation under challenging illumination conditions and non-Lambertian reflectance, demonstrating the potential of hybrid architectures that combine global foundation-model priors with fine-grained, endoscopy-aware features.
+%
+However, none of these approaches combine foundation model fine-tuning with an explicit illumination-invariant supervision signal, leaving unaddressed the fundamental 
+challenge that photometric perturbations in endoscopy are local, abrupt, and highly dependent on the organ geometry and the endoscope's viewpoint.
+
+%
+These emerging works highlight a new direction: leveraging strong pretrained geometric priors while incorporating endoscopy-specific photometric modeling. Nonetheless, even foundation models require explicit handling of the severe lighting variability inherent to endoscopy, reinforcing the need for illumination-invariant depth learning strategies such as those proposed in this work.
+
+\subsection{Conclusion on the state-of-the-art limitations}
+
+Existing methods struggle to handle the strong illumination changes common in endoscopy owing to simplistic assumptions on how illumination varies between frames. Classical self-supervised approaches often rely on the brightness constancy assumption, which is systematically violated in endoscopic imaging and leads to inaccurate depth prediction and motion tracking. Two notable contributions attempted to mitigate these issues. The authors in \citep{Ozyoruk_MIA_2021} introduced an affine brightness transformation model to facilitate the search for homologous pixels between consecutive images. However, this global model---with only two parameters (a multiplicative and an additive term)---fails to capture the highly local and non-linear illumination variations observed across different regions of an endoscopic image.  
+
+Similarly, the work in \citep{Shao_MIA_2022} exploited appearance flows to establish pixel correspondences under variable illumination. Although this strategy improves robustness in depth estimation, it substantially increases computational complexity due to its reliance on pre-trained optical flow subnetworks and the need to predict dense appearance flow fields during training.
+
+More recently, foundation-model-based depth estimation approaches such as \emph{Depth Anything V2} \citep{DepthAnythingV2_2024}, as well as endoscopy-oriented adaptations like \emph{EndoDAC} \citep{EndoDAC_MICCAI_2024} and \emph{HA-Depth} \citep{HAdepth_2025}, have demonstrated strong generalization capabilities thanks to large-scale pretraining and universal geometric priors. However, despite their improved cross-domain robustness, these models still struggle with the severe photometric distortions inherent to endoscopy. In practice, even these advanced architectures implicitly or explicitly rely on appearance flow seen in \citep{Shao_MIA_2022} , illumination correction modules, or additional subnetworks designed to compensate for lighting variability. Such components introduce further training complexity, increase computational cost, and do not fundamentally resolve the core challenge that illumination changes in endoscopy are local, abrupt, and highly dependent on organ geometry and endoscope pose.
+
+These shortcomings motivate the present work, which proposes an illumination-invariant training strategy applicable to any depth estimation backbone. Rather than adding optical flow subnetworks or global illumination correction modules, the proposed approach introduces a mathematically grounded local illumination model and a corresponding invariant loss that are computationally lightweight and compatible with 
+foundation model fine-tuning. \textcolor{red}{As shown in Section~\ref{sec:Experimental-Results}, with a foundation encoder this strategy is more accurate than the flow-based baseline, and no significant difference with the strongest foundation-model baselines is detected on SCARED and Hamlyn, at less than half of their training time.}
+%
+\subsection{Paper structure and content}
+%
+
+This paper is organized as follows: Section \ref{sec:methods_and_data} describes two key contributions: i) a novel illumination invariant loss and ii) a per-pixel neural intensity transformation. These two innovations address the limitations of existing approaches by enhancing the robustness to strong illumination variations. This section also outlines the integration of transformer-based architectures to effectively combine local and global contexts. Section \ref{sec:experimental-setup} describes the datasets (SCARED, Hamlyn, and C3VD), as well as the model configurations and hyperparameters used in this work. Section \ref{sec:Experimental-Results} gives quantitative and qualitative results that highlights the effectiveness of the three proposed model variants (MonoII, MonoIIT, MonoIIF) against state-of-the-art approaches, with a particular emphasis on MonoIIF as the primary contribution. \textcolor{red}{Evaluations on the Hamlyn and C3VD datasets assess the generalization capabilities of the models. Additionally, the predicted depth maps are used for 3D surface reconstructions on the Hamlyn dataset, in order to visually check the continuity of the textures and of the geometry of the reconstructed surfaces.} Section \ref{sec:discussion_and_futher_work} discusses the strengths and limitations of the proposed approach. Section \ref{sec:conclusions} summarizes the contributions of this work. 
+
+\section{New self-supervised illumination invariant
+ depth prediction in endoscopy}
+\label{sec:methods_and_data}
+
+\subsection{Illumination invariance in endoscopy \label{sec:illumination_models}}
+
+\subsubsection{Model for complex illuminations changes \label{sec:illumination_change_models}}
+The authors in \citep{Ozyoruk_MIA_2021} used an affine transformation to globally model the illumination changes between two images using a single mathematical relationship including a multiplicative and an additive term. Due to the locally changing orientations and shapes of the organ surfaces, the varying endoscope viewpoints and the small tissue-endoscope's distal tip distances, such a global model with same parameter values for all pixels cannot appropriately represent the illumination changes between images. However, an affine model can be appropriate to locally model the illumination changes between small enough images regions. In Eq.~\eqref{eq:ill_model1}, multiplicative term $a_{\mathbf{x}_i} \in \mathbb{R}_{>0}$ and additive term $b_{\mathbf{x}_i} \in \mathbb{R}$ have different values according to the image region centered on pixel ${\bf x}_i$ with coordinates $(x_i, y_i)$. The illumination change model is local since, for all pixels ${\bf x}_k$ of a squared patch $\mathcal{P}({\bf x}_i)$ centered on ${\bf x}_i$ in an image, one considers that constant $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ parameter values are appropriate to model the illumination changes between the pixels of small homologous patches $\mathcal{P}_s({\bf x}_i)$ and $\mathcal{P}_t({\bf x}_j)$, respectively located in source image $I_s$ and target image $I_t$. In Eq.~\eqref{eq:ill_model1}, vector $\vec{v}=(x_j-x_i, y_j-y_i)$ places the central pixel ${\bf x}_i$ of patch $\mathcal{P}_s$ in source $I_s$ on the coordinates ${\bf x}_j$ of patch $\mathcal{P}_t$ in target $I_t$.
+%
+\begin{equation} \label{eq:ill_model1}
+\mathcal{P}_t({\bf x}_j) = \mathcal{P}_t({\bf x}_i + \vec{v}) = a_{\mathbf{x}_i} \mathcal{P}_s({\bf x}_i) + b_{\mathbf{x}_i},  \, \, \forall {\bf x}_k \in \mathcal{P}_s({\bf x}_i) 
+\end{equation}
+%
+Very different local illuminations changes can be modeled with Eq.~\eqref{eq:ill_model1} when small patches are associated to all pixels of images $I_s$ and  $I_t$. The proposed model is the most ``local'' for $3 \times 3$ patch sizes and is able to mathematically represent all types of complex illumination changes between images.   
+%
+\subsubsection{Illumination invariant patch content descriptors}
+%
+The aim of descriptor $\mathbf{D}$ is to use the intensities of the pixels of patches $\mathcal{P}_s({\bf x}_i)$  and  $\mathcal{P}_t({\bf x}_j)$ to determine an illumination change independent representation of the content of small homologous image regions, i.e., 
+%
+\begin{equation} \label{eq:ill_model2}
+\mathbf{D}\left(\mathcal{P}_t({\bf x}_j)\right) =  \mathbf{D}\left(\mathcal{P}_t({\bf x}_i+\vec{v})\right) =
+\mathbf{D}\left(a_{\mathbf{x}_i} \mathcal{P}_s({\bf x}_i) + b_{\mathbf{x}_i}\right),
+\end{equation}
+%
+where $\vec{v}$, $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ have the same meaning as in Eq.~\eqref{eq:ill_model1}.
+%
+The authors in \citep{Trinh_CVIU_2019} proposed two general mathematical formulations from which numerous illumination invariant descriptors can be derived. Inspired by this general formulation, convolution kernels are used in this contribution to compute directional derivatives of the intensities in patches $\mathcal{P}_s({\bf x}_i)$  and  $\mathcal{P}_t({\bf x}_j)$. By taking $3 \times 3$ sized kernels $K^d$ (the same size as the patches), one can define eight directions $d$ for the derivatives      
+%
+\begin{equation} \label{eq:ill_model3}
+K^d = \left[
+\begin{array}{ccc}
+    k_1^d &  k_2^d & k_3^d\\
+    k_4^d &  k_0 ^d & k_5^d\\
+    k_6^d &  k_7 ^d & k_8^d
+\end{array}\right],
+\end{equation}
+where, according to the value of $d \in [1, 2, \dots, 8]$, the direction of derivation is west (horizontal), west/south (diagonal), south (vertical), south/east (diagonal), east (horizontal), east/north (diagonal), north (vertical) or north/west (diagonal). 
+%
+The convolution of a kernel $K^d$ with a patch $\mathcal{P}({\mathbf{x}_i})$ in which the intensities change according to an affine transformation can be formulated as follows.   
+%
+\begin{equation} \label{eq:ill_model4}
+C_{\mathbf{x}_i}^d = \left(a_{\mathbf{x}_i}\mathcal{P}(\mathbf{x}_i) + b_{\mathbf{x}_i}\right) \otimes K^d 
+\end{equation}
+%
+The illumination change effects produced by multiplicative term $a_{\mathbf{x}_i}$ and additive term $b_{\mathbf{x}_i}$ can be separated with the linearity property of the convolution. 
+%
+\begin{equation} \label{eq:ill_model5}
+C_{\mathbf{x}_i}^d = a_{\mathbf{x}_i}\mathcal{P}({\mathbf{x}_i}) \otimes K^d + b_{\mathbf{x}_i} \otimes K^d
+\end{equation}
+%
+If coefficients $k_c^d$ in Eq.~\eqref{eq:ill_model3} are chosen such that 
+\begin{equation} 
+\sum_{c=0}^{c=8} k_{c}^d = 0,  \nonumber
+\end{equation}
+%
+then 
+%
+\begin{equation} 
+b_{\mathbf{x}_i} \otimes K^d =  \sum_{c=0}^{c=8} b_{\mathbf{x}_i}k_{c}^d = 
+b_{\mathbf{x}_i} \sum_{c=0}^{c=8} k_{c}^d = 0
+\nonumber 
+\end{equation}
+%
+and Eq.~\eqref{eq:ill_model5} leads to Eq.~\eqref{eq:ill_model6} since additive term $b_{\mathbf{x}_i}$ has no effect on the illumination change in patch $\mathcal{P}({\mathbf{x}_i})$.  
+%
+\begin{equation} \label{eq:ill_model6}
+C_{\mathbf{x}_i}^d = a_{\mathbf{x}_i}\mathcal{P}({\mathbf{x}_i}) \otimes K^d 
+\end{equation}
+%C\
+Now, one can consider vector $\mathbf{C}_{\mathbf{x}_i}$ consisting of eight components $C_{\mathbf{x}_i}^d$, i.e., $\mathbf{C}_{\mathbf{x}_i} = \left(C_{\mathbf{x}_i}^1, C_{\mathbf{x}_i}^2, \cdots, C_{\mathbf{x}_i}^8\right)^T$. The norm $\|\mathbf{C}_{\mathbf{x}_i}\|$ of this vector is defined as follows.
+%
+\begin{equation} \label{eq:ill_model7}
+\|\mathbf{C}_{\mathbf{x}_i}\| = \sqrt{\sum_{d=1}^{d=8}\hspace*{-1mm}\left(C_{\mathbf{x}_i}^d\right)^2} = \sqrt{\left(a_{\mathbf{x}_i}\right)^2\sum_{d=1}^{d=8} \hspace*{-1mm} \left(\mathcal{P}({\mathbf{x}_i}) \otimes K^d \right)^2}
+\end{equation}
+%
+The components $C_{\mathbf{x}_i}^d$ can be normalized by the norm of their vector given in Eq.~\eqref{eq:ill_model7}.  
+%
+\begin{equation} \label{eq:ill_model8}
+\frac{C_{\mathbf{x}_i}^d}{\|\mathbf{C}_{\mathbf{x}_i}\|} = 
+\frac{\cancel{a_{\mathbf{x}_i}}\,\mathcal{P}({\mathbf{x}_i}) \otimes K^d}
+{\cancel{a_{\mathbf{x}_i}}\sqrt{\sum\limits_{d=1}^{d=8} \hspace*{-1mm} \left(\mathcal{P}({\mathbf{x}_i}) \otimes K^d \right)^2}} 
+\end{equation}
+%
+It is visible in Eq.~\eqref{eq:ill_model8} that this normalization 
+compensates the illumination change effect due to multiplicative term $a_{\mathbf{x}_i}$ in patch $\mathcal{P}({\mathbf{x}_i})$.  
+%
+The descriptor vector $\mathbf{D}$ of patch $\mathcal{P}({\bf x}_i)$ can now be defined as follows.
+%
+\begin{equation} \label{eq:ill_model9}
+\mathbf{D}\left(\mathcal{P}({\bf x}_i)\right) = \frac{\mathbf{C}_{\mathbf{x}_i}}{\|\mathbf{C}_{\mathbf{x}_i}\|} = \left(
+\frac{C_{\mathbf{x}_i}^1}{\|\mathbf{C}_{\mathbf{x}_i}\|}, 
+\frac{C_{\mathbf{x}_i}^2}{\|\mathbf{C}_{\mathbf{x}_i}\|}
+\cdots, \frac{C_{\mathbf{x}_i}^8}{\|\mathbf{C}_{\mathbf{x}_i}\|} \right)^T
+\end{equation}
+%
+The descriptor $\mathbf{D}$ proposed in Eq.~\eqref{eq:ill_model9} is illumination invariant since all the components of this vector fulfill the definition of illumination invariance given in Eq.~\eqref{eq:ill_model2}. In the specific case of oriented $3 \times 3$ derivative kernels $K^d$, the descriptor $\mathbf{D}$ represents the content of a patch by a star-shaped intensity variation (variations along eight star branches) which remain constant under the illumination changes modeled by Eq.~\eqref{eq:ill_model1}.      
+%
+%%%%%%%%%%%%%%%%%%%%%%%%   FIGURE 2 %%%%%%%%%%%%%%%%%%%%
+%
+\begin{figure*}[th]
+    \centering
+\includegraphics[width=\textwidth]{Architecture_blocks.png}
+%
+\caption{Overview of the proposed depth prediction framework. 
+The depth prediction module estimates depth map values $D(\mathbf{x}_s^i)$ for each pixel $\mathbf{x}^i_s$ of source image $I_s$. Equation \eqref{eq:Eq1} is then used to establish the geometric relationship between the pixels of source $I_s$ and target image $I_t$ which are assumed to be homologous. The intensity transformation module (see Section \ref{sec:Architectures}) predicts brightness and contrast changes between the viewpoints of $I_s$ and $I_t$. These predicted illumination changes are used to correct the colors of synthesized image $\hat{I}_t$ so that the colors of the latter (referred to as "$\hat{I}_t$ refined" in this figure) better aligns with that of $I_t$. This step improves the estimation efficiency of the photometric loss ($\mathcal{L}_\textrm{PML}$, see Eq.~\eqref{eq:lpms} and Section \ref{sec:lit}). Additionally, illumination-invariant vectors ($\mathbf{D}^{im}$ in Eq.~\eqref{eq:ill_model10}) are determined for both $I_s$ and $I_t$ using Robinson Kernels (see Section \ref{sec:clf}), and an illumination invariant loss ($\mathcal{L}_\textrm{II}$, see Eq.~\eqref{eq:ill_model13}) is calculated to make poorly textured image region of the source and target images more comparable, even under changing illumination. A separate encoder takes a pair of images $(I_s, I_t)$ and predicts their relative camera pose and light intensity transformation.   
+\label{Modules}}
+\end{figure*}
+%
+\subsection{Illumination invariant self-supervised depth prediction model}
+%
+\subsubsection{Preliminary remarks} \label{sec:preleminaryRemarks}
+%
+Monocular depth estimation models as that in \citep{Godard_ICCV_2019,Zhou_CVPR_2017,Zhou_ICCV_2019,Zhao_3DV_2022}
+are classically based on self-supervision signals that are used to train a depth-map estimation network. 
+%
+These supervision signals are derived from a geometrical relationship referred to as ``view synthesis'' involving two camera poses from which two images $I_t$ (target) and $I_s$ (source) are acquired. This view synthesis relationship is expressed in Eq.~\eqref{eq:Eq1}, where ${\bf x}^j_i$ stands for the homogeneous coordinates (a column vector with three components) of pixel $i$ in image $I_j$. Eq.~\eqref{eq:Eq1} is based on the usual 3 $\times$ 3 matrix $\bf{K}$ of intrinsic 
+parameters\footnote{The entries of matrix $\bf{K}$ depend on focal length $f$, the CCD sensor side width and height, and the coordinates of the optical center projection on the image plane. Eq.~\eqref{eq:Eq1} assumes that the barrel distortions due to the small $f$ values of endoscopes were corrected in $I_t$ and $I_s$ with a method such described in \citep{Miranda_ICIP_2004}.},  
+%
+the 4 $\times$ 4 matrix ${\bf M}_{s \rightarrow t}$\footnote{${\bf M}_{s \rightarrow t}$ is an isometry, i.e., a matrix with three translation parameters and three angles.}
+%
+which allows to pass from the coordinate system of the source camera pose to that of the target camera pose, and a depth map $D$ that must be predicted for the source image $I_s$ (scalar $D({\bf x}^s_i)$ stands for the depth value of pixel ${\bf x}^s_i$). 
+%
+ Under the assumption that both  $\bf{K}$ and ${\bf M}_{s \rightarrow t}$ matrices are accurately known (estimated), a correctly predicted depth map $D$ implies that the pixels ${\bf x}^s_{i}$ and ${\bf x}^t_{i}$ linked by Eq.~\eqref{eq:Eq1} effectively represent homologous pixels in $I_s$ and $I_t$.      
+%
+\begin{equation} \label{eq:Eq1}
+{\bf x}_i^t = 
+\begin{bmatrix}
+\mathbf{K} | \mathbf{0}
+\end{bmatrix}
+\mathbf{M}_{s\rightarrow t}
+\begin{bmatrix}
+D({\bf x}^s_i) \mathbf{K}^{-1} {\bf x}_i^s\\
+ 1
+\end{bmatrix}
+\end{equation}
+%
+A synthesized target image $\hat{I}_{t}$ is obtained via a differentiable inverse warping operation referred to as a spatial transformer. After the warping process, one ideally has  $\hat{I}_{t}({\bf x}_i^t)$ = $I_{t}({\bf x}_i^t)$ $\forall i$ (i.e., homologous pixels have the same colors in images $\hat{I}_{t}$ and $I_{t}$). 
+% 
+The most common approach for measuring appearance differences makes use of a combination of  the mean of the $L_1$ norm of the color vector differences of the pixels in $\hat{I}{_t}$ and $I{_t}$  ($\Vert\hat{I}_{t},I_t\Vert_1$) in tandem with the Structural Similarity Index Measure (SSIM) computed for these same image pair (see Eq.~\eqref{eq:lpms}). The SSIM term, which accounts for both structural and statistical intensity information, is appropriate when texture changes and illumination variations are small. The value of the parameter $\alpha$ in Eq.~\eqref{eq:lpms} is typically set to 0.85 to favor the SSIM term 
+in the photometric similarity loss $\mathcal{L}_\textrm{PML}$, and to maintain the impact of the potential color dissimilarities between $\hat{I}_t$ and $I_t$ in   $\Vert\hat{I}_{t},I_t\Vert_1$ term small. 
+%
+\begin{equation} \label{eq:lpms}
+\mathcal{L}_\textrm{PML}(\hat{I}_{t},I_t) = \frac{\alpha (1-\textrm{SSIM}(\hat{I}_{t},I_t))}{2} \\ 
++ (1 - \alpha) \Vert\hat{I}_{t},I_t\Vert_1
+\end{equation}
+%
+Assuming that the scene is rigid and that the scene illumination is viewpoint independent, the colors of target image $I_{t}$ are expected to be similar to the colors of the synthesized target image $\hat{I}_{t}$ \footnote{The colors of synthesized image $\hat{I}_{t}$ are close to that of source $I_s$ after the inverse warping operation.}. If such assumptions on the scene hold, the $\mathcal{L}_\textrm{PML}$ loss given in Eq.~\eqref{eq:lpms} can be deemed appropriate for training depth and camera pose estimation models.
+
+However, self-supervised depth prediction approaches based on the assumption of brightness constancy between frames $I_t$ and $\hat{I}_{t}$ are inappropriate in endoscopy due to drastic illumination changes between $I_s$ and $I_t$, which can lead to depth maps with erroneous values (i.e., with wrong predictions or discontinuities in the depth map). Moreover, large inaccuracies can also be introduced in the presence of over- or underexposed image regions. 
+%
+As summarized and sketched in Fig.~\ref{Modules}, the proposed depth prediction framework is improved using two key components (see the blue boxes in Fig.~\ref{Modules}) to account for such complex illumination changes.    
+%
+On the one hand, this contribution proposes a solution based on the local intensity change model given in Eq.~\eqref{eq:ill_model1} to help loss $\mathcal{L}_\textrm{PML}$ in the similarity assessment of synthesized image $\hat{I}_{t}$ and target $I_t$ through the adaptation of terms $\Vert\hat{I}_{t},I_t\Vert_1$ and $\textrm{SSIM}(\hat{I}_{t},I_t)$ in Eq.~\eqref{eq:lpms} to complex illumination changes (see Section \ref{sec:lit}). On the other hand, an illumination invariant loss based on patch descriptors is defined in Section  \ref{sec:clf} for comparing synthesized target image $\hat{I}_{t}$ and target $I_t$ using the components of the vectors defined in Eq.~\eqref{eq:ill_model9}.
+%
+%
+\subsubsection{Training of the proposed architecture\label{sec:sst}}
+%
+In the training phase, the proposed network consists of a depth estimation module, a camera pose prediction module, and a lighting correction calibration module. The improved depth prediction module integrates a transformer-based architecture, which combines local and global information through the combination of CNN blocks and transformer blocks. The purpose of the lighting change calibration module is to enable the correction of the colors of frame $\hat{I}_{t}$ to make them comparable to that of $I_t$ by compensating for local light illumination changes between $I_s$ and $I_t$. 
+In addition, a novel supervision signal is introduced. An illumination invariant loss serves as a secondary signal to capture illumination invariant information that the photometric loss might miss. The complete training framework is depicted in Fig.~\ref{Modules}. 
+
+\subsubsection{Light intensity transformation\label{sec:lit}}
+%
+The purpose of the lighting change calibration module is to enable the prediction of illumination variations between the synthesized target image $\hat{I}_t$ and target $I_t$. The predicted local brightness and contrast variations are used to correct $\hat{I}_t$ so that its colors are as close as possible to those of $I_t$. In the affine model of Eq.~\eqref{eq:ill_model1}, the multiplicative term $a_{\mathbf{x}_i}$ represents a local contrast adjustment parameter, while the additive term $b_{\mathbf{x}_i}$ accounts for brightness offsets between homologous pixels $\mathbf{x}_i$ in images $I_s$ and $I_t$. Given that in endoscopy viewpoint changes mainly involve illumination intensity variations (and very small hue changes), the same predicted multiplicative and additive terms $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ enable to correct the three RGB-color components of pixels $\mathbf{x}_i$. 
+
+As illustrated in Fig.~\ref{Modules}, during training, the features from the final convolutional layer of the pose encoder are passed through a lighting change decoder to generate the predicted brightness and contrast images ($I_B$ and $I_A$, respectively). During the depth estimation step, the intensities of all pixels $\mathbf{x}_i$ in image $\hat{I}_{t}$ are obtained by correcting $I_s$ using the coefficients $I_B(\mathbf{x}_i)$ and $I_A(\mathbf{x}_i)$. Ensuring consistency in terms of illumination across $I_s$ and $\hat{I}_t$ (see Fig.~\ref{Brightness}) when calculating the 
+$\mathcal{L}_\textrm{PML}$ loss mitigates the impact of illumination changes on the primary training signal (see Fig.~\ref{Modules}). 
+%
+%
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{brightness_h.png}
+    \caption{
+     The top row gives, from the left to the right,  target image $I_t$, target $\hat{I}_t$ obtained with the predicted depth map and having the colors of source $I_s$ (see Eq.~\eqref{eq:Eq1}),  refined image $\hat{I}_t^\text{refined}$ having the colors of $\hat{I}_t$ which were corrected with the predicted local parameters $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ (encoded in $I_A$ and $I_B$, see Section \ref{sec:lit}) of the affine relationship modeling the pixel-wise illumination change between $I_s$ and $I_t$, predicted contrast image $I_A$, and predicted brightness images $I_B$. The second row shows zoomed image parts of homologous regions in $I_t$, $\hat{I}_t$ and $\hat{I}_t^\text{refined}$. The gray-level images in the third and last columns represent the absolute values of the color differences between the zoomed regions in the first ($I_t$) and second ($\hat{I}_t$) columns and between that in the first ($I_t$) and fifth ($\hat{I}_t^\text{refined}$) columns, respectively. In these different images, the range of values was greatly stretched to enable a clear visualization of the effect of exposure differences. It is noticeable that the difference image of the sixth column include much less bright pixels than that in the third column. This result indicates that image $\hat{I}_t^\text{refined}$ is effectively more similar to $I_t$ than $\hat{I}_t$ after the color correction.
+    \label{Brightness}}
+\end{figure*}
+%
+\subsubsection{Depth estimation backbone architectures  \label{sec:Architectures}} 
+%
+\paragraph{\textcolor{red}{CNN backbone (MonoII).}} \textcolor{red}{The MonoII model uses the convolutional encoder--decoder of Monodepth2 \citep{Godard_ICCV_2019}: a ResNet-18 encoder \citep{He_CVPR_2016} pretrained on ImageNet \citep{Deng_CVPR_2009}, followed by a DispNet-like decoder with skip connections that predicts the disparity maps. The pose estimation module is also based on a ResNet-18 encoder. This lightweight variant allows the two illumination components to be assessed with a purely convolutional depth network (see also Section~\ref{sec:model_architectures}).}
+%
+\paragraph{Transformer-based backbone (MonoIIT).}
+State-of-the-art depth prediction networks, such as \citep{Godard_ICCV_2019,Ozyoruk_MIA_2021,Shao_MIA_2022} rely on conventional convolutional layers to gather contextual information and progressively expand the network's receptive field through a series of layers and stridden convolutions. However, due to the inherent local nature of the convolution operation, CNNs struggle to capture long-range similarities in appearance among objects, particularly in shallow features. This becomes evident in scenarios where objects share texture similarities with the background (a common situation in endoscopy), causing the network to group these features in the same semantic context. 
+
+As shown in Fig.~\ref{Modules}, a transfomer-based depth estimation module that uses vision transformer (ViT) blocks \citep{Zhao_3DV_2022} was integrated into the proposed architecture to address this issue. The ViT blocks, depicted in Fig.~\ref{MonoViT}, capture diverse contextual information (both short-range and long-range) by combining features from CNN and transformer layers. The images are first processed through a Conv-stem block, which consists of two convolutional layers with a 3×3 kernel size. A stride of 2 is applied in the initial convolution, generating feature maps with dimensions $H/2 \times W/2$, where $H$ and $W$ represent the height and width of the image, respectively. From stage two to stage five, multi-path transformer blocks are sequentially applied within each stage. These blocks, labeled as ``Joint CNN \& Transformer Layer'' in Fig.~\ref{MonoViT}, enable the extraction of robust features by leveraging the complementary strengths of CNNs and transformers.
+%
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{MonoViT.png}
+    \caption{\textcolor{red}{Architecture of MonoIIT.} The network begins with a convolutional \textcolor{red}{stem (Conv-stem)} that processes the input image. It then passes through multiple stages of joint CNN and transformer layers at progressively reduced resolutions. Each stage feeds into up-convolution (Upconv) layers which up-sample the feature maps back to the original resolution, using skip connections (dashed lines) to integrate high-resolution features from earlier stages. The up-sampled outputs are then processed by disparity heads to generate depth (disparity) maps at different scales. The arrows give the direction of the data flow, black and blue arrows indicating connections and up-sampling operations, respectively.}
+    \label{MonoViT}
+\end{figure*}
+
+Each of the "Joint CNN \& Transformer Layer" depicted in Fig.~\ref{MonoViT} integrates a Multi-Scale Patch Embedding layer, which are in charge of embedding visual tokens of varying sizes simultaneously. In this work, four parallel convolutional blocks extract features with receptive fields of $3\times 3$, $5\times5$, and $7\times7$ pixels, achieved by stacking multiple $3\times3$ convolutional layers. Capitalizing on ViT's capability to establish global dependencies while acknowledging its limitations in modeling local details, the extracted tokens undergo processing via both convolutional layers and Transformer blocks in a parallel and complementary fashion. This involves the use of the four branches shown in Fig.~\ref{MonoViT}, which consist of three parallel Transformer blocks and a convolutional block. The latter incorporates $1\times1$ conventional convolutions, as well as $1\times1$, $3\times3$ depthwise convolutions. While the convolutional branch fosters local relationships between neighboring features, the three transformer blocks facilitate information interaction across the entire input space within features, a capability afforded by the use of the self-attention mechanism.
+%
+ViT blocks exhibit greater potential for capturing long-range dependencies while convolutional blocks extract fine-grained details commonly necessary in endoscopy.
+%
+\paragraph{Foundation model backbone (MonoIIF).}
+The MonoIIF model builds upon the Depth~Anything foundation model ~\citep{yang2024depth}, which provides robust monocular depth priors through large-scale pretraining on diverse natural image datasets. Rather than fine-tuning all model parameters which would be computationally prohibitive and risk catastrophic forgetting of learned geometric priors MonoIIF employs domain-specific low-rank adaptation DVLoRA~\citep{cui2024endodac} to inject endoscopy-specific knowledge into the pretrained encoder. DVLoRA decomposes weight updates into low-rank matrices, enabling efficient adaptation with a small number of trainable parameters while preserving the generalization capability of the original foundation model. The proposed illumination-invariant loss $\mathcal{L}_\text{II}$ and the per-pixel lighting calibration module (see Section~\ref{sec:lit}) are applied identically to MonoIIF as to the other variants, ensuring that the photometric robustness introduced by the illumination-invariant training strategy is fully retained. The pose estimation module follows the same encoder-decoder structure used in MonoII, ensuring a comparable architectural footprint and enabling a fair assessment of the contribution of the foundation model backbone.
+%
+\subsubsection{Complementary loss functions \label{sec:clf}}
+%
+\noindent{\bf Overview of the three used loss functions.}
+%
+The efficiency of the photometric similarity loss function $\mathcal{L}_{\textrm{PML}}$ defined in Eq.~\eqref{eq:lpms} was improved by correcting the intensities of synthesized target images $\hat{I}_t$ with the predicted multiplicative and additive terms of the model given in Eq.~\eqref{eq:ill_model1}. \textcolor{black}{More precisely,from Eq.~\eqref{eq:ItChanged} it can be observed that the intensities of the pixels of synthesized image $\hat{I}_t$ are modified using the multiplicative term $a_{\mathbf{x}_i}$ and the additive term $b_{\mathbf{x}_i}$ of all patches $\mathcal{P}({\mathbf{x}_i})$. In this equation, pixels $\mathbf{x}^t_i$ and $\mathbf{x}^s_i$ are those that also appear in Eq.~\eqref{eq:Eq1} which expresses the view synthesis principle.}
+%
+\textcolor{black}{
+\begin{equation} \label{eq:ItChanged}
+\hat{I}_t\left(\mathbf{x}^t_i\right) = 
+  a_{\mathbf{x}_i}I_s\left(\mathbf{x}^s_i\right) + b_{\mathbf{x}_i} \;\; \forall{\mathbf{x}^s_i \in \mathcal{P}({\mathbf{x}_i}) \; \textrm{and} \; \forall{\mathcal{P}({\mathbf{x}_i})}} 
+\end{equation}
+}
+\textcolor{black}{In contrast, in previous work \citep{Trinh_CVIU_2019} the local affine model was only used to prove that the descriptors used in the optical flow data-term are illumination invariant, but the parameters of the model were not integrated in the flow field estimation. In contrast, herein the predicted model parameters are directly used in loss function $\mathcal{L}_{\textrm{PML}}$ to estimate the depth maps.}
+%
+
+However, even if this intensity correction improves the efficiency of the $\mathcal{L}_{\textrm{PML}}$ loss, this improvement also depends on the accuracy of the prediction of the values of parameters $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ associated to patches $\mathcal{P}_{im}({\bf x}_i)$. For this reason, this contribution proposes a novel illumination invariant loss $\mathcal{L}_{\textrm{II}}$, which acts as a secondary signal in the depth prediction module. This loss is designed such that it is independent of the values of parameters $a_{\mathbf{x}_i}$ and $b_{\mathbf{x}_i}$ of Eq.~\eqref{eq:ill_model1}.
+Furthermore, an edge-aware depth smoothness loss ($\mathcal{L}_{\textrm{Edge}}$)  was used in the depth prediction module to ensure a smooth depth signal in edge-free image regions.
+%
+
+\vspace*{1 mm}
+\noindent{\bf Illumination invariant loss.} The proposed illumination invariant loss exploits the general formulation of illumination invariant descriptors given in Eqs.~\eqref{eq:ill_model8} and \eqref{eq:ill_model9}. As sketched in Fig.~\ref{iil}, the convolution kernels $K^d$ used in Eq.~\eqref{eq:ill_model8} are Robinson's kernels, each of the eight kernels $K^d$ leading to a derivative in a given direction $d \in [1, 2, \ldots, 8]$. \textcolor{black}{The authors in  \citep{Trinh_CVIU_2019} integrated the Robinson-kernel-based descriptor vectors in the data-term of a dense optical flow method that had to provide accurate vector fields linking homologous pixels, even in the presence of i) large camera movements, ii) scenes with very low textures (i.e., only small color variations) and iii) local dependent and strong  illumination changes between images. Gastroscopic scenes (as the stomach) are characterized by extremely challenging imaging conditions. The acquired images can be simultaneously affected by the three previously listed effects, in a larger proportion to conventional outdoor scenes. Given  that this optical flow method (based on the Robinson-kernel descriptors) yielded strong results for building  both visually coherent large fields of view 2D mosaics in the stomach \citep{Zenteno_CBM_2022} in the one hand, and accurate textured stomach surfaces using a structure from motion approach \citep{Phan_PR_2020} in the other, led naturally to its application in depth estimation pipelines. The main rationale was that the obtained descriptors could also represent an appropriate and robust tool for improved depth estimation in endoscopic applications.}
+
+It is noticeable in Fig.~\ref{iil} that the sum of the coefficients $k_c^d$ (with $c \in [0, 2, \ldots, 8]$, see Eq.~\eqref{eq:ill_model3}) is null for all eight kernels so that the effect of additive terms $b_{\mathbf{x}_i}$ can effectively be ignored (i.e., $b_{\mathbf{x}_i}\otimes K^d = 0$) when passing from Eq.~\eqref{eq:ill_model5} to Eq.~\eqref{eq:ill_model6}.
+%
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{iil.png}
+    \caption{Illustration of the illumination-invariant feature determination. Eight Robinson kernels   
+    are convolved with the gray-scale versions of $I_s$ and $I_t$. The normalization of these convolved images (see Eq.~\eqref{eq:ill_model11}), leads to eight ``descriptor vector component images''. Each normalized image corresponds to one of the eight directional variations encoding together local illumination-invariant features essential for robust depth estimation.
+    \label{iil}}
+\end{figure*}
+%
+Based on Eq.~\eqref{eq:ill_model9}, the eight components of descriptor vectors $\mathbf{D}^{im}\left(\mathcal{P}_{im}({\bf x}_i)\right)$ can now be computed as follows for $3\times3$ sized patches $\mathcal{P}_{im}({\bf x}_i)$ centered on pixel $\mathbf{x}_i$ in the source $I_s$ ($im = s$) and target $I_t$ ($im = t$) images. 
+%
+%
+\begin{equation} \label{eq:ill_model10}
+\mathbf{D}^{im}\left(\mathcal{P}_{im}({\bf x}_i)\right)  = \left(
+\frac{C_{\mathbf{x}_i}^{im,1}}{\|\mathbf{C}^{im}_{\mathbf{x}_i}\|}, 
+\frac{C_{\mathbf{x}_i}^{im,2}}{\|\mathbf{C}^{im}_{\mathbf{x}_i}\|}
+\cdots, \frac{C_{\mathbf{x}_i}^{im,8}}{\|\mathbf{C}^{im}_{\mathbf{x}_i}\|} \right)^T
+\end{equation}
+%
+The value of the components $d$ for the all descriptors of image $im$  can be used to represent the source $I_s$ and target $I_t$ by eight illumination invariant gradient images (i.e., the vectors given in Eq.~\eqref{eq:ill_model10} are rewritten as eight ``vector component images'' $I_{im}^{d}$ in Eq.~\eqref{eq:ill_model11}).
+%
+\begin{equation} \label{eq:ill_model11}
+I_{im}^{d}({\bf x}_i) = \frac{C_{\mathbf{x}_i}^{im,d}}{\|\mathbf{C}^{im}_{\mathbf{x}_i}\|} = 
+\frac{\mathcal{P}_{im}({\mathbf{x}_i}) \otimes K^d}
+{\sqrt{\sum\limits_{d=1}^{d=8} \left(\mathcal{P}_{im}({\mathbf{x}_i}) \otimes K^d \right)^2}}
+\end{equation}
+%
+The structural similarity index measure of images $\hat{I}_{t}$ and $I_t$ is defined by the mean of all SSIM values between the gradient images $I_{s}^{d}({\bf x}_i)$ and $I_{t}^{d}({\bf x}_i)$.
+%
+\begin{equation} \label{eq:ill_model12}
+SSIM_{\textrm{II}}\left(\hat{I}_{t}, I_t\right) = \frac{1}{8}\sum\limits_{d=1}^{d=8}\left(SSIM\left(\hat{I}_{t}^{d},I_{t}^{d}\right)\right)
+\end{equation}
+%
+With the SSIM given in Eq.~\eqref{eq:ill_model12} one can classically define the illumination-invariant loss $\mathcal{L}_{\textrm{II}}$.
+%
+\begin{equation} \label{eq:ill_model13}
+\mathcal{L}_{\textrm{II}}\left(\hat{I}_t, I_t\right) = 1 - SSIM_{\textrm{II}}\left(\hat{I}_t, I_t\right)
+\end{equation}
+%
+\begin{comment}
+\begin{equation} \label{Eq4}
+IIF_s = [M1 \otimes Is,M2 \otimes Is,...,M8 \otimes Is]
+\end{equation}
+%
+\begin{equation} \label{Eq5}
+IIF_t\rightarrow t  = [M1 \otimes It,M2 \otimes Is,...,M8 \otimes It]
+\end{equation}
+%
+\begin{equation} \label{Eq6}
+IILoss = (1-SSIM(IIF_s,IIF_t\rightarrow t))
+\end{equation}    
+\end{comment}
+
+The $\mathcal{L}_{\textrm{II}}$ loss in Eq.~\eqref{eq:ill_model13} acts as a secondary signal for self-supervision by focusing the attention of the model on image regions with strong illumination changes. This loss is appropriate for weakly textured images, since the gradient descriptors measure intensity variations that must not correspond to contrasted textures.
+
+\vspace*{2mm}
+\noindent{\bf Edge-aware depth smoothness.}
+%
+In endoscopy, a region of an image $I_{im}$ without pronounced edges often translates to a region in the depth map $D$ with  small and smooth depth changes. In other words, a small intensity or color change around pixel $I_{im}(\mathbf{x}_i)$ should be associated with a small variation around $D(\mathbf{x}_i)$ in the depth map. In Eq.~\eqref{edge}, the location of pixel $\mathbf{x}_i$ in source $I_{s}$ of $M$ columns and $N$ lines is defined by coordinates $(x_i, y_i)$ and $\|.\|$ stands for the norm of the RGB-color vector changes along the rows (partial derivative $\scriptstyle \frac{\partial}{\partial x_i}$) and columns (partial derivative $\scriptstyle \frac{\partial}{\partial y_i}$). In this edge-aware depth smoothness loss function \citep{Godard_ICCV_2019}, small color changes favor the impact of depth variations $\partial D(\mathbf{x}_i)/\partial x_i$ and $\partial D(\mathbf{x}_i)/\partial y_i$ on $\mathcal{L}_{\textrm{Edge}}$ since the weight values $e^{-\|.\|}$ tend to the maximum value of 1 when $\|\partial I_s(\mathbf{x}_i)/\partial x_i\|$ and $\|\partial I_s(\mathbf{x}_i)/\partial y_i\|$ are small.
+%
+\begin{eqnarray} \label{edge} \hspace{-8 mm}
+\mathcal{L}_{\textrm{Edge}}\left(D, I_s\right) \hspace{-2 mm}&=&\hspace{-2 mm} \frac{1}{N{\scriptscriptstyle \times}M} \hspace{-2 mm} \sum_{i=1}^{i=N{\scriptscriptstyle \times}M} \left(
+\left| \frac{\partial D(\mathbf{x}_i)}{\partial x_i} \right| e^{-\left\|\frac{\partial I_{s}(\mathbf{x}_i)}{\partial x_i}\right\|} \nonumber \right.\\ 
+%
+& & \hspace{15 mm}+ 
+%
+\left.\left| \frac{\partial D(\mathbf{x}_i)}{\partial y_i} \right| e^{-\left\|\frac{\partial I_{s}(\mathbf{x}_i)}{\partial y_i}\right\|}\right)
+\end{eqnarray}
+%
+The minimization of the $\mathcal{L}_{\textrm{Edge}}$ loss ensures that image regions without edges  are actually associated with regions with little and smooth variations in the corresponding depth map.  
+%
+\subsubsection{Occlusion mask determination}
+%
+Depending on the camera poses, some regions visible in source $I_s$ may be occluded both in $\hat{I}_t$ and $I_t$. A binary mask $\mu$ can thus be used to locate 
+visible ($\mu(\mathbf{x}_i) = 1$) or occluded ($\mu(\mathbf{x}_i) = 0$) pixels $\mathbf{x}_i$ in the $\hat{I}_t$ and $I_t$ images.
+%
+This mask is computed using Eq.~\eqref{eq:mask_definition} during the network's forward pass. The norm $\left\|I_{im1}(\mathbf{x}_i) - I_{im2}(\mathbf{x}_i)\right\|$ gives the distance in the RGB-color space between two homo\-lo\-gous pixels of images $I_{im1}$ and $I_{im2}$. By making use of the differentiable inverse warping process mentioned in Section \ref{sec:preleminaryRemarks}, the color distances $d_{htt}(\mathbf{x}_i)$ between homologous pixels of the synthesized  $\hat{I}_t$ and target $I_t$ images should be smaller than the corresponding distances $d_{st}(\mathbf{x}_i)$ between homologous pixels of source $I_s$ and target $I_t$. For $d_{htt} > d_{hst}$, the assumption is made that a very large color distance $d_{htt}$ originates either from an occlusion in $\hat{I}_t$ or from a highly inaccurate color estimate $\hat{I}_{t}(\mathbf{x}_i)$. $H(\cdot)$ stands for the Heaviside function, which yields  $\mu(\mathbf{x}_i) = 1$ when $d_{htt} \leq d_{hst}$ or $\mu(\mathbf{x}_i) = 0$, otherwise.
+%
+\begin{equation} \label{eq:mask_definition} 
+\mu(\mathbf{x}_i) =  H (\underbrace{\|I_s(\mathbf{x}_i) - I_t(\mathbf{x}_i)\|}_{d_{st}(\mathbf{x}_i)} - \underbrace{\|\hat{I}_t(\mathbf{x}_i) - I_t(\mathbf{x}_i)\|}_{d_{htt}(\mathbf{x}_i)})
+\end{equation} 
+%
+%
+\subsubsection{Global loss determination}  
+%
+The global loss function $\mathcal{L}_{\textrm{G}}$ is obtained from the linear combination of the three loss components, namely the photometric similarity $\mathcal{L}_\textrm{PML}$, the illumination invariant $\mathcal{L}_\textrm{II}$ and the edge-aware smoothness $\mathcal{L}_{\textrm{Edge}}$ losses. In Eq.~\eqref{eq:global_loss}, $\mathcal{L}_\textrm{PML}$ (see Eq.~\eqref{eq:lpms} and Section \ref{sec:lit}) and $\mathcal{L}_\textrm{II}$ (see Eqs.~\eqref{eq:ill_model11}-\eqref{eq:ill_model13}) are only determined for non-occluded homologous pixels in $I_t(\mathbf{x}_i)$ and $\hat{I}_t(\mathbf{x}_i)$, i.e., for $\mu(\mathbf{x}_i) = 1$ in Eq.~\eqref{eq:mask_definition}. 
+%
+%
+\begin{eqnarray} \label{eq:global_loss} \hspace{-6mm}
+    \mathcal{L}_\textrm{G}(\hat{I}_{t},I_t,D, I_s) & = & \nonumber \\ & & \hspace{-22mm}
+    \mathcal{L}_\textrm{PML}(\hat{I}_{t},I_t) + \lambda_1 \mathcal{L}_\textrm{II}(\hat{I}_t, I_t) + \lambda_2 \mathcal{L}_{\textrm{Edge}}(D, I_s)
+\end{eqnarray}
+%
+%
+Eq.~\eqref{eq:global_loss} cumulates three effects: (i) the photometric loss \( \mathcal{L}_{\text{PMS}} \) enforces pixel-wise the intensity consistency between the source and synthesized target images obtained by the light intensity transformation process, (ii) the  \( \mathcal{L}_\textrm{II} \) loss, weighted by \( \lambda_1 \) whose value ablation is described in Section \ref{sec:experimental-setup}, captures the perceptual consistency by considering luminance, contrast, and texture similarities, improving robustness against illumination changes, and (iii) the edge-aware loss \( \mathcal{L}_{\text{Edge}} \), weighted by a constant \( \lambda_2 \) weight value of \( 10^{-3} \) used in \citep{Godard_ICCV_2019,Shao_MIA_2022}, regularizes the depth predictions by enforcing smoothness, while preserving depth discontinuities at image edges.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+\section{Model design and evaluation criteria\label{sec:experimental-setup}}
+%
+This section first describes the training and testing datasets. Then, it introduces the evaluation metrics and provides the model implementation details. Subsequently, it describes the ablation study to optimize the model design, and presents the architecture of the \textcolor{red}{three} proposed models.
+%
+\subsection{Depth prediction evaluation datasets}
+Three datasets were used to test the accuracy of the proposed models and to compare their performance with that of the state-of-the-art. 
+
+The SCARED dataset consists of 35 endoscopic video-sequences acquired from a fresh porcine cadaver abdominal cavities. The ground truth in terms of depth values and ego-motion data is known for these videos. \textcolor{red}{The public split introduced with AF-SfMLearner \citep{Shao_MIA_2022} and also adopted by EndoDAC \citep{EndoDAC_MICCAI_2024} is used without modification.} The SCARED dataset is divided into three subsets: 15,351 training images, 1,705 validation images, and 551 test images\textcolor{red}{, the three subsets being taken from different keyframe videos. Only the training images are used to optimize the network weights.} The 551 test images\textcolor{red}{, which belong to seven video sequences,} were used for the ablation study described in Section~\ref{sec:ablation} and the quantitative evaluations given in Section~\ref{sec:Experimental-Results} allowing for a fair comparison of the performance of ten models \textcolor{red}{ under the evaluation protocol of the compared methods. Since the ablation study also served to choose the loss weight $\lambda_1$ and the retained configurations, the consequences of this double use of the test images are stated in Section~\ref{sec:ablation}.}
+
+
+The Hamlyn dataset \citep{Recasens_IEEERAL_2021} includes laparoscopic video-sequences acquired from porcine abdominal cavities, as well as some images of deforming silicon heart phantoms for which ground truths are available in the form of 3D points clouds. \textcolor{black}{ The depth metrics of Table~\ref{tab:quant_hamlyn} are computed on sequence rectified14 of the rectified Hamlyn set (5\,742 stereo frames), and the paired analysis of Table~\ref{tab:paired-c1} on four rectified sequences (rectified06, 08, 11 and~14), all with per-pixel depth ground truth; the 3D reconstructions of Section~\ref{sec:surface} use other Hamlyn sequences, for which ground truth is provided in the form of 3D point clouds.} The C3VD dataset~\citep{bobrow2023colonoscopy} consists of colonoscopy video sequences acquired from a 
+high-fidelity colon phantom, with ground truth depth maps obtained via structured light scanning. This dataset presents a complementary challenge to the SCARED and Hamlyn datasets, as it features specular reflections and texturally homogeneous mucosal surfaces typical of colonoscopy. The Hamlyn and C3VD datasets were used in the generalization tests detailed in Section~\ref{sec:Experimental-Results}. \textcolor{red}{These two datasets were used for inference only: no network weight, hyperparameter or model configuration was chosen with them.} 
+
+%
+\begin{table}[]
+    \centering
+    \resizebox{\columnwidth}{!}{
+    \begin{tabular}{|rl|}    
+    \hline
+        Metric & Definition\\
+        \hline
+        $\varepsilon_\textrm{AbsRel}=$ & $\frac{1}{|D_{data}|} \sum\limits_{i = 1}^{i=|D_{data}|} \frac{|d_i^* - d_i|}{d^*_i}$\\
+        $\varepsilon_\textrm{SqRel}=$ & $\frac{1}{|D_{data}|} \sum \limits_{i = 1}^{i=|D_{data}|} \frac{(d_i^* - d_i)^2}{d^*_i}$\\
+        $\varepsilon_\textrm{RMSE}=$ & $\sqrt{ \frac{1}{|D_{data}|} \sum \limits_{i =1}^{i=|D_{data}|} (d_i^* - d_i)^2}$ \\
+        $\varepsilon_\textrm{RMSELog}=$ & $\sqrt{\frac{1}{|D_{data}|} \sum \limits_{i = 1}^{i=|D_{data}|} \hspace{-2mm} \left(\log(d_i^*+1) - \log(d_i+1)\right)^2}$ \\
+        $\delta_{1.25}$ {\scriptsize{(\%)}} = & $
+        100 \frac{1}{|D_{data}|} \sum\limits_{i = 1}^{i=|D_{data}|} \hspace{-2mm}
+        H\left(1.25 - \max \left( \frac{d^*_i}{d_i}, \frac{d_i}{d^*_i} \right) \right) 
+        $ \\ 
+        $\delta_{1.25^2}$ (\%) & same as $\delta_{1.25}$ with threshold $1.25^2$ \\
+        $\delta_{1.25^3}$ (\%) & same as $\delta_{1.25}$ with threshold $1.25^3$ \\
+        \hline
+    \end{tabular}
+    }
+    \caption{ 
+    \textcolor{red}{Metrics} used to assess model performances using datasets including $|D_{data}|$ depth values ($d_i$ and $d_i^*$ are respectively the estimated and the ground truth values of pixel $i$). Accuracy criterion $\delta_{1.25}$ uses Heaviside function $H(\cdot)$ whose value is 1 when the greatest value of pair ($d_i^*/d_i$, $d_i/d_i^*$) is smaller or equal to 1.25 (i.e., when $d_i \ge 0.8\, d_i^*$ and $d_i \leq 1.25\, d_i^*$). For $d_i < 0.8\, d_i^*$ or $d_i > 1.25\, d_i^*$ on have $H(\cdot)=0$. 
+    }
+    \label{tab:metrics}
+\end{table}
+
+\subsection{Performance evaluation protocol}
+% 
+
+\noindent{\bf Comparison with reference models.} The performance of the proposed models is compared to that of six reference methods, namely Monodepth2~\citep{Godard_ICCV_2019}, MonoViT~\citep{Zhao_3DV_2022}, 
+EndoSfMLearner~\citep{Ozyoruk_MIA_2021}, AF-SfMLearner~\citep{Shao_MIA_2022}, EndoDAC~\citep{EndoDAC_MICCAI_2024}, and HADepth~\citep{HAdepth_2025}. Additionally, MonoPCC~\citep{wang2025monopcc}  is included as a photometric consistency-constrained baseline. For all methods, either the original author-provided code or the best published model weights were used to ensure a fair comparison. \\
+%
+\noindent{\bf Quality metrics.} 
+In addition to the five accuracy metrics defined in Table~\ref{tab:metrics}, this evaluation reports 
+two additional accuracy thresholds, $\delta_{1.25^2}$ and $\delta_{1.25^3}$, which measure the percentage 
+of depth predictions within progressively \textcolor{red}{looser} \textcolor{blue}{less stringent?} accuracy bounds. Inference time (measured in milliseconds per frame on an A100 GPU) and total training time are also reported to assess the practical deployability of each model.
+%
+The four standard error metrics used are the mean absolute relative difference between the values of $d_i$ and $d_i^*$ ($\varepsilon_\textrm{AbsRel}$~in Table \ref{tab:metrics}), the mean squared relative difference ($\varepsilon_\textrm{SqRel}$), as well as the linear ($\varepsilon_\textrm{RMSE}$) and log ($\varepsilon_\textrm{RMSELog}$) versions  of the root mean square error. 
+%
+The fifth metric in Table~\ref{tab:metrics} (i.e., $\delta_{1.25}$)  gives the percentage of predicted depth values $d_i$  in the range  [$0.8\,d_i^*$, $1.25\,d_i^*$]. While for the first four criteria the precision is defined by various mean errors depending on differences of $d_i$ and $d_i^*$ (magnitude of errors), $\delta_{1.25}$ is an accuracy criterion relating to the number of depth estimations $d_i$ obtained with a minimal accuracy (percentage of predictions within a given accuracy interval). It is noticeable that for a given accuracy threshold (1.25 in Table~\ref{tab:metrics}), the interval centered on 1 ($d_i = d_i^*$) is not symmetric since the lower and upper interval bound values are respectively $80\%$ and $125\%$ of ground truth $d_i^*$. Although this asymmetry was not justified in the literature, $\delta_{1.25}$ is used in this contribution since it is a gold standard in the depth estimation field. \vspace*{1mm} \\ 
+%
+\noindent{\bf Depth normalization.} 
+As is the case for other depth prediction methods in the literature, the depths determined with the proposed model are defined up to a scale factor. 
+Thus, the method proposed in \citep{Godard_ICCV_2019} is used to globally rescale the obtained depth values prior to the determination of the five quality metric values. Specifically, the predicted depth values \( D_{pred}(\mathbf{x}_i) \) in depth map \( D_{pred} \) are corrected using Eq.~\eqref{eq:MapScaling}, where \( \textrm{med}(D_{map}) \) represents the median depth of the ground truth (\( map = gt \)) and the predicted depth map (\( map = pred \)).
+%
+\begin{equation} \label{eq:MapScaling}
+    D_{scaled}(\mathbf{x}_i) = D_{pred}(\mathbf{x}_i) \frac{\textrm{med}(D_{gt})} {\textrm{med}(D_{pred})} \quad \forall \, \mathbf{x}_i \in I_s
+\end{equation}
+%
+
+As in previous works \citep{Godard_ICCV_2019,Ozyoruk_MIA_2021,Shao_MIA_2022}, the scaled depth maps are capped at 150\,mm for the SCARED and Hamlyn datasets, and at 300\,mm for the C3VD dataset to account for the larger working distances in colonoscopy. These threshold values were chosen because they encompass nearly all ground truth depth values in each dataset, thereby preserving the essential depth information while excluding extreme or unrealistic predictions.
+\textcolor{black}
+{\noindent{\bf Training runs and seeds.}
+Unless stated otherwise, each configuration was trained once: this is the case for
+Tables~\ref{tab:ablation}, \ref{tab:backbone_comparison} and~\ref{tab:quant_scared}--\ref{tab:quant_c3vd}.
+The configurations of Tables~\ref{tab:calib-resnet-lam0}, \ref{tab:components-isolated-scared}
+and~\ref{tab:paired-c1} were trained with three random seeds and the reported values are averaged over these seeds. \textcolor{red}{The number of training seeds of each configuration of Table~\ref{tab:components-crossdomain} is \textcolor{blue}{also}given in \textcolor{blue}{the last column of the same table}.} Tables~\ref{tab:components-isolated-scared} and~\ref{tab:paired-c1} additionally
+give 95\% cluster bootstrap confidence intervals computed over test sequences; these quantify the
+variability across test data, not across training runs. The comparison methods are evaluated with
+the checkpoints released by their authors, so their seed-to-seed variability cannot be assessed.
+Over the three seeds, the sample standard deviation of $\varepsilon_\textrm{AbsRel}$ of MonoIIF on
+SCARED is $0.0023$ (values between $0.0485$ and $0.0528$, pooled over the 551 test frames as in
+Table~\ref{tab:quant_scared}); the single-run value reported in Table~\ref{tab:quant_scared}
+($0.050$) lies within this range. Differences of this order between two methods or two
+configurations cannot be attributed to the compared factor on the basis of single training runs,
+and the single-run tables should be read with this in mind. \textcolor{red}{In the paired analyses, a difference is said to be not significant, and the two methods are said not to be distinguished }\textcolor{blue}{distinguishable?}\textcolor{red}{, when the 95\% interval of the paired difference includes zero. No equivalence test was performed: with four to seven test sequences, the absence of a significant difference does not establish that two methods are equivalent, but only that the available test data do not allow them to be separated.}}
+%
+\begin{table*}[!t]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|r|l|c|c|c|c|c|c|c|c|c|}
+\hline
+        & & Transformer & Use of & Lighting & Use of & {\large $\varepsilon_\textrm{AbsRel}$} ($\downarrow$) & {\large $\varepsilon_\textrm{SqRel}$} ($\downarrow$) & {\large $\varepsilon_\textrm{RMSE}$} ($\downarrow$) & {\large $\varepsilon_\textrm{RMSELog}$} ($\downarrow$) & $\delta_{1.25}$ ($\uparrow$) \\
+        \textcolor{gray}{Line} & Backbone & blocks & loss $\mathcal{L}_\textrm{PML}$ & correction & loss $\mathcal{L}_\textrm{II}$ & & & & &  \\
+        \hline
+        \textcolor{gray}{1} & ResNet-18 & \xmark & \xmark & \xmark & \cmark $(\lambda_1 = 1)$ & 0.072 & 0.713 & 6.027 & 0.098 & 0.942 \\
+        \textcolor{gray}{2} & ResNet-18 & \xmark & \cmark & \cmark & \xmark & 0.062 & 0.486 & 5.093 & 0.084 & 0.968 \\
+        \textcolor{gray}{3} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 0.25)$ & 0.063 & 0.490 & 5.100 & 0.088 & 0.956 \\
+        \textcolor{gray}{4} & ResNet-18 (MonoII)& \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 0.5)$ & 0.058 & 0.438 & 4.850 & 0.082 & 0.966 \\
+        \textcolor{gray}{5} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 1)$ & 0.060 & 0.448 & 4.864 & 0.083 & 0.964 \\
+        \textcolor{gray}{6} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 2)$ & 0.063 & 0.492 & 5.072 & 0.088 & 0.957 \\
+        \textcolor{gray}{7} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 3)$ & 0.064 & 0.508 & 5.176 & 0.088 & 0.956 \\
+        \textcolor{gray}{8} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 4)$ & 0.064 & 0.506 & 5.193 & 0.088 & 0.960 \\
+        \textcolor{gray}{9} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 5)$ & 0.063 & 0.478 & 4.992 & 0.086 & 0.963 \\
+        \textcolor{gray}{10} & ResNet-18 & \xmark & \cmark & \cmark & \cmark $(\lambda_1 = 10)$ & 0.061 & 0.469 & 4.997 & 0.084 & 0.966 \\
+        \textcolor{gray}{11} & MPViT-S (MonoIIT)& \cmark & \cmark & \cmark & \cmark $(\lambda_1 = 0.5)$ & 0.055 & 0.407 & \underline{4.685} & 0.077 & 0.971 \\
+        \textcolor{gray}{12} & MPViT-S & \cmark & \cmark & \cmark & \xmark & 0.059 & 0.502 & 5.221 & 0.085 & 0.968 \\
+        \textcolor{gray}{13} & MPViT-S & \cmark & \cmark & \xmark & \xmark & 0.059 & 0.492 & 5.108 & 0.084 & 0.964 \\
+        \textcolor{gray}{14} & MPViT-S & \cmark & \cmark & \xmark & \cmark $(\lambda_1 = 0.5)$ & 0.057 & 0.439 & 4.737 & 0.080 & 0.966 \\
+        \hline
+        \textcolor{gray}{15} & DA v2 $+$ DV-LoRA & \cmark & \cmark & \xmark & \xmark & \underline{0.052} & \underline{0.404} & 4.737 & \underline{0.075} & \underline{0.979} \\
+        \textcolor{gray}{16} & DA v2 $+$ DV-LoRA (MonoIIF) & \cmark & \cmark & \cmark & \cmark $(\lambda_1 = 0.5)$ & \textbf{0.050} & \textbf{0.341} & \textbf{4.327} & \textbf{0.070} & \textbf{0.982}  \\
+        \textcolor{gray}{17} & DA v3 $+$ DV-LoRA & \cmark & \cmark & \xmark & \xmark & 0.053 & 0.448 & 4.939 & 0.077 & 0.977  \\
+        \textcolor{gray}{18} & DA v3 $+$ DV-LoRA & \cmark & \cmark & \cmark & \cmark $(\lambda_1 = 0.5)$ & 0.054 & 0.441 & 4.904 & 0.078 & 0.974 \\
+        \hline
+    \end{tabular}
+    }
+    \caption{\textcolor{black}{Overview of the ablation study results on SCARED, computed over the 551 test frames as in Table~\ref{tab:quant_scared}.
+    Columns~2--6 define the model configuration: i) the backbone of the depth network; ii) whether the transformer-based depth estimation blocks described in Section~\ref{sec:Architectures} were used (\cmark) or not (\xmark) --- for the Depth~Anything rows the encoder itself is a vision transformer; iii) whether the photometric similarity loss $\mathcal{L}_\textrm{PML}$ is used; iv) the illumination change model with which the synthesized target images $\hat{I}_t$ are corrected (see Section~\ref{sec:lit}): none (\xmark) or the dense per-pixel affine field (\cmark), as defined in Table~\ref{tab:calib-resnet-lam0}; and v) the weight $\lambda_1$ of the illumination invariant loss $\mathcal{L}_\textrm{II}$ in Eq.~\eqref{eq:global_loss}, where \xmark\ is equivalent to $\lambda_1=0$.
+    The last five columns give the quality criteria defined in Table~\ref{tab:metrics}.
+    Lines~3--10 sweep $\lambda_1$ on the ResNet-18 backbone with all other settings fixed; lines~15--18 replace the backbone by a DV-LoRA adapted Depth~Anything encoder. Lines~4,~11 and~16 correspond to the three proposed models, MonoII, MonoIIT and MonoIIF respectively. The best and second best values per metric are respectively in bold and underlined. Each line corresponds to a single training run.}}
+    \label{tab:ablation}
+\end{table*}
+%
+
+\subsection{Implementation details}
+
+The proposed model was implemented using the PyTorch framework \citep{pytorch_2019}. The model is trained end-to-end  using the Adam optimizer \citep{Adam_ICLR_2015}. The training was done for $20$ epochs on an A100 GPU with mini-batches of size 12. The initial learning rate is set to $1e^{-4}$. The weighting factor $\alpha$ in Eq.~\eqref{eq:lpms} is set to $0.85$, while the loss weights values $\lambda_1$ and $\lambda_2$ in Eq.~\eqref{eq:global_loss} are adjusted to $0.5$ and $1 e^{-3}$, respectively. An ablation justifying the choice of these values is presented in Section~\ref{sec:ablation}. Data augmentation was also performed by adjusting the brightness, contrast, saturation, and hue of the images to prevent overfitting,  ensuring that the training data distribution remains unbiased across specific datasets. 
+%
+
+For MonoIIF, the Depth~Anything encoder is initialized with pretrained weights and adapted using DVLoRA with 
+rank $r=4$ applied to the query and value projection matrices of all self-attention layers. The pretrained 
+encoder weights are frozen during the first 5 epochs, after which the DVLoRA parameters and the illumination 
+calibration module are jointly fine-tuned for the remaining 15 epochs. The same Adam optimizer, learning 
+rate schedule, and data augmentation strategy described above are used for all three model variants. Total 
+training time on a single A100 GPU was 5h\,1m for MonoIIT, 2h\,6m for MonoII, and 12h\,8m for MonoIIF.
+%
+\subsection{Ablation study \label{sec:ablation}}
+%
+
+Ablation experiments were conducted on the SCARED dataset to investigate the importance of the different loss components of the proposed model. \textcolor{red}{The 15,351 training images of the public split were used to optimize the network weights, and the 1,705 validation images were used only to monitor a validation loss during training. The ablation experiments were evaluated on the 551 test images, and their results were used to choose the weight $\lambda_1$ and the three retained configurations. In addition, MonoIIF is trained with the publicly released training code of EndoDAC \citep{EndoDAC_MICCAI_2024}, which evaluates the model on the test split after each epoch and retains the epoch with the lowest $\varepsilon_\textrm{RMSE}$; this checkpoint selection was kept unchanged, so that MonoIIF and EndoDAC are compared under the same training and selection procedure. The test images therefore influenced the model selection, and the SCARED values of the proposed models in Tables~\ref{tab:ablation}, \ref{tab:backbone_comparison} and~\ref{tab:quant_scared} may be slightly optimistic. Two elements limit the consequences of this choice. First, the differences between the candidate configurations are of the order of the seed-to-seed variability (standard deviation of $0.0023$ in $\varepsilon_\textrm{AbsRel}$ for MonoIIF, Section~\ref{sec:experimental-setup}), so that no in-domain conclusion of this work relies on the selected values. Second, the Hamlyn and C3VD datasets were used for inference only: no network weight, hyperparameter or configuration was chosen with them, so that the generalization results are independent of this selection.} Different model configurations allow us to analyse i) the effect of the illumination-invariant loss (see Section~\ref{sec:clf}) for different $\lambda_1$ values in Eq.~\eqref{eq:global_loss}, ii) the impact of the lighting (or exposure) correction described in Section~\ref{sec:lit} and used in the loss $\mathcal{L}_\textrm{PML}$ \textcolor{red}{(see Eq.~\eqref{eq:global_loss})}, and iii) the interest of the transformer-based encoder–decoder architecture (see Section~\ref{sec:Architectures}). In addition, a foundational-based-model baseline configuration was evaluated in the proposed pipeline, as noticeable in Table~\ref{tab:backbone_comparison}. The importance of the illumination invariance, exposure correction, and transformer blocks components, as well as the the interest of a foundation model backbone, were assessed using the five depth-prediction criteria reported in Table~\ref{tab:metrics}.
+ 
+
+%
+\begin{table}[h]
+\centering
+\begin{tabular}{lccccc}
+\toprule
+Model & $\varepsilon_\text{AbsRel}$↓ & 
+       $\varepsilon_\text{SqRel}$↓ & 
+       $\varepsilon_\text{RMSE}$↓ & 
+       $\varepsilon_\text{RMSELog}$↓ & 
+       $\delta_{1.25}$↑ \\
+\midrule
+MonoII  & 0.058 & 0.438 & 4.850 & 0.082 & 0.966 \\
+MonoIIT & \underline{0.055} & \underline{0.407} & 
+          \underline{4.685} & \underline{0.077} & 
+          \underline{0.971} \\
+MonoIIF & \textbf{0.050} & \textbf{0.341} & 
+          \textbf{4.327} & \textbf{0.070} & 
+          \textbf{0.982} \\
+\bottomrule
+\end{tabular}
+\caption{Quantitative comparison of the three proposed 
+model variants on the SCARED dataset. Best and 
+second-best results are in \textbf{bold} and 
+\underline{underlined}, respectively. \textcolor{black}{Each model corresponds to a single training run.}}
+\label{tab:backbone_comparison}
+\end{table}
+%
+\begin{table}[t]
+\centering
+\caption{\textcolor{black}{Illumination correction model in $\mathcal{L}_\text{PML}$, ResNet-18 backbone, SCARED. All three configurations are trained with $\lambda_1=0$ (no illumination-invariant loss), so they differ only in how $\mathcal{L}_\text{PML}$ synthesizes the target image $\hat{I}_t$: without correction (None), with one global affine pair $(c,b)$ per image (Global), or with a spatially varying affine field (Dense). Metrics are averaged within each of the seven test sequences, then across sequences and across 3 training seeds; they are therefore not directly comparable to lines~1--14 of Table~\ref{tab:ablation}, which pool over the 551 test frames. Best in bold, second best underlined.}}
+\label{tab:calib-resnet-lam0}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Corr. & $\varepsilon_\text{AbsRel}$↓ & 
+       $\varepsilon_\text{SqRel}$↓ & 
+       $\varepsilon_\text{RMSE}$↓ & 
+       $\varepsilon_\text{RMSELog}$↓ & 
+       $\delta_{1.25}$↑  \\
+\midrule
+None & \underline{0.059} & 0.485 & 5.158 & \underline{0.084} & \underline{0.967} \\
+Global & 0.061 & \underline{0.483} & \underline{5.112} & 0.085 & 0.966 \\
+Dense& \textbf{0.058} & \textbf{0.481} & \textbf{5.100} & \textbf{0.083} & \textbf{0.969} \\
+\bottomrule
+\end{tabular}
+\end{table}
+%
+\begin{table*}[t]
+\centering
+\caption{\textcolor{black}{Contribution of each component of MonoIIF on SCARED, isolated. Each row gives the paired difference in Abs Rel per test sequence ($n=7$), computed as (model with the component) $-$ (model without it), so that a \textbf{negative} value means the component helps; its 95\% cluster bootstrap interval; the number $k$ of sequences in which the component improves Abs Rel; and the exact two-sided Wilcoxon signed-rank $p$, whose smallest attainable value at $n=7$ is $2/2^{7}=0.016$. Each configuration is averaged over three training seeds. Bold marks intervals excluding zero.}}
+\label{tab:components-isolated-scared}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Component isolated & $\Delta$ Abs Rel & 95\% CI & $k/n$ & exact $p$ \\
+\midrule
+pretrained weights & $\mathbf{-0.0549}$ & $[-0.0696, -0.0409]$ & 7/7 & 0.016 \\
+DV-LoRA adapters & $\mathbf{-0.0089}$ & $[-0.0140, -0.0041]$ & 6/7 & 0.031 \\
+local calibration alone & $-0.0012$ & $[-0.0028, +0.0002]$ & 6/7 & 0.219 \\
+illumination-invariant loss & $-0.0023$ & $[-0.0081, +0.0017]$ & 3/7 & 0.938 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+%
+\textcolor{black}
+{\noindent{\bf Transformer blocks.} Among the configurations without a foundation encoder (lines~1--14 of Table~\ref{tab:ablation}), the lowest values of the four error criteria are obtained by the transformer-based configurations that use $\mathcal{L}_\textrm{II}$ (lines~11 and~14). Without $\mathcal{L}_\textrm{II}$ (lines~12 and~13), the transformer-based configurations are less accurate on these four criteria than the best ResNet-18 configuration (line~4), which indicates that transformer blocks and the illumination-invariant loss are complementary rather than independently beneficial. The Depth~Anything rows (lines~15--18) are not included in this comparison, since their lower errors mainly result from pretraining (Table~\ref{tab:components-isolated-scared}).} \vspace*{1mm} \\
+
+\noindent{\bf Photometric loss $\mathcal{L}_\textrm{PML}$.} \textcolor{black}{The photometric loss is the primary self-supervision signal. Without it (line~1 of Table~\ref{tab:ablation}, where only $\mathcal{L}_\textrm{II}$ is used),} one has $\varepsilon_\textrm{AbsRel}=0.072$, $\varepsilon_\textrm{SqRel} = 0.713$, $\varepsilon_\textrm{RMSE} = 6.027$ and $\varepsilon_\textrm{RMSELog}=0.098$, which are by far the highest values for these four criteria, and $\delta_{1.25}=0.942$ is the lowest value. 
+Passing from line~1 (no $\mathcal{L}_\textrm{PML}$) to line~2 ($\mathcal{L}_\textrm{PML}$ computed on images corrected with the predicted light changes, without $\mathcal{L}_\textrm{II}$) improves all five criteria, e.g., $\varepsilon_\textrm{AbsRel}$ from 0.072 to 0.062 and $\varepsilon_\textrm{SqRel}$ from 0.713 to 0.486.
+\vspace*{1mm} \newline
+%
+\noindent{\bf Illumination invariant loss $\mathcal{L}_\textrm{II}$.} Transformer blocks associated with loss $\mathcal{L}_\textrm{II}$ weighted by $\lambda_1 = 0.5$ lead to the \textcolor{black}{best criteria values among lines~1--14} with (line 11) and without (line 14) a predicted exposure correction in loss $\mathcal{L}_\textrm{PML}$. \textcolor{black}{From line~3 to line~10}, the only configuration difference is associated with the values of $\lambda_1$ weighting loss $\mathcal{L}_\textrm{II}$, the transformer blocks not being used and ``the exposure corrected'' loss $\mathcal{L}_\textrm{PML}$ being used for all of these 8 configurations. It has been identified that a value of 0.5 (line 4) and 1 (line 5) for the weight $\lambda_1$ produce the best results when observing globally all five criteria values, although the differences within the explored range are of the order of the seed-to-seed variability. The criteria values show a small performance decrease for $\lambda_1 < 0.5$ or $\lambda_1 \ge 2$. However, for $\lambda_1 \in [0.25, 10]$ the changes are rather moderate, which entails that adjusting appropriately the value of $\lambda_1$ is not a challenging task.  
+\textcolor{black}
+{
+\noindent{\bf Foundation model backbones (lines 15--18).}
+Lines~15--18 of Table~\ref{tab:ablation} repeat the analysis with a Depth~Anything encoder adapted by DV-LoRA. With the DA~v2 encoder, adding the dense illumination correction and the loss $\mathcal{L}_\textrm{II}$ (line~15 $\rightarrow$ line~16) lowers $\varepsilon_\textrm{AbsRel}$ from 0.052 to 0.050, $\varepsilon_\textrm{SqRel}$ from 0.404 to 0.341 ($-15.6\%$) and $\varepsilon_\textrm{RMSE}$ from 4.737 to 4.327 ($-8.7\%$), and raises $\delta_{1.25}$ from 0.979 to 0.982. The change in $\varepsilon_\textrm{AbsRel}$ (0.002) is smaller than the seed-to-seed standard deviation of MonoIIF (0.0023, Section~\ref{sec:experimental-setup}), so it is not conclusive on its own; the larger relative reductions of the squared-error criteria are more indicative. The same pattern is observed with the MPViT-S backbone (line~13 $\rightarrow$ line~11: $-17.3\%$ in $\varepsilon_\textrm{SqRel}$ and $-8.3\%$ in $\varepsilon_\textrm{RMSE}$). The larger relative gains on the squared-error criteria than on $\varepsilon_\textrm{AbsRel}$ indicate that the two components mainly reduce the largest depth errors, which is consistent with the error maps of Fig.~\ref{fig:qual_scared}, where these errors concentrate in specular and poorly exposed regions.
+The benefit is, however, backbone dependent. With the DA~v3 encoder (line~17 $\rightarrow$ line~18), the same components leave the criteria essentially unchanged: $\varepsilon_\textrm{SqRel}$ and $\varepsilon_\textrm{RMSE}$ decrease by less than 2\%, while $\varepsilon_\textrm{AbsRel}$, $\varepsilon_\textrm{RMSELog}$ and $\delta_{1.25}$ are slightly worse. The cause of this difference was not investigated further and is left for future work. DA~v2 was retained for MonoIIF, although the differences between the two encoders (at most 0.004 in $\varepsilon_\textrm{AbsRel}$) are of the order of the seed-to-seed variability.}
+
+\noindent\textcolor{black}{{\bf Illumination correction model.}
+Table~\ref{tab:calib-resnet-lam0} isolates the illumination correction used in $\mathcal{L}_\textrm{PML}$ by training the ResNet-18 model without $\mathcal{L}_\textrm{II}$ ($\lambda_1=0$). The dense per-pixel affine field gives the best value for all five criteria, but the differences are small: $\varepsilon_\textrm{AbsRel}$ ranges only from 0.058 (Dense) to 0.061 (Global). A single global affine pair $(c,b)$ per image does not help and even degrades $\varepsilon_\textrm{AbsRel}$, $\varepsilon_\textrm{RMSELog}$ and $\delta_{1.25}$ with respect to no correction. This is consistent with the nature of endoscopic illumination: since the light source moves with the camera, brightness changes between consecutive frames are spatially non-uniform (vignetting, specular highlights, distance-dependent fall-off) and cannot be compensated by one gain and one offset per image.
+Used alone, the correction is therefore a weak signal, in agreement with the small and non-significant isolated effect reported in Table~\ref{tab:components-isolated-scared} (local calibration alone: $-0.0012$, 95\% CI $[-0.0028, +0.0002]$). Its benefit appears in combination with $\mathcal{L}_\textrm{II}$: with the MPViT-S backbone, adding the correction without $\mathcal{L}_\textrm{II}$ does not improve the results (line~13 $\rightarrow$ line~12 of Table~\ref{tab:ablation}), whereas adding it on top of $\mathcal{L}_\textrm{II}$ further reduces $\varepsilon_\textrm{AbsRel}$ from 0.057 to 0.055 and $\varepsilon_\textrm{SqRel}$ from 0.439 to 0.407 (line~14 $\rightarrow$ line~11).}
+%
+\paragraph{Foundation model backbone.}
+
+Table~\ref{tab:backbone_comparison} gives the performances of MonoII, MonoIIT, and MonoIIF according to recognized set of metrics so that the contribution of the foundation model backbone can be  assessed independently from the illumination-invariant components. MonoIIF consistently achieves the lowest error values across all criteria, confirming that the pretrained geometric priors of the Depth Anything backbone provide a complementary benefit to the illumination-invariant training strategy. Notably, this improvement is achieved at a substantially lower training cost than HADepth (12h\,8m vs.\ 26h\,13m) and EndoDAC (12h\,8m vs.\ 25h\,16m), highlighting the  advantage in terms of efficiency of the DVLoRA adaptation strategy.
+\vspace*{1mm} \\
+
+%
+\textcolor{black}
+{
+\paragraph{Isolated contribution of each component.}
+Table~\ref{tab:components-isolated-scared} quantifies the contribution of each component of MonoIIF on SCARED as a paired difference over the seven test sequences. The pretrained Depth~Anything weights are by far the dominant factor ($\Delta\varepsilon_\textrm{AbsRel}=-0.0549$, improvement in all seven sequences), and the DV-LoRA adapters add a smaller but consistent gain ($-0.0089$, six of seven sequences); both intervals exclude zero. The effects of the two illumination components are 20 to 45 times smaller than that of the pretrained weights. The local calibration alone improves six of the seven sequences, but its mean effect ($-0.0012$) is small and its interval marginally includes zero. The illumination-invariant loss has a larger mean effect ($-0.0023$) but improves only three sequences, with a wide interval, which indicates that its benefit is concentrated in a subset of sequences rather than uniformly distributed. 
+Note that these effects are computed per sequence and are not additive, so they need not sum to the difference between lines~15 and~16 of Table~\ref{tab:ablation}.
+These results call for a nuanced reading. On in-domain SCARED data, most of the accuracy of MonoIIF comes from the pretrained encoder and its adaptation, and the illumination components provide a modest refinement that cannot be distinguished from zero with seven test sequences. Their expected benefit lies rather in the robustness to photometric conditions not seen during training, which is examined in the generalization tests below \textcolor{red}{(Table~\ref{tab:components-crossdomain}); as shown there, this expectation is only partly confirmed.}}
+%
+\begin{figure}[]
+    \centering
+    \includegraphics[scale=.23]{ablation_image.png}
+    \caption{The first column presents two source images $I_s$ for which depth maps were computed for three different combinations of losses $\mathcal{L}_\textrm{PML}$ and $\mathcal{L}_\textrm{II}$. 
+    The depth maps in the second column were determined using $\mathcal{L}_\textrm{PML}$ computed with non-exposure corrected images and without loss $\mathcal{L}_\textrm{II}$, those in the third column were obtained with $\mathcal{L}_\textrm{PML}$ computed with light corrected images and without loss $\mathcal{L}_\textrm{II}$ and the maps in the last column were calculated with $\mathcal{L}_\textrm{PML}$ determined with light corrected images and associated with loss $\mathcal{L}_\textrm{II}$. When going from the second to the fourth column, it is visible that at edge locations in $I_s$ the depth variations become progressively more sharp, while on surfaces (i.e., in regions without edges in $I_s$), depth variations become smoother. 
+    }
+    \label{fig:ablation}
+%
+\end{figure}
+% 
+\textcolor{black}{ In this contribution, three configurations were retained. They share the loss $\mathcal{L}_\textrm{II}$ weighted by $\lambda_1 = 0.5$ and the loss $\mathcal{L}_\textrm{PML}$ determined with light-corrected images, and differ in the depth encoder: ResNet-18 (MonoII), MPViT-S with transformer blocks (MonoIIT), and Depth~Anything~v2 adapted with DV-LoRA (MonoIIF).} The benefits of combining these two loss functions are illustrated in Fig.~\ref{fig:ablation}. \vspace*{1mm} \newline
+%
+\noindent{\bf Configuration with transformer blocks} (line 11 in Table~\ref{tab:ablation}). \textcolor{black}{Among lines~1--14, this configuration gives the lowest values of the four error criteria and the highest $\delta_{1.25}$ (0.971)}. This configuration is referred to as MonoIIT (IIT stands for illumination invariant and transformer blocks). \vspace*{1mm} \newline
+%
+\noindent{\bf Configuration without transformer blocks} (line 4). \textcolor{black}{Among the configurations without transformer blocks (lines~1--10), this configuration gives the lowest values of the four error criteria, and its $\delta_{1.25}=0.966$ is within 0.002 of the best value (0.968, line~2).} This configuration is referred to as MonoII (II as illumination invariant). 
+%
+\newline
+\textcolor{black}
+{
+\noindent{\bf Foundation model configuration (MonoIIF).}
+In addition to the illumination-invariant and transformer-based variants, a foundation-model configuration was evaluated (line~16 of Table~\ref{tab:ablation}). It replaces the depth encoder by a Depth~Anything encoder adapted with DV-LoRA and keeps the proposed illumination-invariant training. As shown in Table~\ref{tab:backbone_comparison}, MonoIIF achieves the lowest values of the four error criteria and the highest accuracy $\delta_{1.25}=0.982$ among the three proposed variants.}
+%
+
+\begin{table*}[!hbt]
+\centering
+%\resizebox{\textwidth}{!}{%
+\begin{tabular}{clcccccccccc}
+\toprule
+\textcolor{gray}{Line} & Method & $\varepsilon_\text{AbsRel}$↓ & 
+        $\varepsilon_\text{SqRel}$↓ & 
+        $\varepsilon_\text{RMSE}$↓ & 
+        $\varepsilon_\text{RMSELog}$↓ & 
+        $\delta_{1.25}$↑ & 
+        $\delta_{1.25^2}$↑ & 
+        $\delta_{1.25^3}$↑ & 
+        IT (ms) & TT \\
+\midrule
+\textcolor{gray}{1} & Monodepth2     & 0.094 & 1.185 & 8.160 & 0.134 & 0.906 & 0.981 & 0.995 & 8.6  & 2h\,8m  \\
+\textcolor{gray}{2} &MonoViT        & 0.072 & 0.600 & 5.651 & 0.096 & 0.953 & 0.995 & 0.999 & 59.5 & 5h\,9m  \\
+\textcolor{gray}{3} &EndoSfMLearner & 0.103 & 1.346 & 8.778 & 0.148 & 0.884 & 0.980 & 0.993 & 9.0  & 5d\,20h \\
+\textcolor{gray}{4} &AF-SfMLearner  & 0.059 & 0.479 & 5.132 & 0.084 & 0.966 & 0.997 & 0.999 & 8.9  & 10h\,6m \\
+\textcolor{gray}{5} &MonoPCC        & 0.051 & 0.352 & 4.547 & 0.072 & \textbf{0.983} & 0.998 & 1.000 & 62.6 & N/A \\
+\textcolor{gray}{6} &EndoDAC        & 0.051 & 0.354 & 4.422 & 0.073 & 0.979 & 0.998 & 1.000 & 26.0 & 25h\,16m\\
+\textcolor{gray}{7} &HADepth        & \textbf{0.049} & \textbf{0.325} & \textbf{4.304} & \textbf{0.070} & \textbf{0.983} & 0.998 & 1.000 & 46.9 & 26h\,13m\\
+\midrule
+\textcolor{gray}{8} &MonoII  (Proposed) & 0.058 & 0.438 & 4.850 & 0.082 & 0.966 & 0.997 & 0.999 & 8.6  & 2h\,6m  \\
+\textcolor{gray}{9} &MonoIIT (Proposed) & 0.055 & 0.407 & 4.685 & 0.077 & 0.971 & 0.998 & 1.000 & 54.6 & 5h\,1m  \\
+\textcolor{gray}{10} &MonoIIF (Proposed) & \underline{0.050} & \underline{0.341} & \underline{4.327} & \textbf{0.070} & 0.982 & 0.998 & 1.000 & 31.7 & 12h\,8m \\
+\bottomrule
+\end{tabular}
+%}
+\caption{Depth estimation accuracy on the SCARED dataset 
+(551 test images). Training time (TT, last column) and inference time (IT, penultimate column)
+per frame are also reported. Best and second-best 
+results per metric are in \textbf{bold} and 
+\underline{underlined}; tied best values share the bold. $\delta_{1.25^2}$ and $\delta_{1.25^3}$ are saturated (five methods share the best value) and are not marked. \textcolor{black}{The proposed models correspond to a single training run and the comparison methods to the authors' released checkpoints; metrics are pooled over all test frames.}}
+\label{tab:quant_scared}
+\end{table*}
+%%%%
+\subsection{MonoIIT, MonoII and MonoIIF model architectures\label{sec:model_architectures}}  
+%
+The architectures of the MonoIIT, MonoII, and MonoIIF models are derived from the Monodepth2 framework \citep{Godard_ICCV_2019}, which serves as the baseline for our self-supervised depth estimation pipeline. In all three variants, the depth prediction module is adapted to reduce its sensitivity to illumination variations by integrating the proposed illumination-invariant loss $\mathcal{L}_\textrm{II}$ and the photometric similarity loss $\mathcal{L}_\textrm{PML}$, thereby better addressing the challenging photometric conditions present in endoscopic images.
+
+%
+\paragraph{\bf MonoII model.}  
+This architecture of this model employs DispNet performing a disparity-based depth map estimation. The depth encoder is a ResNet18 backbone which is pre-trained on ImageNet \citep{Deng_CVPR_2009}.The pose estimation module consists of an encoder-decoder network with skip connections and is also based on ResNet18 \citep{He_CVPR_2016}. This configuration follows a conventional CNN-based paradigm leveraging hierarchical feature extraction for depth estimation.  
+%
+\paragraph{\bf MonoIIT model.}  
+The architecture of this model is inspired by the MonoViT model \citep{Zhao_3DV_2022} which integrates vision transformer (ViT) blocks within the depth prediction network. It employs a hybrid encoder-decoder structure, in which ViT blocks capture long-range dependencies, while convolutional layers refine fine-grained spatial details. This design, illustrated in Fig.~\ref{MonoViT}, enhances the model’s ability to generalize to complex scenes by balancing local and global feature representations. The architecture of the pose estimation module in MonoIIT remains the same as that in MonoViT.
+%
+
+\paragraph{MonoIIF model.}
+The MonoIIF architecture leverages the Depth~Anything encoder~\citep{yang2024depth} as its backbone that is
+adapted to the endoscopic domain via DVLoRA. This approach preserves the large-scale geometric priors 
+learned during the foundation model pretraining while enabling efficient domain-specific fine-tuning through 
+low-rank weight updates. The depth decoder follows the same multi-scale disparity head structure used 
+in MonoIIT. The pose estimation module follows the same encoder-decoder structure as MonoII, ensuring 
+architectural comparability across the three variants. MonoIIF represents the primary contribution of this 
+work, combining foundation model capacity with principled illumination-invariant supervision.
+
+%
+
+The depth prediction network therefore benefits simultaneously from (i) the generalization capabilities of a foundation model trained on large and diverse datasets and (ii) the photometric robustness introduced by the illumination-invariant and exposure-corrected losses described in Section~\ref{sec:clf}.
+%
+
+The pose estimation module in MonoIIF follows the same encoder–decoder structure used in MonoII, ensuring a comparable architectural footprint while enabling a fair assessment of the contribution of the foundation-model depth backbone. This configuration, referred to as MonoIIF, demonstrates the advantage of enriching self-supervised endoscopic depth estimation with strong pretrained geometric priors tailored through domain adaptation. 
+
+%
+\section{Experimental Results \label{sec:Experimental-Results}}
+%
+This section first presents two quantitative evaluations of the performance of the proposed models. On the one hand, the SCARED dataset and the metrics defined in Table \ref{tab:metrics} are used to compare the performance of the proposed model to that of state-of-the-art self-supervised depth estimation methods. On the other hand, the generalization ability  of the models described in Section \ref{sec:methods_and_data} is assessed with the Hamlyn and C3VD datasets. This section also provides qualitative results to highlight the effect of depth estimation improvements on the cartography of endoscopic video sequences including illumination changes.
+
+\subsection{Quantitative Results \label{sec:quantitative}}
+%
+\subsubsection{Evaluation on the SCARED dataset\label{sec:Scared_comparison}}
+%
+
+\begin{table*}[!hbt]
+\centering
+%\resizebox{\textwidth}{!}{%
+\begin{tabular}{clccccccc}
+\toprule
+\textcolor{gray}{Line} & Method & $\varepsilon_\text{AbsRel}$↓ & 
+        $\varepsilon_\text{SqRel}$↓ & 
+        $\varepsilon_\text{RMSE}$↓ & 
+        $\varepsilon_\text{RMSELog}$↓ & 
+        $\delta_{1.25}$↑ & $\delta_{1.25^2}$↑ & 
+        $\delta_{1.25^3}$↑ \\
+\midrule
+\textcolor{gray}{1} &Monodepth2     & 0.224 & 6.069 & 17.517 & 0.297 & 0.635 & 0.856 & 0.938 \\
+\textcolor{gray}{2} &MonoViT        & 0.195 & 5.990 & 16.538 & 0.251 & 0.727 & 0.889 & 0.956 \\
+\textcolor{gray}{3} &EndoSfMLearner & 0.238 & 7.333 & 18.170 & 0.302 & 0.631 & 0.862 & 0.945 \\
+\textcolor{gray}{4} &AF-SfMLearner  & 0.182 & 5.586 & 15.267 & 0.232 & 0.750 & 0.911 & 0.968 \\
+\textcolor{gray}{5} &MonoPCC        & 0.172 & 4.984 & 15.176 & 0.232 & 0.758 & 0.905 & 0.965 \\
+\textcolor{gray}{6} &EndoDAC        & 0.184 & 4.686 & 15.182 & 0.247 & 0.717 & 0.891 & 0.965 \\
+\textcolor{gray}{7} &HADepth        & \underline{0.162} & 4.432 & 14.071 & \underline{0.217} & \textbf{0.769} & \underline{0.926} & \textbf{0.976} \\
+\midrule
+\textcolor{gray}{8} & \textcolor{black}{MonoII (Proposed)} & \underline{0.162} & \underline{4.216} & \underline{13.873} & 0.220 & \underline{0.765} & 0.918 & \textbf{0.976} \\
+\textcolor{gray}{9} &MonoIIT (Proposed) & 0.188 & 5.987 & 16.465 & 0.250 & 0.734 & 0.889 & 0.952 \\
+\textcolor{gray}{10} &MonoIIF (Proposed) & \textbf{0.159} & \textbf{4.155} & \textbf{13.680} & \textbf{0.214} & 0.764 & \textbf{0.930} & \textbf{0.976} \\
+\bottomrule
+\end{tabular}
+%}
+\caption{Generalization results on the Hamlyn dataset. 
+Models trained on SCARED. Best and second-best 
+per metric in \textbf{bold} and \underline{underlined}; tied best values share the bold. \textcolor{black}{The proposed models correspond to a single training run and the comparison methods to the authors' released checkpoints; metrics are pooled over all test frames.}}
+\label{tab:quant_hamlyn}
+\end{table*}
+
+% \begin{table*}
+%     \centering
+%     \resizebox{\textwidth}{!}{%
+%     \begin{tabular}{|c|l|c|c|c|c|c|}
+%     \hline
+%         \textcolor{gray}{Line} & Method &{\large $\varepsilon_\textrm{AbsRel}$} ($\downarrow$) & {\large $\varepsilon_\textrm{SqRel}$} ($\downarrow$) & {\large $\varepsilon_\textrm{RSME}$} ($\downarrow$)&  {\large $\varepsilon_\textrm{RSMELog}$} ($\downarrow$) & $\delta_{1.25} (\uparrow)$\\
+%         \hline
+%         \textcolor{gray}{1} & Monodepth2 \citep{Godard_ICCV_2019})& 0.128 & 0.009 & 0.053 & 0.159 & 0.846\\
+%         \textcolor{gray}{2} &MonoViT \citep{Zhao_3DV_2022})& 0.144 & 0.010 & 0.047 & 0.140 & \textbf{0.894} \\
+%         \textcolor{gray}{3} &EndoSfMLearner \citep{Ozyoruk_MIA_2021})& 0.160 & 0.038 & 0,102 & 0,295 & 0.590 \\ \cline{2-2}
+%         \textcolor{gray}{4} &AF-SfMLearner \citep{Shao_MIA_2022})& \underline{0.108} & \underline{0,007} & \underline{0.046} & \textbf{0.136} & \underline{0.882} \\
+%         \textcolor{gray}{5} &MonoII - (proposed model, $1^{st}$ configuration) & 0.115 & 0.009 & \underline{0,052} & 0.142 & 0.846 \\
+%         \textcolor{gray}{6} &MonoIIT - (proposed model, $2^{nd}$ configuration) & \textbf{0.105} & \textbf{0.006} & \textbf{0,044} & \underline{0.139} & 0.874 \\
+%         \hline
+%     \end{tabular}
+%     }
+%     \caption{Generalization tests on the SERV-CT dataset. The best and second-best results obtained for each of the five metrics are respectively written in bold and underlined.}
+%     \label{tab:quant_serv}
+% \end{table*}
+
+\begin{table*}[h]
+\centering
+%\resizebox{\textwidth}{!}{%
+\begin{tabular}{clccccccc}
+\toprule
+\textcolor{gray}{Line} & Method & $\varepsilon_\text{AbsRel}$↓ & 
+        $\varepsilon_\text{SqRel}$↓ & 
+        $\varepsilon_\text{RMSE}$↓ & 
+        $\varepsilon_\text{RMSELog}$↓ & 
+        $\delta_{1.25}$↑ & $\delta_{1.25^2}$↑ & 
+        $\delta_{1.25^3}$↑ \\
+\midrule
+\textcolor{gray}{1} &Monodepth2     & 0.342 & 5.242 & 14.632 & 0.415 & 0.393 & 0.696 & 0.885 \\
+\textcolor{gray}{2} &MonoViT        & 0.281 & 3.953 & 13.015 & 0.354 & 0.465 & 0.770 & 0.942 \\
+\textcolor{gray}{3} &EndoSfMLearner & 0.468 & 9.879 & 17.398 & 0.524 & 0.337 & 0.602 & 0.786 \\
+\textcolor{gray}{4} &AF-SfMLearner  & 0.360 & 6.105 & 15.197 & 0.432 & 0.397 & 0.688 & 0.856 \\
+\textcolor{gray}{5} &MonoPCC        & 0.356 & 5.466 & 14.809 & 0.425 & 0.366 & 0.664 & 0.894 \\
+\textcolor{gray}{6} &EndoDAC        & 0.267 & 3.273 & \textbf{11.194} & 0.321 & 0.519 & \textbf{0.841} & 0.950 \\
+\textcolor{gray}{7} &HADepth        & \underline{0.234} & \underline{3.052} & 12.080 & \textbf{0.312} & \textbf{0.555} & \underline{0.835} & \textbf{0.963} \\
+\midrule
+\textcolor{gray}{8} & \textcolor{black}{MonoII (Proposed)} & 0.293 & 4.905 & 15.215 & 0.394 & 0.466 & 0.743 & 0.888 \\
+\textcolor{gray}{9} &MonoIIT (Proposed) & 0.259 & 3.490 & 12.162 & 0.326 & 0.510 & 0.811 & 0.953 \\
+\textcolor{gray}{10} &MonoIIF (Proposed) & \textbf{0.226} & \textbf{3.043} & \underline{12.030} & \textbf{0.312} & \underline{0.534} & \underline{0.835} & \textbf{0.963} \\
+\bottomrule
+\end{tabular}
+%}
+\caption{Generalization results on the C3VD dataset. 
+Models trained on SCARED. Best and second-best 
+per metric in \textbf{bold} and \underline{underlined}; tied best values share the bold. \textcolor{black}{The proposed models correspond to a single training run and the comparison methods to the authors' released checkpoints; metrics are pooled over all test frames.}}
+\label{tab:quant_c3vd}
+\end{table*}
+
+%%%%
+\begin{table*}[t]
+\centering
+\color{red}
+\caption{\textcolor{red}{Isolated contribution of the two illumination components on the generalization datasets (inference only, models trained on SCARED). $\Delta$ is the paired difference in $\varepsilon_\textrm{AbsRel}$ between two configurations that differ only in the component, (with the component) $-$ (without it): a \textbf{negative} value means that the component helps. CI: 95\% cluster bootstrap interval; $k/n$: units in which the component lowers $\varepsilon_\textrm{AbsRel}$. Units: blocks of 100 consecutive frames of sequence rectified14 for Hamlyn ($n=58$) and scenes for C3VD ($n=7$, with the exact two-sided Wilcoxon signed-rank $p$); same evaluation pipeline as Table~\ref{tab:paired-c1}. $\mathcal{L}_\textrm{II}$ is weighted by $\lambda_1=0.5$. Seeds: training seeds averaged with/without the component. Bold: interval excluding zero. $^{\dagger}$Both configurations use a spatially varying affine calibration field restricted to a first-order polynomial of the pixel coordinates. $^{\ddagger}$Single training seed; both configurations are trained from random initialization with the highlight-aware photometric term, and $\mathcal{L}_\textrm{II}$ is weighted by $\lambda_1=0.1$.}}
+\label{tab:components-crossdomain}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l rcc rccc c}
+\toprule
+ & \multicolumn{3}{c}{Hamlyn} & \multicolumn{4}{c}{C3VD} & \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-8}
+Component isolated & \multicolumn{1}{c}{$\Delta$} & 95\% CI & $k/n$ & \multicolumn{1}{c}{$\Delta$} & 95\% CI & $k/n$ & $p$ & Seeds \\
+\midrule
+\multicolumn{9}{l}{\emph{Depth~Anything $+$ DV-LoRA encoder (MonoIIF)}} \\
+\quad Lighting calibration alone & $\mathbf{+0.0029}$ & $[+0.0014,\ +0.0045]$ & 18/58 & $\mathbf{-0.0260}$ & $[-0.0358,\ -0.0160]$ & 7/7 & 0.016 & 3/3 \\
+\quad $\mathcal{L}_\textrm{II}$ added to the calibration$^{\dagger}$ & $\mathbf{+0.0022}$ & $[+0.0006,\ +0.0039]$ & 24/58 & $-0.0034$ & $[-0.0106,\ +0.0046]$ & 4/7 & 0.375 & 3/3 \\
+\midrule
+\multicolumn{9}{l}{\emph{ResNet-18 encoder (MonoII)}} \\
+\quad Lighting calibration alone & $\mathbf{-0.0073}$ & $[-0.0099,\ -0.0048]$ & 45/58 & $\mathbf{+0.0214}$ & $[+0.0142,\ +0.0289]$ & 0/7 & 0.016 & 1/3 \\
+\quad $\mathcal{L}_\textrm{II}$ alone & $\mathbf{-0.0066}$ & $[-0.0101,\ -0.0033]$ & 36/58 & $+0.0084$ & $[0.0000,\ +0.0160]$ & 2/7 & 0.109 & 3/3 \\
+\quad Calibration $+$ $\mathcal{L}_\textrm{II}$ (MonoII) & $-0.0007$ & $[-0.0046,\ +0.0033]$ & 28/58 & $\mathbf{+0.0100}$ & $[+0.0051,\ +0.0149]$ & 0/7 & 0.016 & 3/3 \\
+\midrule
+\multicolumn{9}{l}{\emph{MPViT-S encoder (MonoIIT)}} \\
+\quad Calibration $+$ $\mathcal{L}_\textrm{II}$$^{\ddagger}$ & $\mathbf{-0.0214}$ & $[-0.0268,\ -0.0159]$ & 50/58 & $\mathbf{+0.0094}$ & $[+0.0011,\ +0.0160]$ & 1/7 & 0.078 & 1/1 \\
+\midrule
+\quad $\mathcal{L}_\textrm{II}$ ($\lambda_1=0.1$) added to MonoIIF & $-0.0015$ & $[-0.0029,\ +0.0001]$ & 38/58 & $\mathbf{+0.0170}$ & $[+0.0072,\ +0.0273]$ & 1/7 & 0.031 & 3/3 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+%%%%
+\begin{table*}[t]
+\centering
+\caption{\textcolor{black}{Uncertainty and paired comparisons for the methods of Tables~\ref{tab:quant_scared}--\ref{tab:quant_c3vd}. The unit of analysis is the video sequence: $n=7$ for SCARED and C3VD, and $n=4$ for Hamlyn (rectified06, 08, 11 and~14). Column~3 gives each method's Abs Rel with a 95\% cluster bootstrap confidence interval over those units (10\,000 draws). Column~4 gives the mean paired difference (method $-$ MonoIIF) over the same units, computed before rounding and signed so that a positive value means MonoIIF is better, with its own bootstrap interval; $k/n$ counts the units in which MonoIIF is better. The exact two-sided Wilcoxon signed-rank $p$ is also given; its smallest attainable value is $2/2^{7}=0.016$ for $n=7$ and $2/2^{4}=0.125$ for $n=4$, so no family-wise correction across a table of this size can reach significance, and these comparisons are exploratory. With four sequences, the bootstrap intervals of Hamlyn rely on only $4^4=256$ distinct resamples and are unreliable; the Hamlyn comparisons are therefore descriptive. In column~3 the best value per dataset is in bold and the second best underlined; tied best values share the bold and no underline is assigned. In column~4 paired differences whose interval excludes zero are in bold. MonoIIF is the mean of three training seeds and the comparison methods are the authors' released checkpoints; because each unit is given the same weight and MonoIIF is averaged over three seeds, the Abs Rel values differ slightly from those of Tables~\ref{tab:quant_scared}--\ref{tab:quant_c3vd}, which correspond to a single training run and pool over all test frames; for Hamlyn they differ markedly, since Table~\ref{tab:quant_hamlyn} is computed on sequence rectified14 only. On C3VD, the test scenes are strongly unbalanced (t1\_b alone holds 40\% of the frames), so that pooling weights each scene by its length, whereas this table gives each scene equal weight; the two orderings can differ where the accuracy of a method on the longest scene is atypical.}}
+\label{tab:paired-c1}
+\small
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Method & Abs Rel [95\% CI] & $\Delta$ vs MonoIIF [95\% CI] & $k/n$ & exact $p$ \\
+\midrule
+\multirow{6}{*}{SCARED}
+ & HADepth            & \textbf{0.0489} $[0.0398, 0.0569]$    & $-0.0008$ $[-0.0053, +0.0026]$          & 4/7   & 0.938 \\
+ & MonoIIF (proposed) & \underline{0.0497} $[0.0400, 0.0594]$ & ---                                     & ---   & ---   \\
+ & MonoPCC            & 0.0505 $[0.0396, 0.0591]$             & $+0.0008$ $[-0.0057, +0.0063]$          & 4/7   & 0.688 \\
+ & EndoDAC            & 0.0507 $[0.0401, 0.0607]$             & $+0.0011$ $[-0.0036, +0.0058]$          & 4/7   & 0.688 \\
+ & AF-SfMLearner      & 0.0584 $[0.0446, 0.0724]$             & $\mathbf{+0.0087}$ $[+0.0018, +0.0160]$ & 6/7   & 0.078 \\
+ & Monodepth2         & 0.0933 $[0.0750, 0.1104]$             & $\mathbf{+0.0436}$ $[+0.0287, +0.0598]$ & 7/7   & 0.016 \\
+\midrule
+% Hamlyn: 4 sequence(s), unit = sequence, n = 4, reference = MonoIIF_published
+\multirow{6}{*}{Hamlyn}
+ & EndoDAC            & \textbf{0.0904} $[0.0477, 0.1366]$    & $-0.0027$ $[-0.0069, +0.0016]$          & 2/4   & 0.625 \\
+ & MonoIIF (proposed) & \underline{0.0931} $[0.0546, 0.1366]$ & ---                                     & ---   & ---   \\
+ & HADepth            & 0.0934 $[0.0549, 0.1394]$             & $+0.0004$ $[-0.0034, +0.0042]$          & 2/4   & 0.875 \\
+ & MonoPCC            & 0.1042 $[0.0645, 0.1523]$             & $\mathbf{+0.0112}$ $[+0.0056, +0.0167]$ & 4/4   & 0.125 \\
+ & AF-SfMLearner      & 0.1106 $[0.0655, 0.1636]$             & $\mathbf{+0.0176}$ $[+0.0065, +0.0286]$ & 4/4   & 0.125 \\
+ & Monodepth2         & 0.1392 $[0.0866, 0.2016]$             & $\mathbf{+0.0461}$ $[+0.0292, +0.0630]$ & 4/4   & 0.125 \\
+\midrule
+\multirow{6}{*}{C3VD}
+ & HADepth            & \textbf{0.2213} $[0.2019, 0.2419]$    & $\mathbf{-0.0296}$ $[-0.0494, -0.0105]$ & 1/7   & 0.031 \\
+ & MonoIIF (proposed) & \underline{0.2509} $[0.2319, 0.2716]$ & ---                                     & ---   & ---   \\
+ & EndoDAC            & 0.2568 $[0.2215, 0.2938]$             & $+0.0059$ $[-0.0189, +0.0285]$          & 5/7   & 0.812 \\
+ & AF-SfMLearner      & 0.3356 $[0.2822, 0.3839]$             & $\mathbf{+0.0847}$ $[+0.0298, +0.1360]$ & 5/7   & 0.078 \\
+ & Monodepth2         & 0.3419 $[0.2948, 0.3775]$             & $\mathbf{+0.0910}$ $[+0.0505, +0.1224]$ & 6/7   & 0.031 \\
+ & MonoPCC            & 0.3568 $[0.3184, 0.3865]$             & $\mathbf{+0.1059}$ $[+0.0731, +0.1329]$ & 7/7   & 0.016 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+%%%%%
+
+
+Table~\ref{tab:quant_scared} shows that models can be grouped into three categories. The first category (Monodepth2, MonoViT, EndoSfMLearner) relies on brightness constancy or simple global illumination models and performs poorly under the strong photometric variations of endoscopic imaging. The second category (AF-SfMLearner, MonoII, MonoIIT) employs illumination-aware strategies and achieves substantially better accuracy, with MonoIIT outperforming AF-SfMLearner on \textcolor{black}{all seven accuracy criteria} despite requiring no external optical flow subnetwork and less than half the training time (5h\,1m vs.\ 10h\,6m). The third category (EndoDAC, HADepth, MonoPCC, MonoIIF) leverages foundation model pretraining or contrastive regularization. \textcolor{black}{ Within this category, MonoIIF obtains values close to those of HADepth (best on $\varepsilon_\text{AbsRel}$) and slightly lower errors than EndoDAC on the four error criteria, while training in 12h\,8m compared to over 25 hours for both HADepth and EndoDAC. These differences are, however, smaller than the seed-to-seed variability of MonoIIF, and the paired analysis of Table~\ref{tab:paired-c1} \textcolor{red}{detects no significant difference between MonoIIF and HADepth, MonoPCC or EndoDAC on SCARED;} the main practical advantage of MonoIIF on in-domain data is therefore its lower training cost.}
+
+%
+\subsubsection{Generalization tests}
+%
+
+The ten models trained on the SCARED dataset using the training-test data split given in  Table~\ref{tab:quant_scared}, were used to estimate the depth values of the Hamlyn and C3VD datasets in order to assess their generalization capabilities. The results of these generalization tests are presented in Tables~\ref{tab:quant_hamlyn} and \ref{tab:quant_c3vd} for the Hamlyn and C3VD datasets, respectively.
+
+
+Tables~\ref{tab:quant_hamlyn} and~\ref{tab:quant_c3vd} report generalization results on the Hamlyn and C3VD datasets, for which no fine-tuning was performed. The overall ranking trends observed on SCARED are preserved: flow-based and illumination-aware methods outperform brightness-constancy baselines, and foundation model-based approaches achieve the highest accuracy. 
+\textcolor{black}{On sequence rectified14 (Table~\ref{tab:quant_hamlyn}),} MonoIIF achieves the best performance across most metrics, surpassing HADepth on $\varepsilon_\text{AbsRel}$ (0.159 vs.\ 0.162), $\varepsilon_\text{SqRel}$ (4.155 vs.\ 4.432), $\varepsilon_\text{RMSE}$ (13.680 vs.\ 14.071), and $\varepsilon_\text{RMSELog}$ (0.214 vs.\ 0.217), while also improving $\delta_{1.25^2}$ (0.930 vs.\ 0.926) and equalling it on $\delta_{1.25^3}$ (0.976). \textcolor{black}{HADepth, however, retains the best $\delta_{1.25}$ (0.769 vs.\ 0.764). On the four Hamlyn sequences of Table~\ref{tab:paired-c1}, EndoDAC obtains a slightly lower $\varepsilon_\textrm{AbsRel}$ than MonoIIF and HADepth a slightly higher one, although neither difference can be distinguished from zero.
+On C3VD, MonoIIF obtains the lowest $\varepsilon_\textrm{AbsRel}$ (0.226) and $\varepsilon_\textrm{SqRel}$ (3.043), and ties HADepth on $\varepsilon_\textrm{RMSELog}$ and $\delta_{1.25^3}$. EndoDAC, however, obtains the lowest $\varepsilon_\textrm{RMSE}$ (11.194 vs.\ 12.030) and the highest $\delta_{1.25^2}$ (0.841 vs.\ 0.835), and HADepth the highest $\delta_{1.25}$ (0.555 vs.\ 0.534). MonoIIF is therefore the most accurate method on the relative error criteria of Table~\ref{tab:quant_c3vd}, but not on every criterion; moreover, when the seven C3VD scenes are given equal weight (Table~\ref{tab:paired-c1}), HADepth is more accurate than MonoIIF in six of them.}
+\textcolor{black}
+{\noindent{\bf Generalization of the lightweight variants.}
+The two lightweight variants behave very differently outside the training domain. On Hamlyn, MonoII (ResNet-18, 2h\,6m of training) ties HADepth on $\varepsilon_\textrm{AbsRel}$ (0.162), outperforms it on $\varepsilon_\textrm{SqRel}$ (4.216 vs.\ 4.432) and $\varepsilon_\textrm{RMSE}$ (13.873 vs.\ 14.071), and ranks second only to MonoIIF on these two criteria, whereas HADepth requires 26h\,13m of training. Conversely, MonoIIT, which was more accurate than MonoII on SCARED ($\varepsilon_\textrm{AbsRel}$ of 0.055 vs.\ 0.058), drops to 0.188 on Hamlyn, a value close to that of MonoViT (0.195), from which its architecture derives. One possible explanation for this reversal is that the MPViT-S model fits the appearance of SCARED more closely than the ResNet-18 model, at the expense of transfer to a new acquisition setup.
+On C3VD, the order of the two variants is inverted again: MonoIIT ($\varepsilon_\textrm{AbsRel}=0.259$) outperforms MonoII (0.293), which nevertheless remains more accurate than Monodepth2, MonoPCC, AF-SfMLearner and EndoSfMLearner. C3VD differs from SCARED not only in illumination but also in geometry (tubular colon, working distances up to 300\,mm) and surface texture, so that encoder capacity and pretraining matter more than on Hamlyn, whose porcine laparoscopic scenes are closer to the training data. MonoIIF obtains the lowest $\varepsilon_\textrm{AbsRel}$ on both generalization datasets in Tables~\ref{tab:quant_hamlyn} and~\ref{tab:quant_c3vd}, but these margins do not hold in the paired analysis of Table~\ref{tab:paired-c1}: on the four Hamlyn sequences it is slightly behind EndoDAC and level with HADepth, and on C3VD HADepth is more accurate than MonoIIF in six of the seven scenes, while MonoIIF and EndoDAC cannot be distinguished. \textcolor{red}{No significant difference is therefore detected between MonoIIF and the best competing methods on Hamlyn, nor between MonoIIF and EndoDAC on C3VD, where HADepth is more accurate.}}
+
+\textcolor{red}{\noindent{ Isolated contribution of the illumination components outside the training domain.} Table~\ref{tab:components-crossdomain} isolates the two illumination components on Hamlyn and C3VD, by inference only, with models trained on SCARED: each row compares two configurations that differ only in the component considered. With the foundation encoder, the dense lighting calibration lowers $\varepsilon_\textrm{AbsRel}$ on C3VD in all seven scenes ($-0.0260$), but slightly raises it on Hamlyn ($+0.0029$, improvement in 18 of the 58 units). The loss $\mathcal{L}_\textrm{II}$ with $\lambda_1=0.5$ brings no measurable benefit with this encoder: the error is slightly higher on Hamlyn ($+0.0022$), and the difference on C3VD ($-0.0034$, four of seven scenes) is not significant. With the ResNet-18 encoder, each component used alone lowers the error on Hamlyn ($-0.0073$ for the calibration and $-0.0066$ for $\mathcal{L}_\textrm{II}$) but not on C3VD, where the calibration alone increases it ($+0.0214$); when the two components are combined (MonoII), the difference with respect to the same network trained without them is not significant on Hamlyn ($-0.0007$) and unfavourable on C3VD ($+0.0100$). With the MPViT-S encoder (a single training seed), the two components combined lower the error on Hamlyn ($-0.0214$, 50 of the 58 units) but raise it on C3VD ($+0.0094$, improvement in one of the seven scenes). The cross-domain benefit of the illumination components is therefore not consistent: it depends on the encoder and on the nature of the domain shift, the clearest gain being that of the lighting calibration on C3VD with the foundation encoder.}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\linewidth]{MonoIIF - SCARED.png}
+    \caption{Absolute relative error maps for five test images of the SCARED dataset (porcine abdominal 
+cavity). The first column shows the input images with regions of interest (ROIs) highlighted by red dashed 
+boxes. The remaining columns show the $\varepsilon_{\text{AbsRel}}$ error maps for Endo-SfM, Monodepth2, MonoViT, AF-SfM, MonoIIT, MonoPCC, EndoDAC, HADepth, and MonoIIF, respectively. The OpenCV Jet colormap is used for visualization: blue indicates low error (accurate predictions) and red indicates high error. \textcolor{red}{In these five examples, MonoIIF produces low errors in the ROI regions, particularly} in areas affected by specular 
+reflections and illumination gradients (rows 1 and 4), and in scenes with surgical instruments (row 1) and 
+tissue folds with low contrast (rows 3 and 5).\label{fig:qual_scared}}
+\end{figure*}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\linewidth]{MonoIIF - Hamlyn & C3VD.png}
+    \caption{Absolute relative error maps for generalization test images from the Hamlyn dataset (rows 1--2) and the C3VD dataset (rows 3--4). All models were trained exclusively on SCARED. The first column shows input images with ROIs highlighted by red dashed boxes; remaining columns show $\varepsilon_{\text{AbsRel}}$ error maps for Endo-SfM, Monodepth2, MonoViT, AF-SfM, MonoIIT, MonoPCC, EndoDAC, HADepth, and MonoIIF, respectively (Jet colormap: blue = low error, red = high error). In the Hamlyn rows, early methods (columns 2--4) exhibit high error concentrated in the specular highlight regions visible in the ROIs, while MonoIIF (last column) substantially reduces this error. In the C3VD rows, the tubular geometry and uniform mucosal texture present a strong generalization challenge; \textcolor{red}{in the two examples shown, the error maps of MonoIIF are among the most uniform, although HADepth is more accurate on this dataset as a whole (Table~\ref{tab:paired-c1}).}\label{fig:qual_gen}} 
+\end{figure*}
+%
+\textcolor{black}
+{\noindent{\bf Statistical reliability of the comparisons.}
+The values of Table~\ref{tab:paired-c1} differ slightly from those of Tables~\ref{tab:quant_scared}--\ref{tab:quant_c3vd} because each test sequence is given the same weight and MonoIIF is averaged over three training seeds rather than obtained from a single run, and, for Hamlyn, because Table~\ref{tab:paired-c1} covers four sequences whereas Table~\ref{tab:quant_hamlyn} covers rectified14 only.
+Since the differences between the best methods are small compared with the variability between test sequences, Table~\ref{tab:paired-c1} reports them with the video sequence as the unit of analysis. On SCARED, HADepth, MonoIIF, MonoPCC and EndoDAC lie within 0.002 of each other in $\varepsilon_\textrm{AbsRel}$; all paired intervals with respect to MonoIIF include zero, and MonoIIF is better in only four of the seven sequences against each of these methods, so they cannot be distinguished on this dataset. Only AF-SfMLearner and Monodepth2 are reliably less accurate than MonoIIF.
+On the four Hamlyn sequences, EndoDAC obtains a slightly lower error than MonoIIF ($-0.0027$, $[-0.0069, +0.0016]$) and HADepth a slightly higher one ($+0.0004$, $[-0.0034, +0.0042]$), but neither difference can be distinguished from zero, whereas MonoPCC, AF-SfMLearner and Monodepth2 are less accurate than MonoIIF in all four sequences.}
+
+On C3VD, HADepth is more accurate than MonoIIF ($-0.0296$, $[-0.0494, -0.0105]$, in six of the seven scenes, $p=0.031$), MonoIIF and EndoDAC cannot be distinguished ($+0.0059$, $[-0.0189, +0.0285]$), and MonoIIF is more accurate than AF-SfMLearner, Monodepth2 and MonoPCC.
+In summary, in terms of $\varepsilon_\textrm{AbsRel}$, \textcolor{red}{no significant difference is detected between MonoIIF and EndoDAC on the three datasets, nor between MonoIIF and HADepth on SCARED and Hamlyn, whereas} HADepth is more accurate on C3VD; MonoIIF requires less than half of the training time of either method. With seven sequences the smallest attainable exact $p$ is 0.016, and with four sequences 0.125, so these comparisons should be read as exploratory; confirming the smaller differences would require a larger number of test sequences.
+
+%
+\subsection{Qualitative results}
+\subsubsection{Absolute relative error map comparison}
+
+Figures~\ref{fig:qual_scared} and~\ref{fig:qual_gen} present $\varepsilon_{\text{AbsRel}}$ error maps for 
+all compared methods, visualized using the Jet colormap (blue: low error; red: high error). Regions of interest delineated by red dashed boxes in the input images (first columns) correspond to areas with challenging illumination conditions, tissue fold boundaries, or specular highlights.
+
+
+On the SCARED dataset (see Fig.~\ref{fig:qual_scared}), three categories of performances are clearly visible. 
+Methods in the first category (Endo-SfM, Monodepth2 and MonoViT) exhibit large red regions throughout the error maps, with particularly high errors concentrated in overexposed zones and near depth discontinuities 
+at tissue fold edges. This confirms that brightness constancy assumptions and standard transformer blocks alone are insufficient to handle the photometric complexity of endoscopic imaging. AF-SfMLearner and MonoIIT represent the second category: their error maps show substantially reduced red regions, with the ROI areas exhibiting improved accuracy compared to the first category. However, residual high-error patches remain in regions with specular reflections or with low-contrasted tissue surfaces (see rows~3 and~5), suggesting that appearance-flow-based illumination handling and transformer architectures still struggle with severe local photometric perturbations. MonoPCC, EndoDAC, HADepth, and MonoIIF form the third category, with largely blue error maps across all five test images. \textcolor{red}{In these examples, MonoIIF produces uniformly low-error maps, with the ROI} close-up regions showing finer structural detail and fewer residual red patches than HADepth in rows~1 and~4, where specular highlights and surgical instrument boundaries coexist with illumination gradients.
+
+On the generalization datasets (see Fig.~\ref{fig:qual_gen}), \textcolor{red}{the differences between the three categories of methods remain visible.} In the Hamlyn rows (see rows~1--2), the input images contain dark backgrounds with strong specular reflections, a photometric artifact not seen during SCARED training. Methods from the first category produce error maps dominated by red, indicating near-complete failure to generalize. AF-SfMLearner partially recovers structure, but high errors persist in the specular regions highlighted by the ROI boxes. \textcolor{red}{In the two Hamlyn examples, MonoIIF produces mostly blue error maps in these regions; these examples alone do not allow this behaviour to be attributed to a particular component of the model.} 
+
+In the C3VD rows (see rows~3--4 of  Fig.~\ref{fig:qual_gen}), the challenge shifts to the tubular geometry and texturally homogeneous mucosal surface of the colon. Most methods produce error maps with visible boundary artifacts and  depth discontinuities misaligned with the actual anatomical curvature. \textcolor{red}{In the two examples shown, MonoIIF gives a uniform error distribution, with smooth transitions that follow the tubular structure of the colon wall. These examples are illustrative: over the whole C3VD dataset, HADepth is more accurate than MonoIIF, and no significant difference is detected between MonoIIF and EndoDAC (Table~\ref{tab:paired-c1}).}
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width = \linewidth]{3D.png}
+    \caption{Surface reconstruction results for two images of the HAMLYN dataset (abdominal cavity of a pig). The first row shows reconstruction results for image 1 of sequence ``Test1'', while the surfaces in the second row were obtained for image 1 of sequence ``Test17''. The column in the middle gives the surfaces reconstructed with the ground truth depths. This surface acts as a visual reference. The surfaces in the left column were determined with the depth maps provided by the HADepth  model, while the results in the right column were obtained with the depth maps computed using MonoIIF.}
+    \label{Fig:3D_Single}
+\end{figure*}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width = \linewidth]{3D_10Frames.PNG}
+    \caption{3D mosaicing result. The surfaces were constructed using images 1 to 10 of sequence 20 from the HAMLYN dataset (porcine abdominal cavity). The central column gives the ground truth surface acting as visual reference. The surfaces in the left and right columns were determined with the depth maps respectively provided by the HADepth and MonoIIF models. \label{Fig:3D10_HAMLYM}}
+\end{figure*}
+
+\subsection{Surface construction}
+\label{sec:surface}
+
+
+\textcolor{red}{The depth maps produced by a model for an image can also be inspected visually by using them to determine the 3D shape of a meshed surface carrying the textures seen in the image. The aim of this section is not to measure the accuracy of the reconstructed surfaces, but to visually check the continuity of their textures and the presence of geometric discontinuities.}
+
+\subsubsection*{Surface construction principle}
+
+The method used for this 3D image construction follows the approach described in \citep{Recasens_IEEERAL_2021}. It begins by representing the surface to be reconstructed on a discrete voxel grid, where each voxel stores a weighted signed distance to the nearest surface point corresponding to the predicted depth. This representation, known as the truncated signed distance function (TSDF), encodes the surface geometry by maintaining a running average of signed distances, effectively filtering out noise and ensuring smooth reconstructions. In the case of 3D image mosaicing, the TSDF is incrementally updated by integrating depth predictions from successive viewpoints, allowing for an extended surface estimation. An important step of this 
+method is associated with the selection of key-frames, which are reference images within the endoscopic sequence that provide reliable depth information and serve as anchors for reconstruction. Depth predictions from successive frames are fused into the TSDF volume, progressively refining the surface representation. 
+Finally, the marching cubes algorithm \citep{Lorensen_SIGGRAPH_1987} is employed to extract a polygonal mesh from the TSDF, yielding the final 3D reconstructed surface. No global surface correction algorithm was applied to the meshed output, so as to preserve the direct impact of depth prediction accuracy on surface quality.
+
+\subsubsection*{Surface construction tests with a single image}
+\textcolor{red}{The reconstructed 3D textured surfaces can be visually compared with the surfaces obtained with the ground truth depths, shown} in the central column of 
+Fig.~\ref{Fig:3D_Single}. The left column shows surfaces reconstructed using HADepth depth maps, while the right column shows those obtained with MonoIIF.
+
+In the first row (sequence ``Test1''), HADepth produces a surface with noticeable staircase aliasing artifacts along the lower and lateral edges, and the tissue fold 
+in the center appears somewhat flattened relative to the ground truth. \textcolor{red}{In this example, the surface obtained with MonoIIF shows smoother depth transitions at the fold boundaries, and the shape of the fold is visually closer to that of the ground truth surface.}
+
+The difference is more pronounced in the second row (sequence ``Test17''). HADepth introduces severe comb-like geometric artifacts along the lower edge of the surface, \textcolor{red}{which suggests that the depth predictions in this region contain errors that propagate into the mesh. In this example, the reconstruction obtained with MonoIIF is visually cleaner: the lower edge is free of such discontinuities, the global shape is visually closer to that of the ground truth surface, and the texture of the mucosal surface remains visually coherent, without bleeding artifacts near specular highlights.}
+
+
+\subsubsection*{3D mosaicing test with a sequence of 
+10 images}
+Fig.~\ref{Fig:3D10_HAMLYM} shows 3D mosaics constructed from the ground truth depth values and from the depth maps predicted by HADepth and MonoIIF, respectively, using images~1 to~10 of sequence~20 from the Hamlyn dataset. The ground truth mosaic (central column) exhibits some discontinuities in its lower portion due to the limitations of the TSDF fusion algorithm without global bundle adjustment, but serves as an appropriate visual reference for evaluating predicted depth quality.
+
+The HADepth mosaic (left column) exhibits pronounced geometric discontinuities, most visibly as a large step-like misalignment in the lower-left region of the surface where adjacent depth predictions fail to register correctly. The overexposed region near the center of the mosaic also correlates with surface distortions, \textcolor{red}{which may indicate that the depth estimates of HADepth in this photometrically degraded area are less suited to multi-frame fusion.} These per-frame errors accumulate as surface patches are placed in a common coordinate system, amplifying the geometric inconsistencies in the final mosaic.
+
+\textcolor{red}{In this example, the MonoIIF mosaic (right column) shows fewer geometric discontinuities and a visually coherent texture.} The surface patches align more consistently across viewpoints, the lower region that was problematic for HADepth shows markedly fewer discontinuities, and the overexposed area is handled more gracefully with less surface distortion. While the MonoIIF mosaic 
+still exhibits minor imperfections inherent to the TSDF-based fusion without global optimization, \textcolor{red}{the individual surface patches obtained with MonoIIF in this sequence appear to be a suitable input for downstream 3D cartography algorithms.}
+
+These 3D surface reconstruction results underscore an important limitation of standard depth evaluation metrics: the pixelwise error criteria reported in Table~\ref{tab:quant_scared} and Table~\ref{tab:quant_hamlyn} are based on one-dimensional magnitude differences between predicted and ground truth depth values. 
+When constructing extended 3D surfaces, the geometric coherence of depth maps across viewpoints becomes critical, and small per-pixel errors can accumulate into significant surface artifacts during multi-frame fusion. \textcolor{red}{The examples of Figs.~\ref{Fig:3D_Single} and~\ref{Fig:3D10_HAMLYM} therefore illustrate a property that the pixelwise criteria do not measure, namely the continuity of the textures and of the geometry of the reconstructed surfaces. They are visual illustrations on a few images and not a quantitative comparison: they do not establish that the surfaces obtained with MonoIIF are more accurate than those obtained with HADepth, and the observed differences cannot be attributed to a particular component of the model.}
+%
+\section{Discussion and further works}
+\label{sec:discussion_and_futher_work}
+%
+\textcolor{black}
+{
+The quantitative results of Section~\ref{sec:Experimental-Results} show that \textcolor{red}{no significant difference is detected between MonoIIF and EndoDAC on the three datasets, nor between MonoIIF and HADepth on SCARED and Hamlyn, whereas} HADepth is more accurate on C3VD (Table~\ref{tab:paired-c1}). According to the isolated ablation of Table~\ref{tab:components-isolated-scared}, this accuracy stems mainly from (i) the pretrained geometric priors of the Depth Anything foundation model, adapted to the endoscopic domain via DVLoRA, and to a lesser extent from (ii) the dedicated lighting calibration module improving the efficiency of the photometric loss $\mathcal{L}_\text{PML}$ (primary signal for self-supervision), and (iii) the illumination-invariant loss $\mathcal{L}_\text{II}$, acting as a secondary self-supervision signal that is robust to local brightness and contrast changes.}
+Importantly, MonoIIF achieves \textcolor{black}{competitive} accuracy compared to HADepth and EndoDAC while training in 12h\,8m on a single A100 GPU, less than half the training time of either competing foundation model baseline.
+\textcolor{black}
+{\paragraph{Cross-dataset generalization.}
+The three datasets differ in the domain shift they introduce with respect to the SCARED training data. Hamlyn keeps an abdominal laparoscopic scene but changes the acquisition setup and the photometric conditions, with dark backgrounds and strong specular reflections (Fig.~\ref{fig:qual_gen}), so that the shift is mainly photometric. C3VD adds a geometric shift to the photometric one: a tubular colon phantom with texturally homogeneous mucosa, specular highlights, and working distances up to 300\,mm, over which the distance-dependent fall-off of the endoscope light produces strongly non-uniform illumination. \textcolor{red}{The illumination components were isolated directly on these two datasets in Table~\ref{tab:components-crossdomain}, which shows no consistent cross-domain benefit. This direct analysis can be complemented by comparing each proposed variant with the published method closest to it.} Three observations follow. First, with respect to brightness-constancy methods sharing the same depth network, the advantage of the proposed variants is preserved on all datasets but does not grow with the shift: the $\varepsilon_\textrm{AbsRel}$ of MonoII is 38\%, 28\% and 14\% lower than that of Monodepth2 on SCARED, Hamlyn (rectified14) and C3VD, and that of MonoIIT is 24\%, 4\% and 8\% lower than that of MonoViT, the change of geometry and depth range becoming the dominant source of error outside the training domain. Second, for lightweight encoders, the illumination-invariant supervision is associated with better transfer: MonoII and AF-SfMLearner, which handles illumination through appearance flow, differ by 2\% on SCARED, whereas the error of MonoII is 11\% and 19\% lower on Hamlyn and C3VD, and MonoII matches HADepth on sequence rectified14. Third, with a foundation encoder, no such benefit can be measured: MonoIIF and EndoDAC, which adapts a Depth~Anything encoder with a similar low-rank strategy but without illumination handling, cannot be distinguished on any of the three datasets, and HADepth, which explicitly accounts for specular highlights, is more accurate than MonoIIF on C3VD (Table~\ref{tab:paired-c1}), the dataset in which highlights and non-uniform illumination are most pronounced. These results indicate that the transferability of MonoIIF stems mainly from the pretrained geometric priors of the foundation encoder. The illumination-invariant supervision provides a measurable transfer benefit for lightweight encoders but, once such priors are available, its contribution under domain shift cannot be distinguished from that of a comparable adaptation without it. This evidence remains indirect, since the compared methods also differ in training details. \textcolor{red}{It is consistent with the direct contrasts of Table~\ref{tab:components-crossdomain}, in which $\mathcal{L}_\textrm{II}$ brings no measurable benefit with the foundation encoder, whereas the lighting calibration improves the transfer to C3VD.}}
+
+%
+HADepth ranks among the best-performing models in the quantitative results of Section~\ref{sec:Experimental-Results}. \textcolor{red}{However, in the examples of Section~\ref{sec:surface}, the surfaces reconstructed with the depth maps of HADepth and of MonoIIF differ visually.} The quantitative analysis provided in Section~\ref{sec:Experimental-Results} is mandatory (it is a current practice of the depth prediction community), but not sufficient. In fact, the criteria in Table~\ref{tab:metrics} are based on one-dimensional information, i.e., a magnitude difference between a ground truth and a predicted depth value. When accurate extended 3D surfaces have to be constructed, it is necessary to assess precise point positions in a 3D space (either a depth and two angles, or three-point coordinates). \textcolor{red}{This may explain why differences between the surfaces obtained with MonoIIF and with HADepth are visible in the examples of Section~\ref{sec:surface}, whereas the quantitative criteria do not separate the two methods on Hamlyn. A quantitative evaluation of the reconstructed surfaces, which was not the aim of this work, would be required to confirm this observation.}
+%
+A key practical advantage of the proposed framework lies in its training efficiency. AF-SfMLearner requires a two-phase training procedure optical flow pretraining followed by full pipeline fine-tuning totaling over 10 hours, and introduces a dependency on an external pretrained optical flow subnetwork. EndoDAC and HADepth, despite achieving strong accuracy through foundation model pretraining, require over 25 hours of training each. By contrast, MonoIIF completes training in 12h\,8m while achieving \textcolor{red}{an accuracy that is not significantly different from theirs on SCARED and Hamlyn}, and MonoIIT trains in only 5h\,1m. The single-phase end-to-end training of all three proposed variants eliminates the need for external pretrained subnetworks and simplifies hyperparameter tuning, making the proposed framework particularly suitable for research settings with limited computational resources.
+%
+Concerning the surface construction method evaluated in this contribution, several limitations remain both at the depth estimation level and at the 3D mosaicing stage. On the one hand, in strongly under- or overexposed image regions it is difficult to predict or correct illumination changes between two viewpoints, and the predicted depths in such regions are often inaccurate. On the other hand, using too many consecutive images without sufficient viewpoint diversity for the same surface part tends to produce 3D mosaics with geometrical and color discontinuities in the extended field-of-view map.
+%
+\paragraph{Depth prediction improvements.}
+Vector fields geometrically linking the homologous pixels of source $I_s$ and target $I_t$ could be used to further improve self-supervised depth prediction. The AF-SfMLearner~\citep{Shao_MIA_2022} first predicts optical flow fields to link homologous pixels geometrically, then uses this relationship to determine the appearance flow that feeds a brightness change calibration module. However, the flow fields in that approach are predicted by a network whose accuracy remains affected by strong and complex illumination changes, limiting both the flow field vector accuracy and the possible displacement magnitude of homologous pixels, as reflected in the depth error effects visible in \textcolor{red}{Figs.~\ref{fig:qual_scared} and~\ref{fig:qual_gen}.} A more principled solution would be to minimize the effects of illumination changes during the flow field estimation itself, and then use the resulting illumination-robust flow to make synthesized images $\hat{I}_t$ and target images $I_t$ more comparable. 
+%
+
+The deterministic optical flow methods proposed in~\citep{Trinh_CVIU_2019} and~\citep{Weibel_PR_2012} can provide accurate flow fields for complex scenes and large endoscope movements, even for images with almost no textures and under strong illumination changes. Such flow fields could either be used directly to align $I_t$ and $\hat{I}_t$ without prediction, or serve as ground truths in a supervised training phase to obtain precise flow predictions under large displacements and weak texture conditions.
+
+\textcolor{black}{
+Replacing the Robinson's kernels by other kernels to make images $\hat{I}_t$ and $I_t$ more comparable in loss $\mathcal{L}_{\textrm{II}}$ under strong illumination changes could also be solution to improve the results. However, tests made in \citep{Trinh_CVIU_2019} have shown that using $3\times 3$ kernels with simply other derivative coefficients (e.g., as the Kirch or Scharr kernels) will not improve the perception of small star shaped intensity variations, even if the corresponding descriptors are illumination invariant. It was even shown in \citep{Daul2026SPIE} that increasing the derivative filter size to $5\times 5$ pixels has almost no impact on the efficiency of the corresponding descriptors. However, in \citep{Daul2026SPIE} the kernels with increased size were not used to obtain descriptors with more than eight components (i.e., eight derivative directions). Other tests with filters that enable the computation of derivatives in more directions could lead to larger descriptor vectors able to encode finer intensity variations. Canny operators (directed derivatives of Gaussian functions) with various standard deviations will be tested in future work.}        
+%
+\paragraph{3D image mosaicing improvements.}
+
+Geometrical discontinuities on 3D surfaces can be minimized by selecting a small number of images acquired from sufficiently different viewpoints (most often non-consecutive images in the video-sequence) and using them to recover a gapless organ surface. Incremental or global bundle adjustment methods, analogous to those used in structure from motion, can then simultaneously correct the camera poses and minimize surface discontinuities. Such algorithms are effective when surface parts are seen from multiple viewpoints and when different image groups reconstruct overlapping surface regions, as detailed in~\citep{Phan_PR_2020}. 
+These optimization techniques can operate in real-time when accurate depth maps and camera pose estimates are available as initial conditions a prerequisite \textcolor{red}{to which the proposed framework aims to contribute.}
+%
+\section{Conclusion\label{sec:conclusions}}
+
+\textcolor{red}{This contribution proposes a self-supervised framework that integrates an illumination-invariant loss and a per-pixel lighting calibration mechanism into three depth estimation architectures (CNN, hybrid CNN--transformer and adapted foundation model), all trained end-to-end in a single run and without auxiliary pretrained subnetworks. On recognized benchmarks of the depth prediction community, the foundation-model variant, MonoIIF, reaches the accuracy level of the strongest foundation-model baselines: no significant difference with HADepth and EndoDAC is detected on SCARED and Hamlyn, HADepth remaining more accurate on C3VD, while MonoIIF requires less than half of their training time. MonoIIF is also more accurate than the flow-based and brightness-constancy methods on the two generalization datasets, and the lightweight MonoII variant, trained in about two hours, reaches on the Hamlyn sequence of Table~\ref{tab:quant_hamlyn} an accuracy close to that of the best foundation-model baseline. Most of the accuracy of MonoIIF comes from the pretrained encoder and its adaptation; the illumination components act as a refinement, whose clearest effect is the improved transfer to colonoscopic scenes brought by the lighting calibration (all seven C3VD scenes). The depth maps led to reconstructions of endoscopic surfaces whose textures and geometry are visually coherent in the examples shown, which makes the framework a promising and computationally affordable basis for 3D cartography in endoscopy.} Improvements can still be obtained by complementing the illumination change prediction and correction with geometrical information provided by illumination invariant optical flow methods. Accurate and robust depth map and camera pose estimators are an important prerequisite to develop 3D mosaicing algorithms for complex scenes. The depth map prediction approach described in this contribution can still be improved and be a part of a global algorithm for extended 3D field of view construction methods, not only usable in endoscopy, but also in other applications with complex scenes.  
+
+
+\section*{Acknowledgments}
+
+The authors wish to acknowledge the Mexican Council for Science and Technology (CONAHCYT) and Campus France for their support in terms of postgraduate scholarships in this project, particularly through the PhD scholarship under the dossier number 2021-000011-01EXTF-00022. This work has been supported by Azure Sponsorship credits granted by Microsoft’s AI for Good Research Lab through the AI for Health program. We wish to thank Data Science Hub at Tecnológico de Monterrey for making this possible. The project was also supported by the French-Mexican Ecos-Nord grant  322537/M22M01.CH
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Loading bibliography style file
+\bibliographystyle{cas-model2-names}
+
+% Loading bibliography database
+\bibliography{cas-refs_new}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
+

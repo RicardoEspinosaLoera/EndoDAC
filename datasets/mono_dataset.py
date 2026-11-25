@@ -61,10 +61,10 @@ class MonoDataset(data.Dataset):
         self.loader = pil_loader
         self.to_tensor = transforms.ToTensor()
 
-        # When False (the default, and what every run of the CVIU grid was trained with) the
-        # colour jitter is re-sampled per frame, so the frames of one item get *different*
-        # augmentations -- see _sample_color_aug. The trainer sets this from
-        # --color_aug_consistent.
+        # When False (what every run trained before 2026-11-25 used) the colour jitter is
+        # re-sampled per frame, so the frames of one item get *different* augmentations -- see
+        # _sample_color_aug. The trainer sets this from --color_aug_consistent, whose default
+        # is now True; this attribute only matters for a dataset built outside the trainer.
         self.consistent_color_aug = False
 
 
@@ -217,12 +217,9 @@ class MonoDataset(data.Dataset):
 
         if do_color_aug:
             if self.consistent_color_aug:
-                try:
-                    color_aug = self._sample_color_aug()
-                except Exception:
-                    # never fail training over an augmentation: fall back to the legacy path
-                    color_aug = transforms.ColorJitter(
-                        self.brightness, self.contrast, self.saturation, self.hue)
+                # no fallback to transforms.ColorJitter here: that is the per-frame jitter this
+                # flag exists to remove, and a silent fallback would bring it back unnoticed
+                color_aug = self._sample_color_aug()
             else:
                 color_aug = transforms.ColorJitter(self.brightness,self.contrast,self.saturation,self.hue)
         else:

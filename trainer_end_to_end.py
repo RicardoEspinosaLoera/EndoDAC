@@ -802,7 +802,13 @@ class Trainer:
                     # automask-valid and non-specular (3x3 erosion of the joint mask).
                     iif_mask = get_feature_oclution_mask(reprojection_loss_mask * highlight_mask)
                     iif_coverage += iif_mask.mean().detach()
-                    loss_ilumination_invariant += (self.get_illumination_invariant_loss(pred, features_t=features_t) * iif_mask).sum() / (iif_mask.sum() + 1e-6)
+                    # On the RAW warp, not on the calibrated one. The descriptor is invariant to
+                    # a constant (c, b) only; the local calibration field varies over a few
+                    # pixels, so on `color_refined` the lighting head could lower this loss by
+                    # itself, without the depth moving (audit of 2026-11-25: with the geometry
+                    # fixed, optimising the field alone took it from 0.257 to 0.063).
+                    loss_ilumination_invariant += (self.get_illumination_invariant_loss(
+                        outputs[("color", frame_id, scale)], features_t=features_t) * iif_mask).sum() / (iif_mask.sum() + 1e-6)
 
                 if self.opt.calib_supervision > 0 and "lighting" in self.models:
                     # supervise the calibration with the affine pair that best explains the warp:

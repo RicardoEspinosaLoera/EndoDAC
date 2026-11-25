@@ -19,15 +19,15 @@ METHODS = [("HADepth", "HADepth"), ("MonoPCC", "MonoPCC"), ("EndoDAC_MICCAI", "E
            ("AF_SfMLearner", "AF-SfMLearner"), ("Monodepth2", "Monodepth2")]
 
 
-def load(path, dataset, wanted):
-    """(method, seed, sequence) -> mean abs_rel, dropping frames with no valid ground truth."""
+def load(path, dataset, wanted, metric="abs_rel"):
+    """(method, seed, sequence) -> mean of `metric`, dropping frames with no valid ground truth."""
     acc = collections.defaultdict(list)
     with open(path, newline="") as f:
         for r in csv.DictReader(f):
             if r["dataset"] != dataset or r["method"] not in wanted:
                 continue
             try:
-                v = float(r["abs_rel"])
+                v = float(r[metric])
             except ValueError:
                 continue
             if v != v:

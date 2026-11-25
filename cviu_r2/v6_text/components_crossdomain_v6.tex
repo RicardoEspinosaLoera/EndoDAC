@@ -1,0 +1,24 @@
+\begin{table*}[t]
+\centering
+\color{red}
+\caption{\textcolor{red}{Isolated contribution of the two illumination components on the generalization datasets (inference only, models trained on SCARED). $\Delta$ is the paired difference in $\varepsilon_\textrm{AbsRel}$ between two configurations that differ only in the component, (with the component) $-$ (without it): a \textbf{negative} value means that the component helps. CI: 95\% cluster bootstrap interval; $k/n$: units in which the component lowers $\varepsilon_\textrm{AbsRel}$. Units: the rectified sequences of Table~\ref{tab:paired-c1} for Hamlyn ($n=4$) and scenes for C3VD ($n=7$, with the exact two-sided Wilcoxon signed-rank $p$); same evaluation pipeline as Table~\ref{tab:paired-c1}. With four sequences, the Hamlyn intervals are only indicative. $\mathcal{L}_\textrm{II}$ is weighted by $\lambda_1=0.5$. Seeds: training seeds averaged with/without the component. Bold: interval excluding zero. $^{\dagger}$Both configurations use a spatially varying affine calibration field restricted to a first-order polynomial of the pixel coordinates.}}
+\label{tab:components-crossdomain}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l rcc rccc c}
+\toprule
+ & \multicolumn{3}{c}{Hamlyn} & \multicolumn{4}{c}{C3VD} & \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-8}
+Component isolated & \multicolumn{1}{c}{$\Delta$} & 95\% CI & $k/n$ & \multicolumn{1}{c}{$\Delta$} & 95\% CI & $k/n$ & $p$ & Seeds \\
+\midrule
+\multicolumn{9}{l}{\emph{Depth~Anything $+$ DV-LoRA encoder (MonoIIF)}} \\
+\quad Lighting calibration alone & $+0.0002$ & $[-0.0033,\ +0.0037]$ & 2/4 & $\mathbf{-0.0260}$ & $[-0.0358,\ -0.0162]$ & 7/7 & 0.016 & 3/3 \\
+\quad $\mathcal{L}_\textrm{II}$ added to the calibration$^{\dagger}$ & $+0.0001$ & $[-0.0020,\ +0.0022]$ & 2/4 & $-0.0034$ & $[-0.0108,\ +0.0047]$ & 4/7 & 0.375 & 3/3 \\
+\midrule
+\multicolumn{9}{l}{\emph{ResNet-18 encoder (MonoII)}} \\
+\quad Lighting calibration alone & $-0.0013$ & $[-0.0045,\ +0.0023]$ & 3/4 & $\mathbf{+0.0149}$ & $[+0.0107,\ +0.0201]$ & 0/7 & 0.016 & 3/3 \\
+\quad $\mathcal{L}_\textrm{II}$ alone & $-0.0012$ & $[-0.0053,\ +0.0029]$ & 2/4 & $+0.0084$ & $[-0.0003,\ +0.0160]$ & 2/7 & 0.109 & 3/3 \\
+\quad Calibration $+$ $\mathcal{L}_\textrm{II}$ (MonoII) & $-0.0017$ & $[-0.0043,\ +0.0010]$ & 3/4 & $\mathbf{+0.0100}$ & $[+0.0051,\ +0.0149]$ & 0/7 & 0.016 & 3/3 \\
+\bottomrule
+\end{tabular}
+\end{table*}

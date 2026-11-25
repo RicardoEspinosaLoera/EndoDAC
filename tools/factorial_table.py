@@ -30,9 +30,21 @@ DESIGNS = {
     "local": {(0, 0, 0): "E3", (0, 0, 1): "E6", (0, 1, 0): "E5", (0, 1, 1): "C0",
               (1, 0, 0): "E4", (1, 0, 1): "E8-IIF", (1, 1, 0): "E7", (1, 1, 1): "E8"},
 }
-CALIB = {"deg2": "basis, degree 2", "deg2-reuse": "basis, degree 2", "local": "dense map"}
+# the T9-grid of cviu_revision.py: the same factorial with the dense map on each depth network,
+# all cells from one commit at three seeds
+_T9 = {(0, 0, 0): "base", (0, 0, 1): "hl", (0, 1, 0): "ii", (0, 1, 1): "ii-hl",
+       (1, 0, 0): "cal", (1, 0, 1): "cal-hl", (1, 1, 0): "cal-ii", (1, 1, 1): "full"}
+for _bb in ("da", "res", "vit"):
+    DESIGNS["t9-" + _bb] = {k: "t9-%s-%s" % (_bb, v) for k, v in _T9.items()}
+BACKBONE = collections.defaultdict(
+    lambda: r"the EndoDAC backbone (Depth~Anything v1 $+$ DV-LoRA $+$ convolutional neck)",
+    {"t9-res": "the ResNet-18 depth network",
+     "t9-vit": "the MPViT-small depth network (ImageNet initialization)"})
+CALIB = {"deg2": "basis, degree 2", "deg2-reuse": "basis, degree 2", "local": "dense map",
+         "t9-da": "dense map", "t9-res": "dense map", "t9-vit": "dense map"}
 # Robinson directions the II cells were trained with
-DIRECTIONS = {"deg2": "eight", "deg2-reuse": "eight", "local": "four"}
+DIRECTIONS = {"deg2": "eight", "deg2-reuse": "eight", "local": "four",
+              "t9-da": "eight", "t9-res": "eight", "t9-vit": "eight"}
 REFS = [("E3", "EndoDAC (retrained)"), ("C1", "global calib. + II + highlight"),
         ("E8-IIF", "dense calib. + highlight, no II"), ("HADepth", "HADepth"),
         ("EndoDAC_MICCAI", "EndoDAC (released)")]
@@ -96,8 +108,8 @@ def main():
     print()
     print(r"\begin{table}[t]")
     print(r"\centering")
-    print(r"\caption{Factorial ablation of the photometric components on the EndoDAC backbone "
-          r"(Depth~Anything v1 $+$ DV-LoRA $+$ convolutional neck): illumination calibration (%s), "
+    print(r"\caption{Factorial ablation of the photometric components on " + BACKBONE[a.design] +
+          r": illumination calibration (%s), "
           r"illumination-invariant loss $\mathcal{L}_\textrm{II}$ ($\lambda_1=0.1$, %s Robinson "
           r"directions) and the highlight-aware photometric term. Abs Rel averaged within each test "
           r"sequence, then across sequences and training seeds; best per column in bold, second "
@@ -149,7 +161,7 @@ def main():
             (r"calib. $\times$ $\mathcal{L}_\textrm{II}$", lambda V: interaction(V, "C", "I")),
             (r"calib. $\times$ highlight", lambda V: interaction(V, "C", "H")),
             (r"$\mathcal{L}_\textrm{II}$ $\times$ highlight", lambda V: interaction(V, "I", "H")),
-            ("all three vs none (full $-$ EndoDAC)", lambda V: V[(1, 1, 1)] - V[(0, 0, 0)])]
+            ("all three vs none (full $-$ plain network)", lambda V: V[(1, 1, 1)] - V[(0, 0, 0)])]
     print()
     print(r"\begin{table}[t]")
     print(r"\centering")

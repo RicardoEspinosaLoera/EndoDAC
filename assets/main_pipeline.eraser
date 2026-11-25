@@ -1,0 +1,50 @@
+// Training pipeline overview (Eraser remake of assets/main.jpg)
+// How to use: in Eraser open a file, click the "</>" Diagram-as-code button
+// (or Insert > Diagram as code), pick "Flow chart", paste this text.
+
+direction right
+colorMode bold
+styleMode plain
+typeface clean
+
+// ---------- Input frames ----------
+Is [label: "Source frame I_s", shape: document, icon: image, color: gray]
+It [label: "Target frame I_t", shape: document, icon: image, color: gray]
+
+// ---------- Networks ----------
+DepthNet [label: "Transformer-based Depth Estimation", icon: layers, color: "#3F4C60"]
+PoseNet [label: "CNN-based Pose Estimation", icon: cpu, color: "#ED7D31"]
+LightNet [label: "Light Change Estimation", shape: trapezoid, icon: sun, color: "#4472C4"]
+
+// ---------- Predicted quantities ----------
+D [label: "Depth map D", shape: parallelogram, color: purple]
+Pose [label: "Camera pose", shape: hexagon, icon: camera, color: "#8497B0"]
+LightMaps [label: "Light change maps", color: "#4472C4"] {
+  Brightness [shape: parallelogram, color: gray]
+  Contrast [shape: parallelogram, color: gray]
+}
+
+// ---------- View synthesis ----------
+Reproj [label: "Reprojection ⊗", shape: diamond]
+ItHat [label: "Warped frame Î_t", shape: document, icon: image, color: gray]
+LIT [label: "Light Intensity Transformation", color: "#4472C4"]
+ItRefined [label: "Refined frame Î_t refined", shape: document, icon: image, color: "#4472C4"]
+
+// ---------- Losses ----------
+LossPMS [label: "Loss L_PMS", shape: oval, icon: target, color: "#70AD47"]
+LossII [label: "Loss L_II", shape: oval, icon: target, color: "#4472C4"]
+
+// ---------- Data flow ----------
+Is > DepthNet
+Is, It > PoseNet
+DepthNet > D
+PoseNet > Pose
+PoseNet > LightNet
+LightNet > Brightness, Contrast
+D, Pose > Reproj
+Reproj > ItHat
+ItHat > LIT
+Brightness, Contrast > LIT
+LIT > ItRefined
+ItRefined, It > LossPMS
+ItHat, It > LossII

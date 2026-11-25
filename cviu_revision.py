@@ -10,6 +10,9 @@ Stages (each is idempotent: finished work is skipped unless --force is given):
   illum-params  statistics of the learned (c, b) calibration maps of a trained run
   illum-sens    response of the calibration to synthetic gain/bias, and depth robustness to it
   illum-grad    how much gradient each loss term gives to the illumination calibration
+  depth-grad    gradient of the photometric and II terms w.r.t. the disparity map: size and cosine
+  strata        Abs Rel by photometric class (highlight, halo, dark) and depth range, from the
+                disparities saved by predict -> strata.csv
   da3           zero-shot Depth Anything 3 rows
   stats         sequence-level aggregation, bootstrap CIs, paired tests, LaTeX tables
   report        markdown report and figures
@@ -129,6 +132,8 @@ DEFAULT_CONFIG = {
               # is flattened by clipping rather than by the module ignoring illumination
               "sens_stride": 5, "gains": [0.95, 0.975, 1.0, 1.025, 1.05],
               "biases": [-0.03, -0.015, 0.0, 0.015, 0.03]},
+    # strata: V below dark_v is "dark"; the halo of a highlight is halo_frac of the image width
+    "strata": {"dark_v": 0.15, "halo_frac": 0.02},
     "stats": {"n_boot": 10000, "alpha": 0.05, "paired_metrics": ["abs_rel", "sq_rel", "rmse", "a1"],
               "table_methods": None},
 }
@@ -492,6 +497,58 @@ GRID = {
     "N0": {"group": "D", "desc": "MonoIIF with a randomly initialised encoder (no foundation weights)",
            "flags": "--backbone_weights none"},
 }
+
+# T9-grid (2026-11-25): every run behind Tables 5 and 9 of the round-2 manuscript, retrained from
+# one commit at three seeds. One 2x2x2 factorial per depth network: dense local calibration x
+# II loss (lambda1 = 0.1, eight Robinson directions) x highlight-aware photometric term. The
+# flags are spelled out so that a later change of the defaults of options.py cannot move a cell.
+# The earlier runs these replace mix seed counts (E5, E6, E7, cal0-local and the MPViT rows have
+# one) and lambda1 (0.5 on ResNet-18, 0.1 elsewhere), which is why their contrasts could not be
+# laid side by side. (E5 and C0 used four Robinson directions; under --iif_loss l2 that is the
+# same loss as eight, since kernels 5-8 are the negatives of 1-4.) Before 2026-11-25 the II loss
+# was also computed on the calibrated warp, where the local calibration could absorb it. They were also all
+# trained with the per-frame colour jitter; these cells use the corrected one, so their numbers
+# are not comparable with the earlier grids or with the single-run tables of the manuscript.
+T9_BACKBONES = collections.OrderedDict([
+    ("da", ("Depth Anything + DV-LoRA", "")),
+    ("res", ("ResNet-18", "--depth_backbone resnet18")),
+    # ImageNet-pretrained, as MonoViT is published: the launcher needs
+    # <pretrained_path>/mpvit_small.pth (ensure_mpvit_weights) and skips these cells without it
+    ("vit", ("MPViT-small, ImageNet init", "--depth_backbone monovit")),
+])
+# cell -> (calibration, II loss, highlight term)
+T9_CELLS = collections.OrderedDict([
+    ("base", (0, 0, 0)), ("cal", (1, 0, 0)), ("ii", (0, 1, 0)), ("hl", (0, 0, 1)),
+    ("cal-ii", (1, 1, 0)), ("cal-hl", (1, 0, 1)), ("ii-hl", (0, 1, 1)), ("full", (1, 1, 1)),
+])
+
+
+def t9_flags(backbone_flags, cell):
+    c, i, h = cell
+    return " ".join(x for x in [backbone_flags,
+                                "--illum_calib " + ("local" if c else "none"),
+                                "--illumination_invariant " + ("0.1" if i else "0"),
+                                "--photometric " + ("highlight" if h else "standard"),
+                                # one jitter per item, not one per frame: the defect of section 9
+                                # of CVIU_REVISION_PLAN.md, which every earlier grid was trained with
+                                "--color_aug_consistent True"] if x)
+
+
+for _bb, (_label, _bbflags) in T9_BACKBONES.items():
+    for _cell, _levels in T9_CELLS.items():
+        GRID["t9-{}-{}".format(_bb, _cell)] = {
+            "group": "t9", "multi_seed": True,
+            "desc": "{}: calibration {}, II loss {}, highlight term {}".format(
+                _label, *["on" if x else "off" for x in _levels]),
+            "flags": t9_flags(_bbflags, _levels)}
+# the two rows of Table 5 that are not illumination components
+GRID["t9-da-rand"] = {"group": "t9", "multi_seed": True,
+                      "desc": "t9-da-full with a randomly initialised encoder (pretrained-weights row)",
+                      "flags": "--backbone_weights none " + t9_flags("", (1, 1, 1))}
+GRID["t9-da-nolora"] = {"group": "t9", "multi_seed": True,
+                        "desc": "t9-da-base without the DV-LoRA adapters (DV-LoRA row)",
+                        "flags": "--lora_type none " + t9_flags("", (0, 0, 0))}
+T9_RUNS = [r for r in GRID if GRID[r]["group"] == "t9"]
 ABLATION_ORDER = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E8-IIF", "C0", "C1", "C2-sup",
                   "E8-DVLoRA", "C1-lora", "M-none", "M-global", "M-local",
                   "lam-da-025", "lam-da-100", "lam-da-200", "R1", "R2", "MonoII", "MonoViT", "MonoViT-II",
@@ -665,7 +722,10 @@ def run_seeds(cfg, run):
     disk. The union matters for predict/stats: a run trained with `train --seeds 314 1 2` but not
     listed in multi_seed_runs used to be evaluated at seed 314 only, silently."""
     t = cfg["train"]
-    seeds = list(t["multi_seeds"] if run in t["multi_seed_runs"] else t["seeds"])
+    # a run can also ask for the multi-seed list itself ("multi_seed" in its grid entry), so that
+    # it does not depend on the list of cviu_config.yaml, which replaces the default one
+    multi = run in t["multi_seed_runs"] or all_runs(cfg).get(run, {}).get("multi_seed")
+    seeds = list(t["multi_seeds"] if multi else t["seeds"])
     for d in glob.glob(os.path.join(cfg["log_dir"], run_name(run, "*"), "models")):
         tail = os.path.basename(os.path.dirname(d)).rsplit("_s", 1)[-1]
         if tail.isdigit() and int(tail) not in seeds:
@@ -1895,18 +1955,21 @@ def stage_illum_params(cfg, args):
                      c_edges=c_edges, b_edges=b_edges, alpha=alpha, beta=beta)
 
 
-def illum_loss_terms(refined, target, mask, iif_mask, iif_weight, iif_eps, ssim_map_fn, alpha=0.85):
-    """The loss terms that see the illumination-calibrated warp, as scalars.
+def illum_loss_terms(refined, target, mask, iif_mask, iif_weight, iif_eps, ssim_map_fn, alpha=0.85,
+                     warped=None):
+    """The loss terms of Trainer.compute_losses, as scalars.
 
-    Same formulas as Trainer.compute_losses: alpha*SSIM + (1-alpha)*L1 averaged over the
-    automask-valid non-specular pixels, plus the illumination-invariant term on the eroded mask.
+    alpha*SSIM + (1-alpha)*L1 on the calibrated warp, averaged over the automask-valid
+    non-specular pixels, plus the illumination-invariant term on the eroded mask. Since
+    2026-11-25 the trainer computes that last term on the raw warp: pass it as `warped`. Without
+    it the term is computed on `refined`, which is what every earlier run was trained with.
     """
     from utils.layers import get_illumination_invariant_features, get_illumination_invariant_l2
     denom = mask.sum() + 1e-6
     terms = {"ssim": alpha * (ssim_map_fn(refined, target) * mask).sum() / denom,
              "l1": (1.0 - alpha) * ((refined - target).abs().mean(1, True) * mask).sum() / denom}
     ft = get_illumination_invariant_features(target, eps=iif_eps)
-    fp = get_illumination_invariant_features(refined, eps=iif_eps)
+    fp = get_illumination_invariant_features(refined if warped is None else warped, eps=iif_eps)
     d = get_illumination_invariant_l2(fp, ft)
     terms["iif"] = iif_weight * (d * iif_mask).sum() / (iif_mask.sum() + 1e-6)
     return terms
@@ -2779,9 +2842,256 @@ def stage_report(cfg, args):
 # main
 # --------------------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------------------
+# stage: strata (where the depth error is) and depth-grad (what each loss asks of the depth)
+# --------------------------------------------------------------------------------------
+# Both answer one question: why does the plain network (Depth Anything + DV-LoRA, SSIM + L1)
+# score almost the same as the network trained with the calibration, the II loss and the
+# highlight term? `strata` measures how much of the error lies in the pixels those components
+# act on; `depth-grad` measures whether the II loss asks the depth map for anything the
+# photometric loss does not already ask for.
+
+STRATA_CLASSES = ["highlight", "halo", "dark", "regular"]
+STRATA_DEPTH = ["near", "mid", "far"]
+
+
+def strata_masks(rgb, dark_v, halo_px):
+    """Photometric classes of the pixels of an (h,w,3) image in [0,1], mutually exclusive.
+
+    highlight: HADepth's test with the thresholds of Trainer.get_highlight_mask (S below
+    min(mean S - 0.2, 0.1) and V above max(mean V + 0.2, 0.9)); halo: within halo_px of a
+    highlight; dark: V below dark_v; regular: the rest. Returns ({class: bool map}, V).
+    """
+    import cv2
+    v, mn = rgb.max(2), rgb.min(2)
+    sat = (v - mn) / (v + 1e-6)
+    s_tau = max(min(float(sat.mean()) - 0.2, 0.1), 0.0)
+    v_tau = min(max(float(v.mean()) + 0.2, 0.9), 1.0)
+    hl = (sat < s_tau) & (v > v_tau)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * halo_px + 1, 2 * halo_px + 1))
+    halo = cv2.dilate(hl.astype(np.uint8), k).astype(bool) & ~hl
+    dark = (v < dark_v) & ~hl & ~halo
+    return {"highlight": hl, "halo": halo, "dark": dark, "regular": ~(hl | halo | dark)}, v
+
+
+def strata_frame(rgb, gt, pred, max_depth, dark_v=0.15, halo_frac=0.02):
+    """Abs Rel of one frame split by photometric class and by depth range.
+
+    rgb (h,w,3) in [0,1] and pred (disparity) at any resolution, gt (H,W) in mm. The prediction
+    is resized, median-scaled and capped exactly as in evaluate_prediction, so `abs_rel` equals
+    the value of per_frame.csv. For every class: frac_ (share of the valid pixels), abs_rel_
+    (mean error inside it) and share_ (part of the frame's total error it carries). bias_ is the
+    mean of log(pred/gt), positive when the prediction is too far. slope_v is the coefficient of
+    the image brightness V in the regression log(pred/gt) ~ 1 + V + log(gt): negative when, at
+    equal true depth, brighter pixels are predicted nearer (the brightness shortcut).
+    """
+    import cv2
+    gh, gw = gt.shape[:2]
+    pred = cv2.resize(pred.astype(np.float32), (gw, gh))
+    rgb = cv2.resize(np.ascontiguousarray(rgb, dtype=np.float32), (gw, gh), interpolation=cv2.INTER_LINEAR)
+    valid = np.logical_and(gt > MIN_DEPTH, gt < max_depth)
+    n_valid = int(valid.sum())
+    if n_valid == 0:
+        return None
+    depth = 1.0 / np.clip(pred, 1e-6, None)
+    depth = np.clip(depth * (np.median(gt[valid]) / np.median(depth[valid])), MIN_DEPTH, max_depth)
+    g = np.where(valid, gt, 1.0).astype(np.float64)
+    err = np.abs(g - depth) / g
+    slog = np.log(depth / g)
+    total = float(err[valid].sum())
+    row = {"abs_rel": float(err[valid].mean()), "bias": float(slog[valid].mean())}
+    masks, v = strata_masks(rgb, dark_v, max(1, int(round(halo_frac * gw))))
+    q1, q2 = np.quantile(gt[valid], [1.0 / 3, 2.0 / 3])
+    masks.update({"near": gt <= q1, "mid": (gt > q1) & (gt <= q2), "far": gt > q2})
+    for name in STRATA_CLASSES + STRATA_DEPTH:
+        m = masks[name] & valid
+        n = int(m.sum())
+        row["frac_" + name] = n / float(n_valid)
+        row["abs_rel_" + name] = float(err[m].mean()) if n else float("nan")
+        row["share_" + name] = float(err[m].sum() / total) if n and total > 0 else (0.0 if total > 0 else float("nan"))
+        row["bias_" + name] = float(slog[m].mean()) if n else float("nan")
+    x, y, lg = v[valid].astype(np.float64), slog[valid], np.log(g[valid])
+    row["slope_v"], row["corr_v"] = float("nan"), float("nan")
+    if x.std() > 1e-6 and y.std() > 1e-9:
+        A = np.stack([np.ones_like(x), x, lg], 1)
+        row["slope_v"] = float(np.linalg.lstsq(A, y, rcond=None)[0][1])
+        row["corr_v"] = float(np.corrcoef(x, y)[0, 1])
+    return row
+
+
+def stage_strata(cfg, args):
+    """Abs Rel by photometric class and depth range, from the disparities saved by predict."""
+    path = out_path(cfg, "strata.csv")
+    sc = cfg.get("strata") or {}
+    dark_v, halo_frac = sc.get("dark_v", 0.15), sc.get("halo_frac", 0.02)
+    done = {(r["method"], r["seed"], r["dataset"]) for r in read_csv(path)}
+    keys = ["abs_rel", "bias", "slope_v", "corr_v"] + [
+        "{}_{}".format(k, c) for c in STRATA_CLASSES + STRATA_DEPTH for k in ("frac", "abs_rel", "share", "bias")]
+    fields = ["method", "seed", "dataset", "sequence", "frame"] + keys
+    for ds in (args.datasets or cfg["datasets"]):
+        todo = []
+        for f in sorted(glob.glob(out_path(cfg, "pred", "*_{}.npy".format(ds)))):
+            method, seed = os.path.basename(f)[:-len("_{}.npy".format(ds))].rsplit("_s", 1)
+            if args.only and method not in args.only:
+                continue
+            if (method, seed, ds) in done and not args.force:
+                continue
+            todo.append((method, seed, np.load(f, mmap_mode="r")))
+        if not todo:
+            print("[strata] {}: nothing to do (no saved disparities in {}, or all done)".format(
+                ds, out_path(cfg, "pred")))
+            continue
+        print("[strata] {}: {}".format(ds, ", ".join("{}_s{}".format(m, s) for m, s, _ in todo)))
+        cap = MAX_DEPTH[ds]
+        rows = collections.defaultdict(list)
+        n_frames = 0
+        for i, color, seq, frame, gt in iterate_dataset(cfg, ds):
+            n_frames = i + 1
+            rgb = color[0].permute(1, 2, 0).numpy()
+            for method, seed, arr in todo:
+                if i >= arr.shape[0]:
+                    continue
+                r = strata_frame(rgb, gt, np.asarray(arr[i], dtype=np.float32), cap, dark_v, halo_frac)
+                if r is None:
+                    continue
+                r.update({"method": method, "seed": seed, "dataset": ds, "sequence": seq, "frame": frame})
+                rows[(method, seed)].append(r)
+        for method, seed, arr in todo:
+            rs = rows[(method, seed)]
+            if arr.shape[0] != n_frames:
+                # the saved file is from another copy of the dataset: its rows would be misaligned
+                print("[strata] {}_s{} {}: {} saved disparities for {} frames -- re-run "
+                      "`predict --only {} --datasets {} --force`; NOT written".format(
+                          method, seed, ds, arr.shape[0], n_frames, method, ds))
+                continue
+            with _csv_lock(path):
+                if args.force:
+                    keep = [r for r in read_csv(path)
+                            if not (r["method"] == method and r["seed"] == seed and r["dataset"] == ds)]
+                    write_csv(path, keep, fields)
+                append_rows(path, rs, fields)
+            mean = lambda k: float(np.nanmean([r[k] for r in rs])) if rs else float("nan")
+            print("[strata] {:<22} {:<7} abs_rel={:.4f}  ".format("{}_s{}".format(method, seed), ds, mean("abs_rel")) +
+                  "  ".join("{} {:.1%} of px / {:.1%} of error".format(c, mean("frac_" + c), mean("share_" + c))
+                            for c in STRATA_CLASSES) + "  slope_v={:+.4f}".format(mean("slope_v")))
+    print("[strata] wrote {}; compare runs with e.g. `python tools/paired.py --csv {} --metric "
+          "abs_rel_highlight --ref t9-da-base --runs t9-da-cal t9-da-full`".format(path, path))
+
+
+def depth_grad_terms(disp, source, target, K, T, c, b, warper, ssim, ssim_map_fn, use_highlight, iif_eps):
+    """Gradients of the loss terms with respect to the disparity map, all at unit weight.
+
+    `disp` must require grad. The pose, the intrinsics and the calibration (c, b) are constants.
+    Returns ({'photo': (B,1,H,W), 'iif': (B,1,H,W)}, mask) with photo = 0.85 SSIM + 0.15 L1.
+    """
+    from utils.layers import disp_to_depth, get_feature_oclution_mask
+    depth = disp_to_depth(disp, *DEPTH_RANGE)[1]
+    warped, valid, _ = warper.warp(source, depth, K, torch.inverse(K), T)
+    refined = warped if c is None else c * warped + b
+    with torch.no_grad():
+        automask = (photometric_map(ssim, warped, target) <
+                    photometric_map(ssim, source, target)).to(target.dtype) * valid
+        mask = automask * (1.0 - highlight_mask(target)) if use_highlight else automask
+        iif_mask = get_feature_oclution_mask(mask)
+    terms = illum_loss_terms(refined, target, mask, iif_mask, 1.0, iif_eps, ssim_map_fn, warped=warped)
+    grads = {}
+    for name, term in terms.items():
+        g = torch.autograd.grad(term, disp, retain_graph=True, allow_unused=True)[0]
+        grads[name] = torch.zeros_like(disp) if g is None else g
+    return {"photo": grads["ssim"] + grads["l1"], "iif": grads["iif"]}, mask
+
+
+def stage_depth_grad(cfg, args):
+    """What the II loss asks of the depth map, compared with the photometric loss.
+
+    For a trained run and SCARED test pairs, the gradient of each term with respect to the
+    predicted disparity map (pose and calibration held fixed). Two numbers per pair: the ratio
+    of the gradient norms at the lambda1 the run was trained with (how loud the II loss is next
+    to the photometric loss) and the cosine between the two gradient maps (near 1: the II loss
+    pushes the depth where the photometric loss already pushes it, i.e. it is redundant; near 0:
+    it carries information the photometric loss does not).
+    """
+    from torch.utils.data import DataLoader
+    from datasets.scared_dataset import SCAREDRAWDataset
+    from utils.layers import SSIM, transformation_from_parameters
+    device = device_of(args)
+    ic = cfg["illum"]
+    warper, ssim = Warper(device), SSIM().to(device)
+    try:
+        import kornia
+        def ssim_map_fn(a, b):
+            return kornia.losses.ssim_loss(a, b, window_size=7, reduction="none").mean(1, True)
+    except ImportError:
+        ssim_map_fn = lambda a, b: ssim(a, b).mean(1, True)
+    rows = []
+    for run in (args.only or ic["runs"]):
+        seed = ic["seed"]
+        models = load_run_models(cfg, run, seed, device)
+        opt = models["_opt"]
+        lam = float(opt.get("illumination_invariant", 0.1))
+        use_hl = opt.get("photometric", "highlight") == "highlight"
+        lines = readlines(os.path.join(SPLITS, "test_files.txt"))
+        ds = SCAREDRAWDataset(cfg["data"]["scared"], lines, H, W, [0, -1, 1], 4, is_train=False)
+        loader = DataLoader(ds, 4, shuffle=False, num_workers=cfg["num_workers"], drop_last=True)
+        for bi, batch in enumerate(loader):
+            if bi >= ic.get("grad_batches", 20):
+                break
+            target = batch[("color", 0, 0)].to(device)
+            with torch.no_grad():
+                disp0 = F.interpolate(models["depth"](target)[("disp", 0)], [H, W],
+                                      mode="bilinear", align_corners=True)
+            for f in (-1, 1):
+                source = batch[("color", f, 0)].to(device)
+                with torch.no_grad():
+                    feats = models["pose_encoder"](torch.cat([source, target], 1))
+                    axisangle, translation, inter = models["pose"]([feats])
+                    K = models["intrinsics"](inter, W, H) if "intrinsics" in models else batch[("K", 0)].to(device)
+                    T = transformation_from_parameters(axisangle[:, 0], translation[:, 0])
+                    c = b = None
+                    if "lighting" in models:
+                        out = models["lighting"](feats)
+                        c = F.interpolate(out[("contrast", 0)], [H, W], mode="bilinear", align_corners=False)
+                        b = F.interpolate(out[("brightness", 0)], [H, W], mode="bilinear", align_corners=False)
+                disp = disp0.clone().requires_grad_(True)
+                g, mask = depth_grad_terms(disp, source, target, K, T, c, b, warper, ssim, ssim_map_fn,
+                                           use_hl, opt.get("iif_eps", 1e-4))
+                gp, gi = g["photo"].flatten(1), g["iif"].flatten(1)
+                npo, nii = gp.norm(dim=1), gi.norm(dim=1)
+                cos = (gp * gi).sum(1) / (npo * nii + 1e-20)
+                both = (gp.abs() > 0) & (gi.abs() > 0)
+                rows.append({"run": run, "seed": seed, "batch": bi, "source": f, "lambda1": lam,
+                             "mask_frac": float(mask.mean()),
+                             "norm_photo": float(npo.mean()), "norm_iif_unit": float(nii.mean()),
+                             "ratio_at_lambda": float((lam * nii / (npo + 1e-20)).mean()),
+                             "ratio_at_0.1": float((0.1 * nii / (npo + 1e-20)).mean()),
+                             "cosine": float(cos.mean()),
+                             "sign_agreement": float((torch.sign(gp) == torch.sign(gi))[both].float().mean())
+                             if both.any() else float("nan")})
+        del models
+    if not rows:
+        print("[depth-grad] nothing to measure")
+        return
+    fields = ["run", "seed", "batch", "source"] + sorted(k for k in rows[0] if k not in ("run", "seed", "batch", "source"))
+    path = out_path(cfg, "illum", "depth_grad.csv")
+    old = [r for r in read_csv(path) if r["run"] not in {x["run"] for x in rows}]
+    write_csv(path, old + rows, fields)
+    print("[depth-grad] gradient of each term w.r.t. the disparity map (mean over {} SCARED test batches)".format(
+        ic.get("grad_batches", 20)))
+    print("    {:<16} {:>8} {:>12} {:>14} {:>16} {:>9} {:>10}".format(
+        "run", "lambda1", "|g photo|", "|g II| (x1)", "II/photo at l1", "cosine", "same sign"))
+    for run in sorted({r["run"] for r in rows}):
+        rs = [r for r in rows if r["run"] == run]
+        m = lambda k: float(np.nanmean([r[k] for r in rs]))
+        print("    {:<16} {:>8.3g} {:>12.3e} {:>14.3e} {:>16.3f} {:>9.3f} {:>10.3f}".format(
+            run, rs[0]["lambda1"], m("norm_photo"), m("norm_iif_unit"), m("ratio_at_lambda"),
+            m("cosine"), m("sign_agreement")))
+    print("[depth-grad] wrote {}".format(path))
+
+
 STAGES = {"train": stage_train, "predict": stage_predict, "illum-fit": stage_illum_fit,
           "illum-params": stage_illum_params, "illum-sens": stage_illum_sens,
           "illum-grad": stage_illum_grad, "da3": stage_da3,
+          "strata": stage_strata, "depth-grad": stage_depth_grad,
           "stats": stage_stats, "report": stage_report}
 ALL_ORDER = ["predict", "illum-fit", "illum-params", "illum-sens", "da3", "stats", "report"]
 
