@@ -9,7 +9,7 @@
 # The run can be stopped and relaunched: work already written to per_frame.csv is not redone.
 #
 # What it does
-#   1. evaluates every trained seed of the eight runs of the table on SCARED and C3VD
+#   1. evaluates every trained seed of the runs of the table on SCARED and C3VD
 #      (only what is missing from per_frame.csv, e.g. seeds 1 and 2 of cal0-local);
 #   2. re-evaluates these runs on Hamlyn with every rectified sequence present in the Hamlyn
 #      folder (rectified06/08/11/14), so that the unit of analysis is the sequence; runs whose
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 PY=${PYTHON:-python}
-RUNS="E3 E4 da-bas-1 da-lam-050 R1 cal0-local MonoII-none MonoII"
+RUNS="E3 E4 E5 E7 da-bas-1 da-lam-050 da-lam-010 R1 cal0-local MonoII-none MonoII"
 OUT=results/cviu
 
 test -f cviu_revision.py || { echo "run this from the repository root"; exit 1; }

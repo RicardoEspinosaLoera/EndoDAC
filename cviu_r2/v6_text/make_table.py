@@ -17,12 +17,15 @@ LII = r"$\mathcal{L}_\textrm{II}$"
 BLOCKS = [
     ("Depth~Anything $+$ DV-LoRA encoder (MonoIIF)", [
         ("Lighting calibration alone", "E4", "E3"),
-        (LII + r" added to the calibration$^{\dagger}$", "da-lam-050", "da-bas-1"),
+        (LII + r" ($\lambda_1=0.5$) added to the calibration$^{\dagger}$", "da-lam-050", "da-bas-1"),
+        (LII + r" ($\lambda_1=0.1$) added to the calibration$^{\dagger}$", "da-lam-010", "da-bas-1"),
+        (LII + r" ($\lambda_1=0.1$) added to the dense calibration", "E7", "E4"),
+        (LII + r" ($\lambda_1=0.1$) alone", "E5", "E3"),
     ]),
     ("ResNet-18 encoder (MonoII)", [
         ("Lighting calibration alone", "cal0-local", "R1"),
-        (LII + " alone", "MonoII-none", "R1"),
-        ("Calibration $+$ " + LII + " (MonoII)", "MonoII", "R1"),
+        (LII + r" ($\lambda_1=0.5$) alone", "MonoII-none", "R1"),
+        ("Calibration $+$ " + LII + r" ($\lambda_1=0.5$) (MonoII)", "MonoII", "R1"),
     ]),
 ]
 DATASETS = ["hamlyn", "c3vd"]
@@ -54,13 +57,17 @@ caption = (
     r"CI: 95\% cluster bootstrap interval; $k/n$: units in which the component lowers "
     r"$\varepsilon_\textrm{AbsRel}$. Units: HAMUNIT for "
     r"Hamlyn ($n=NHAM$) and scenes for C3VD ($n=NC3VD$, with the exact two-sided Wilcoxon signed-rank $p$); "
-    r"same evaluation pipeline as Table~\ref{tab:paired-c1}. $\mathcal{L}_\textrm{II}$ is weighted by "
-    r"$\lambda_1=0.5$. Seeds: training seeds averaged with/without the component. Bold: interval excluding "
+    r"same evaluation pipeline as Table~\ref{tab:paired-c1}. "
+    r"Seeds: training seeds averaged with/without the component. Bold: interval excluding "
     r"zero. $^{\dagger}$Both configurations use a spatially varying affine calibration field restricted to a "
     r"first-order polynomial of the pixel coordinates."
 ).replace("NC3VD", str(units["c3vd"][1])).replace("NHAM", str(units["hamlyn"][1])).replace(
     "HAMUNIT", "blocks of 100 consecutive frames of sequence rectified14" if units["hamlyn"][0].startswith("block")
     else "the rectified sequences of Table~\\ref{tab:paired-c1}")
+if not units["hamlyn"][0].startswith("block"):
+    caption = caption.replace("Seeds: training seeds",
+                              "With four sequences, the Hamlyn intervals are only indicative. "
+                              "Seeds: training seeds")
 
 # every run of a contrast must be evaluated on the same Hamlyn units, otherwise the pairing is empty
 for (a, b, ds), c in res.items():
